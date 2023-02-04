@@ -1,3 +1,8 @@
+# CAVEAT
+This repository represents a very pre-alpha experimental attempt at the CI/CD system that I wish I had.
+
+**Be warned** until such times as this starts producing releases, it is completely unusable.  It may never be usable.
+
 # Banner CI/CD
 
 Banner is a CI/CD system.  I know, yet another CI/CD system.  However Banner is different. Some of it's more unique qualities are:
