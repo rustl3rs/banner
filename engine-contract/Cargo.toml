@@ -1,0 +1,15 @@
+[package]
+name = "engine-contract"
+version = "0.0.1"
+authors = ["Paul Saunders <pms1969@gmail.com>"]
+categories = ["CICD"]
+edition = "2021"
+keywords = ["ci", "continuous", "integration", "deployment", "delivery",]
+readme = "README.md"
+repository = "local"
+description = "The contract for Banner engines to conform to."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+chrono = "0.4"

@@ -1,0 +1,14 @@
+[package]
+name = "banner-ci"
+version = "0.0.1"
+authors = ["Paul Saunders <pms1969@gmail.com>"]
+categories = ["CICD"]
+edition = "2021"
+keywords = ["ci", "continuous", "integration", "deployment", "delivery",]
+readme = "README.md"
+repository = "local"
+description = "The Banner CLI. Used to ship pipelines to Banner servers and to run pipelines locally."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
