@@ -14,7 +14,7 @@ pub trait Engine {
     // If I'm a Kubernetes engine, am I actually running in k8s?
     fn confirm_requirements() -> Result<(), Error>;
 
-    // Now's your chance to load pipelines and other state from wherever
+    // Now's your chance to load state from wherever
     // it's stored.  The engine won't be considered ready until this returns
     // successfully; possibly with retries.
     fn initialise() -> Result<(), Error>;
