@@ -187,3 +187,34 @@ on_event: commit.repo == src {
     }
 }
 ```
+
+## Syntactic sugar
+
+A job and a pipeline are merely syntactic sugar around tasks and events, which are the main constructs of Banner.
+
+Consider the example from above:
+```
+[tag: rustl3rs.com/team=platform-team]
+[tag: rustl3rs.com/cost-center=company]
+[tag: rustl3rs.com/notification=slack#banner-alerts]
+job unit-test() [
+    { 
+        get-authors,
+        check-format,
+        build-debug,
+    },
+    test,
+]
+```
+
+This desugars to:
+```
+on_event: job.start[unit-test] {
+    trigger task[get-authors];
+    trigger task[check-format];
+    trigger task[build-debug];
+}
+on_event: task.finished[get-authors], task.finished[check-format], task.finished[build-debug] {
+    trigger task[test];
+}
+```
