@@ -214,6 +214,7 @@ on_event: job.start[unit-test] {
     trigger task[check-format];
     trigger task[build-debug];
 }
+
 on_event: task.finished[get-authors], task.finished[check-format], task.finished[build-debug] {
     trigger task[test];
 }
