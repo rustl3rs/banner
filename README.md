@@ -1,5 +1,5 @@
 # CAVEAT
-This repository represents a very pre-alpha experimental attempt at the CI/CD system that I wish I had.
+This repository represents a very pre-alpha experimental attempt at the CI/CD system that I wish I had. Consider this to be a wish list and a set of goals that would ideally be achieved, instead of something that actually exists.
 
 **Be warned** until such times as this starts producing releases, it is completely unusable.  It may never be usable.
 
@@ -28,6 +28,7 @@ Banner is a CI/CD system.  I know, yet another CI/CD system.  However Banner is 
 [Concourse](https://concourse-ci.org/) is very much an influence on the thinking here.  We like the way that containers are used to isolate work, but feel that there are things that could fundamentally be improved about all CI/CD tools currently available. We've tried to take inspiration from every current CI/CD tool, the best of every world. Hopefully, we'll hit the spot.
 
 Other influences:
+* [Argo CD](https://argo-cd.readthedocs.io/en/stable/)
 * [CircleCI](https://circleci.com/)
 * [Drone](https://www.drone.io/)
 * [GoCD](https://www.gocd.org/)
