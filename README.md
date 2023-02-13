@@ -114,7 +114,7 @@ import https://cdn.rustl3rs.com/banner/common/jobs/prod-gate.ban
 // All `tasks` look a bit like methods that take parameters.  The list of parameters can be found
 // in the docs; which don't exist yet... soz!
 // Pass on additional event data by outputing json on the last line.
-task get-authors(exclude_for: src{branches="feature/*", image: get-authors-image, execute: "/bin/bash -c") {
+task get-authors(exclude_for: src{branches="feature/*"}, image: get-authors-image, execute: "/bin/bash -c") {
     # and this is a bash script!
     # some super lengthy git command to find the authors of the commit(s)
     echo Done!
