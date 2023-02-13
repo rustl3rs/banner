@@ -1,0 +1,15 @@
+version: "3"
+
+services:
+
+  tree-sitter-builder:
+    build: .
+    container_name: tree-sitter-builder
+    image: rustl3rs/tree-sitter-builder
+    environment:
+      - BLAH=1
+    volumes:
+      - ./tree-sitter-banner/:/var/src/
+    command: 
+      - /bin/bash
+      
