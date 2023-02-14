@@ -36,13 +36,13 @@ Other influences:
 * [TeamCity](https://www.jetbrains.com/teamcity/)
 * [Gitlab Actions](https://gitlab.com)
 * [Github Actions](https://github.com)
-
+* [Dagger.io](https://dagger.io); I was directed to this on a [reddit comment](https://www.reddit.com/r/rust/comments/10v0ypk/whats_everyone_working_on_this_week_62023/j7rhyy7/).  While I like what they are trying to do, it doesn't fit much of what I'd like to achieve.
 
 ## Requirements
 
 For local running of pipelines:
 * Docker
-* Banner :)
+* Banner 🙂
 
 For running in the cloud/data-center:
 * Banner server with appropriate engine.
