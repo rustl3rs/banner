@@ -1,0 +1,11 @@
+[package]
+name = "banner-parser"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tree-sitter = "0.20.9"
+tree-sitter-banner = { path = "../tree-sitter/tree-sitter-banner" }
+tree-sitter-traversal = "0.1.2"
