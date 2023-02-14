@@ -11,8 +11,9 @@ you might need to just find your way into the correct directory;
 cd ~/src
 ```
 
-you'll need 2 commands
+you'll need 3 commands
 ```bash
+tree-sitter init-config
 tree-sitter generate
 tree-sitter parse example-file
 ```

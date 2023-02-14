@@ -1,4 +1,4 @@
-use engine_contract::{Engine, Image, TaskDefinition};
+use banner_engine::{Engine, Image, TaskDefinition};
 use local_engine::LocalEngine;
 
 #[tokio::test]
@@ -11,7 +11,7 @@ async fn passes_requirments_check() {
 #[tokio::test]
 #[cfg(feature = "docker")]
 async fn starts_task_with_required_tags() {
-    use engine_contract::{ExecutionResult, Tag};
+    use banner_engine::{ExecutionResult, Tag};
     use std::error::Error;
 
     async fn execute(tags: Vec<Tag>) -> Result<ExecutionResult, Box<dyn Error + Send + Sync>> {
