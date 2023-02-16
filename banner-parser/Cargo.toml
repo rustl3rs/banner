@@ -9,3 +9,4 @@ edition = "2021"
 tree-sitter = "0.20.9"
 tree-sitter-banner = { path = "../tree-sitter/tree-sitter-banner" }
 tree-sitter-traversal = "0.1.2"
+tracing = {workspace = true}

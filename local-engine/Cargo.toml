@@ -18,6 +18,7 @@ bollard = "0.14"
 tokio = {version = "1.25", features = ["test-util", "macros"]}
 async-trait = "*"
 futures-util = "*"
+tracing = {workspace = true}
 
 [features]
 default = ["docker"]

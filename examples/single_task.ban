@@ -1,0 +1,9 @@
+// this task does the unit testing of the app
+task unit-test(image: rustl3rs/banner-rust-build, execute: "/bin/bash -c") {
+    r#####"bash
+    # this is a bash comment  
+    echo rustl3rs herd!
+    # basically a no-op.
+    # But a good start to our testing.
+    "#####
+}

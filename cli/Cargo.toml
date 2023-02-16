@@ -1,5 +1,5 @@
 [package]
-name = "banner-ci"
+name = "banner"
 version = "0.0.1"
 authors = ["Paul Saunders <pms1969@gmail.com>"]
 categories = ["CICD"]
@@ -12,3 +12,7 @@ description = "The Banner CLI. Used to ship pipelines to Banner servers and to r
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+clap = { version = "4.1.4", features = ["derive"] }
+banner-parser = { path = "../banner-parser" }
+tracing-subscriber = "0.3"
+tracing = {workspace = true}
