@@ -1,0 +1,39 @@
+pipeline_definition = {
+    SOI ~ (task_definition)* ~ EOI
+}
+
+task_definition = {
+    "task" ~ identifier ~ parameter_list ~ block
+}
+
+parameter_list = _{
+    "(" ~ "image" ~ ":" ~ image_identifier ~ "," ~ "execute" ~ ":" ~ string_literal ~ ")"
+}
+
+block = _{
+    "{" ~ raw_string ~ "}"
+}
+
+identifier = { (ASCII_ALPHANUMERIC | "_" | "-")+ }
+image_identifier = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ":")+ }
+string_literal = { ("\"" ~ identifier ~ "\"" | raw_string){1} }
+string_content = { identifier* }
+
+// raw strings was taken directly from 
+// https://pest.rs/book/grammars/syntax.html#the-stack-wip
+raw_string = _{
+    "r" ~ PUSH("#"*) ~ "\""    // push the number signs onto the stack
+    ~ raw_string_interior
+    ~ "\"" ~ POP               // match a quotation mark and the number signs
+}
+
+raw_string_interior = {
+    (
+        !("\"" ~ PEEK)    // unless the next character is a quotation mark
+                          // followed by the correct amount of number signs,
+        ~ ANY             // consume one character
+    )*
+}
+
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+COMMENT = _{ "//" ~ (!NEWLINE ~ ANY)* }

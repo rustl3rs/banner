@@ -1,60 +1,61 @@
-use crate::errors;
+use crate::grammar::Rule;
+use pest::Span;
 
-use errors::ParseError;
-use std::{error::Error, fmt::Display};
-use tracing::{debug, span, Level};
-use tree_sitter::Tree;
-use tree_sitter_traversal::{traverse, Order};
-
-#[derive(Debug)]
-pub struct AST {
-    pub(crate) tree: Tree,
-    pub(crate) code: String,
+fn span_into_str(span: Span) -> &str {
+    span.as_str()
 }
 
-impl AST {
-    pub fn new(tree: Tree, code: String) -> Self {
-        Self { tree, code }
-    }
-
-    pub fn print(&self) {
-        let span = span!(Level::DEBUG, "AST");
-        let _enter = span.enter();
-
-        let cursor = traverse(self.tree.walk(), Order::Pre);
-        for node in cursor {
-            debug!("{node:?}");
-        }
-    }
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::identifier))]
+pub struct Identifier {
+    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub image: String,
 }
 
-pub fn validate_pipeline(code: String) -> Result<AST, Box<dyn Error + Send + Sync>> {
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(tree_sitter_banner::language())?;
-    let tree = parser.parse(&code, None).unwrap();
-
-    if tree.root_node().has_error() {
-        Err(Box::new(ParseError::new(
-            String::from("Parsing Errors > 0"),
-            AST::new(tree, code),
-        )))
-    } else {
-        Ok(AST::new(tree, code))
-    }
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::image_identifier))]
+pub struct ImageIdentifier {
+    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub image: String,
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn can_parse_task() {
-        assert!(super::validate_pipeline(String::from("//a test")).is_ok());
-        // assert!(false)
-    }
-
-    #[test]
-    fn can_print_ast() {
-        let ast = super::validate_pipeline(String::from("//a test")).unwrap();
-        ast.print();
-        assert!(true)
-    }
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::string_content))]
+pub struct StringContent {
+    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub content: String,
 }
+
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::raw_string_interior))]
+pub struct RawString {
+    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub content: String,
+}
+
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::string_literal))]
+pub enum StringLiteral {
+    Raw(RawString),
+    String(StringContent),
+}
+
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::task_definition))]
+pub struct Task {
+    pub name: Identifier,
+    pub image_identifier: ImageIdentifier,
+    pub execute_command: StringLiteral,
+    pub script: RawString,
+}
+
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::pipeline_definition))]
+pub struct Pipeline {
+    pub tasks: Vec<Task>,
+    eoi: EOI,
+}
+
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::EOI))]
+struct EOI;

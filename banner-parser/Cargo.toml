@@ -1,12 +1,26 @@
 [package]
 name = "banner-parser"
 version = "0.1.0"
+authors = ["Paul Saunders <pms1969@gmail.com>"]
+categories = ["CICD"]
 edition = "2021"
+keywords = ["ci", "continuous", "integration", "deployment", "delivery",]
+readme = "README.md"
+repository = "local"
+description = "A parser for the Banner DSL."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tree-sitter = "0.20.9"
-tree-sitter-banner = { path = "../tree-sitter/tree-sitter-banner" }
-tree-sitter-traversal = "0.1.2"
+banner-engine = { path = "../banner-engine" }
+rhai =  { version = "1.12.0", features = [ "sync" ] }
 tracing = {workspace = true}
+strum = "0.24.1"
+strum_macros = "0.24.3"
+pest = "2.5.5"
+pest_derive = "2.5.5"
+pest-ast = "0.3.3"
+from-pest = "0.3.1"
+
+[dev-dependencies]
+expect-test = "1.4.0"

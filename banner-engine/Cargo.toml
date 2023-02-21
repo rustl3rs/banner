@@ -12,6 +12,6 @@ description = "The contract for Banner engines to conform to."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-trait = {workspace = true}
 chrono = "0.4"
-async-trait = "*"
 semver = "*"

@@ -12,12 +12,12 @@ description = "A local engine for Banner."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-trait = {workspace = true}
 banner-engine = { path = "../banner-engine" }
-cap-tempfile = "1.0"
 bollard = "0.14"
-tokio = {version = "1.25", features = ["test-util", "macros"]}
-async-trait = "*"
+cap-tempfile = "1.0"
 futures-util = "*"
+tokio = {version = "1.25", features = ["test-util", "macros"]}
 tracing = {workspace = true}
 
 [features]
