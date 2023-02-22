@@ -1,0 +1,15 @@
+[tag: banner.io/pipeline=test]
+[tag: banner.io/job=unit-test]
+[tag: banner.io/task=build]
+[tag: rustl3rs.com/owner=pms1969]
+task unit-test(image: alpine, execute: r#"sh -c"#) {
+    r#####"
+    echo testing....
+    echo testing
+    for i in `seq 1 10`; do 
+        echo $i
+        sleep 1
+    done
+    echo done!
+    "#####
+}

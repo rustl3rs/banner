@@ -13,6 +13,7 @@ extern crate from_pest;
 extern crate pest;
 
 pub fn validate_pipeline(code: String) -> Result<Pipeline, Box<dyn Error + Send + Sync>> {
+    trace!("code = {:#?}", &code);
     let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, &code)?;
     trace!("parse tree = {:#?}", parse_tree);
     let syntax_tree: Pipeline = Pipeline::from_pest(&mut parse_tree).expect("infallible");
@@ -22,13 +23,11 @@ pub fn validate_pipeline(code: String) -> Result<Pipeline, Box<dyn Error + Send 
 
 impl From<Task> for TaskDefinition {
     fn from(value: Task) -> Self {
-        let pipeline_tag = Tag::new(
-            String::from("banner.io/pipeline"),
-            String::from("test-pipeline"),
-        );
-        let job_tag = Tag::new(String::from("banner.io/job"), String::from("test-job"));
-        let task_tag = Tag::new(String::from("banner.io/task"), value.name.name);
-        let tags = vec![pipeline_tag, job_tag, task_tag];
+        let tags = value
+            .tags
+            .into_iter()
+            .map(|t| Tag::new(t.key.content, t.value.content))
+            .collect();
         let image = Image::new(value.image_identifier.image, None);
         let mut command = match value.execute_command {
             ast::StringLiteral::Raw(string) => {
@@ -140,7 +139,9 @@ mod tests {
         }
         "#######;
 
-        check(code, expect![[r#"
+        check(
+            code,
+            expect![[r#"
             Pipeline {
                 tasks: [
                     Task {
@@ -179,6 +180,7 @@ mod tests {
                     },
                 ],
                 eoi: EOI,
-            }"#]])
+            }"#]],
+        )
     }
 }
