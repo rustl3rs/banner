@@ -9,7 +9,7 @@ fn span_into_str(span: Span) -> &str {
 #[pest_ast(rule(Rule::identifier))]
 pub struct Identifier {
     #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
-    pub image: String,
+    pub name: String,
 }
 
 #[derive(Debug, FromPest)]

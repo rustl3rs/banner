@@ -27,16 +27,24 @@ impl From<Task> for TaskDefinition {
             String::from("test-pipeline"),
         );
         let job_tag = Tag::new(String::from("banner.io/job"), String::from("test-job"));
-        let task_tag = Tag::new(String::from("banner.io/task"), String::from("test-task"));
+        let task_tag = Tag::new(String::from("banner.io/task"), value.name.name);
         let tags = vec![pipeline_tag, job_tag, task_tag];
         let image = Image::new(value.image_identifier.image, None);
         let mut command = match value.execute_command {
             ast::StringLiteral::Raw(string) => {
-                let c: Vec<String> = string.content.split(r#" "#).map(|s| s.into()).collect();
+                let c: Vec<String> = string
+                    .content
+                    .split_whitespace()
+                    .map(|s| s.into())
+                    .collect();
                 c
             }
             ast::StringLiteral::String(string) => {
-                let c: Vec<String> = string.content.split(r#"\s"#).map(|s| s.into()).collect();
+                let c: Vec<String> = string
+                    .content
+                    .split_whitespace()
+                    .map(|s| s.into())
+                    .collect();
                 c
             }
         };
@@ -67,11 +75,14 @@ mod tests {
     #[test]
     fn can_parse_comment() {
         let code = String::from("//a test");
-        check(&code, expect![[r#"
+        check(
+            &code,
+            expect![[r#"
             Pipeline {
                 tasks: [],
                 eoi: EOI,
-            }"#]])
+            }"#]],
+        )
     }
 
     #[test]
@@ -85,7 +96,9 @@ mod tests {
         }
         "#######;
 
-        check(code, expect![[r#"
+        check(
+            code,
+            expect![[r#"
             Pipeline {
                 tasks: [
                     Task {
@@ -106,6 +119,7 @@ mod tests {
                     },
                 ],
                 eoi: EOI,
-            }"#]])
+            }"#]],
+        )
     }
 }

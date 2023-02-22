@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use banner_engine::{Engine, ExecutionResult, TaskDefinition};
 use bollard::container::{
-    Config, CreateContainerOptions, ListContainersOptions, RemoveContainerOptions,
+    Config, CreateContainerOptions, ListContainersOptions, LogsOptions, RemoveContainerOptions,
     StartContainerOptions, WaitContainerOptions,
 };
 use bollard::Docker;
@@ -10,6 +10,7 @@ use futures_util::stream::TryStreamExt;
 use std::error::Error;
 use std::fmt::Display;
 use std::marker::{Send, Sync};
+use tracing::debug;
 
 #[derive(Debug)]
 pub struct LocalEngine {}
@@ -75,24 +76,51 @@ impl Engine for LocalEngine {
             }
         }
 
-        // wait for the container to finish running.
-        let wait_options = Some(WaitContainerOptions::<String> {
-            ..Default::default()
-        });
-        match docker
-            .wait_container(&container_name, wait_options)
-            .try_collect::<Vec<_>>()
-            .await
-        {
-            Ok(_) => (),
-            Err(e) => {
-                remove_container(&container_name).await?;
-                return Err(Box::new(e));
-            }
-        }
+        let (_, _) = tokio::join!(
+            stream_logs_from_container_to_stdout(&container_name, &task_name),
+            wait_on_container_exit(&container_name)
+        );
 
         remove_container(&container_name).await?;
         Ok(ExecutionResult::Success(vec![]))
+    }
+}
+
+async fn stream_logs_from_container_to_stdout(
+    container_name: &str,
+    task_name: &str,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let docker = Docker::connect_with_local_defaults().unwrap();
+    // wait for the container to finish running.
+    let options = Some(LogsOptions::<String> {
+        stdout: true,
+        ..Default::default()
+    });
+    let mut logs = docker.logs(container_name, options);
+    if let Some(log) = logs.try_next().await.unwrap() {
+        println!("{task_name}: {log}");
+    }
+
+    Ok(())
+}
+
+async fn wait_on_container_exit(container_name: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let docker = Docker::connect_with_local_defaults().unwrap();
+
+    // wait for the container to finish running.
+    let wait_options = Some(WaitContainerOptions::<String> {
+        ..Default::default()
+    });
+    match docker
+        .wait_container(&container_name, wait_options)
+        .try_collect::<Vec<_>>()
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            remove_container(&container_name).await?;
+            return Err(Box::new(e));
+        }
     }
 }
 

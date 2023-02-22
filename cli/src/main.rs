@@ -1,6 +1,6 @@
 use std::{error::Error, fs, path::PathBuf, process::exit};
 
-use banner_engine::Engine;
+use banner_engine::{Engine, TaskDefinition};
 use banner_parser::parser::validate_pipeline;
 use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
@@ -51,7 +51,14 @@ async fn execute_pipeline(filepath: PathBuf) -> Result<(), Box<dyn Error + Send 
             let engine = LocalEngine::new();
             engine.initialise().await?;
             for task in ast.tasks {
-                debug!("Running Task: {:?}", &task.name);
+                let task: TaskDefinition = task.into();
+                let task_name = task
+                    .tags()
+                    .iter()
+                    .find(|tag| tag.key() == "banner.io/task")
+                    .map(|tag| tag.value())
+                    .unwrap();
+                debug!("Running Task: {task_name}");
                 engine.execute(&task.into()).await?;
             }
             ()
