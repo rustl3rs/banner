@@ -43,10 +43,32 @@ pub enum StringLiteral {
 #[derive(Debug, FromPest)]
 #[pest_ast(rule(Rule::task_definition))]
 pub struct Task {
+    pub tags: Vec<Tag>,
     pub name: Identifier,
     pub image_identifier: ImageIdentifier,
     pub execute_command: StringLiteral,
     pub script: RawString,
+}
+
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::tag_value))]
+pub struct TagValue {
+    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub content: String,
+}
+
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::tag_key))]
+pub struct TagKey {
+    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub content: String,
+}
+
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::tag))]
+pub struct Tag {
+    pub key: TagKey,
+    pub value: TagValue,
 }
 
 #[derive(Debug, FromPest)]

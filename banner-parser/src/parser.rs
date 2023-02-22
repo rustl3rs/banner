@@ -53,9 +53,11 @@ impl From<Task> for TaskDefinition {
         td
     }
 }
+
 #[cfg(test)]
 mod tests {
     use expect_test::{expect, Expect};
+    use tracing_test::traced_test;
 
     use super::*;
 
@@ -85,6 +87,7 @@ mod tests {
         )
     }
 
+    // #[traced_test]
     #[test]
     fn can_parse_task_with_comment() {
         let code = r#######"
@@ -102,8 +105,9 @@ mod tests {
             Pipeline {
                 tasks: [
                     Task {
+                        tags: [],
                         name: Identifier {
-                            image: "unit-test",
+                            name: "unit-test",
                         },
                         image_identifier: ImageIdentifier {
                             image: "rustl3rs/banner-rust-build",
@@ -121,5 +125,60 @@ mod tests {
                 eoi: EOI,
             }"#]],
         )
+    }
+
+    #[traced_test]
+    #[test]
+    fn can_parse_task_with_tag_attribute() {
+        let code = r#######"
+        [tag: banner.io/owner=me]
+        [tag: banner.io/company=rustl3rs]
+        task unit-test(image: rustl3rs/banner-rust-build, execute: r#"/bin/bash -c"#) {
+            r#####"bash
+            echo testing, testing, 1, 2, 3!
+            "#####
+        }
+        "#######;
+
+        check(code, expect![[r#"
+            Pipeline {
+                tasks: [
+                    Task {
+                        tags: [
+                            Tag {
+                                key: TagKey {
+                                    content: "banner.io/owner",
+                                },
+                                value: TagValue {
+                                    content: "me",
+                                },
+                            },
+                            Tag {
+                                key: TagKey {
+                                    content: "banner.io/company",
+                                },
+                                value: TagValue {
+                                    content: "rustl3rs",
+                                },
+                            },
+                        ],
+                        name: Identifier {
+                            name: "unit-test",
+                        },
+                        image_identifier: ImageIdentifier {
+                            image: "rustl3rs/banner-rust-build",
+                        },
+                        execute_command: Raw(
+                            RawString {
+                                content: "/bin/bash -c",
+                            },
+                        ),
+                        script: RawString {
+                            content: "bash\n            echo testing, testing, 1, 2, 3!",
+                        },
+                    },
+                ],
+                eoi: EOI,
+            }"#]])
     }
 }

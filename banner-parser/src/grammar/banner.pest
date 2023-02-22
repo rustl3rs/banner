@@ -3,7 +3,7 @@ pipeline_definition = {
 }
 
 task_definition = {
-    "task" ~ identifier ~ parameter_list ~ block
+    (tag_definition)* ~ "task" ~ identifier ~ parameter_list ~ block
 }
 
 parameter_list = _{
@@ -37,3 +37,9 @@ raw_string_interior = {
 
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 COMMENT = _{ "//" ~ (!NEWLINE ~ ANY)* }
+
+// like: [tag: rustl3rs.com/team=platform-team]
+tag_definition = _{ "[" ~ "tag" ~ ":" ~ tag ~ "]" }
+tag = { tag_key ~ "=" ~ tag_value }
+tag_key = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ".")+ }
+tag_value = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ".")+ }
