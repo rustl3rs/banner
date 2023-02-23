@@ -5,70 +5,98 @@ fn span_into_str(span: Span) -> &str {
     span.as_str()
 }
 
-#[derive(Debug, FromPest)]
-#[pest_ast(rule(Rule::identifier))]
-pub struct Identifier {
-    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
-    pub name: String,
-}
-
-#[derive(Debug, FromPest)]
-#[pest_ast(rule(Rule::image_identifier))]
-pub struct ImageIdentifier {
-    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
-    pub image: String,
-}
-
-#[derive(Debug, FromPest)]
-#[pest_ast(rule(Rule::string_content))]
-pub struct StringContent {
-    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
-    pub content: String,
-}
-
-#[derive(Debug, FromPest)]
-#[pest_ast(rule(Rule::raw_string_interior))]
-pub struct RawString {
-    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
-    pub content: String,
-}
-
-#[derive(Debug, FromPest)]
-#[pest_ast(rule(Rule::string_literal))]
+#[derive(Debug)]
 pub enum StringLiteral {
-    Raw(RawString),
-    String(StringContent),
+    RawString(String),
+    StringLiteral(String),
+}
+
+impl<'a> ::from_pest::FromPest<'a> for StringLiteral {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+    fn from_pest(
+        pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
+    ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
+        if pair.as_rule() == Rule::string_literal {
+            let this = Err(::from_pest::ConversionError::NoMatch)
+                .or_else(|_: ::from_pest::ConversionError<::from_pest::Void>| {
+                    let mut inner = pair.clone().into_inner();
+                    let inner = &mut inner;
+                    let this = StringLiteral::RawString(Result::unwrap(str::parse(span_into_str(
+                        inner
+                            .next()
+                            .ok_or(::from_pest::ConversionError::NoMatch)?
+                            .as_span(),
+                    ))));
+                    if inner.clone().next().is_some() {
+                        {
+                            panic!(
+                                "when converting StringLiteral::Raw, found extraneous {0:?}",
+                                inner
+                            )
+                        }
+                    }
+                    Ok(this)
+                })
+                .or_else(|_: ::from_pest::ConversionError<::from_pest::Void>| {
+                    let mut inner = pair.clone().into_inner();
+                    let inner = &mut inner;
+                    let this =
+                        StringLiteral::StringLiteral(Result::unwrap(str::parse(span_into_str(
+                            inner
+                                .next()
+                                .ok_or(::from_pest::ConversionError::NoMatch)?
+                                .as_span(),
+                        ))));
+                    if inner.clone().next().is_some() {
+                        {
+                            panic!(
+                                "when converting StringLiteral::String, found extraneous {0:?}",
+                                inner
+                            )
+                        }
+                    }
+                    Ok(this)
+                })?;
+            *pest = clone;
+            Ok(this)
+        } else {
+            Err(::from_pest::ConversionError::NoMatch)
+        }
+    }
+}
+
+impl StringLiteral {
+    pub fn as_str(&self) -> &str {
+        match self {
+            StringLiteral::RawString(inner) => inner,
+            StringLiteral::StringLiteral(inner) => inner,
+        }
+    }
 }
 
 #[derive(Debug, FromPest)]
 #[pest_ast(rule(Rule::task_definition))]
 pub struct Task {
     pub tags: Vec<Tag>,
-    pub name: Identifier,
-    pub image_identifier: ImageIdentifier,
-    pub execute_command: StringLiteral,
-    pub script: RawString,
-}
-
-#[derive(Debug, FromPest)]
-#[pest_ast(rule(Rule::tag_value))]
-pub struct TagValue {
-    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
-    pub content: String,
-}
-
-#[derive(Debug, FromPest)]
-#[pest_ast(rule(Rule::tag_key))]
-pub struct TagKey {
-    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
-    pub content: String,
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub name: String,
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub image: String,
+    pub command: StringLiteral,
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub script: String,
 }
 
 #[derive(Debug, FromPest)]
 #[pest_ast(rule(Rule::tag))]
 pub struct Tag {
-    pub key: TagKey,
-    pub value: TagValue,
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub key: String,
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub value: String,
 }
 
 #[derive(Debug, FromPest)]

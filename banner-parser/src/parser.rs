@@ -22,32 +22,20 @@ pub fn validate_pipeline(code: String) -> Result<Pipeline, Box<dyn Error + Send 
 }
 
 impl From<Task> for TaskDefinition {
-    fn from(value: Task) -> Self {
-        let tags = value
+    fn from(task: Task) -> Self {
+        let tags = task
             .tags
             .into_iter()
-            .map(|t| Tag::new(t.key.content, t.value.content))
+            .map(|t| Tag::new(t.key, t.value))
             .collect();
-        let image = Image::new(value.image_identifier.image, None);
-        let mut command = match value.execute_command {
-            ast::StringLiteral::Raw(string) => {
-                let c: Vec<String> = string
-                    .content
-                    .split_whitespace()
-                    .map(|s| s.into())
-                    .collect();
-                c
-            }
-            ast::StringLiteral::String(string) => {
-                let c: Vec<String> = string
-                    .content
-                    .split_whitespace()
-                    .map(|s| s.into())
-                    .collect();
-                c
-            }
-        };
-        command.push(value.script.content);
+        let image = Image::new(task.image, None);
+        let mut command: Vec<String> = task
+            .command
+            .as_str()
+            .split_whitespace()
+            .map(|s| s.into())
+            .collect();
+        command.push(task.script);
         let td = Self::new(tags, image, command, vec![], vec![]);
         td
     }
