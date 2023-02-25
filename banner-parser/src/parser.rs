@@ -67,10 +67,11 @@ mod tests {
         check(
             &code,
             expect![[r#"
-            Pipeline {
-                tasks: [],
-                eoi: EOI,
-            }"#]],
+                Pipeline {
+                    imports: [],
+                    tasks: [],
+                    eoi: EOI,
+                }"#]],
         )
     }
 
@@ -89,32 +90,25 @@ mod tests {
         check(
             code,
             expect![[r#"
-            Pipeline {
-                tasks: [
-                    Task {
-                        tags: [],
-                        name: Identifier {
+                Pipeline {
+                    imports: [],
+                    tasks: [
+                        Task {
+                            tags: [],
                             name: "unit-test",
-                        },
-                        image_identifier: ImageIdentifier {
                             image: "rustl3rs/banner-rust-build",
+                            command: RawString(
+                                "/bin/bash -c",
+                            ),
+                            script: "bash\n            echo testing, testing, 1, 2, 3!",
                         },
-                        execute_command: Raw(
-                            RawString {
-                                content: "/bin/bash -c",
-                            },
-                        ),
-                        script: RawString {
-                            content: "bash\n            echo testing, testing, 1, 2, 3!",
-                        },
-                    },
-                ],
-                eoi: EOI,
-            }"#]],
+                    ],
+                    eoi: EOI,
+                }"#]],
         )
     }
 
-    #[traced_test]
+    // #[traced_test]
     #[test]
     fn can_parse_task_with_tag_attribute() {
         let code = r#######"
@@ -130,45 +124,49 @@ mod tests {
         check(
             code,
             expect![[r#"
-            Pipeline {
-                tasks: [
-                    Task {
-                        tags: [
-                            Tag {
-                                key: TagKey {
-                                    content: "banner.io/owner",
+                Pipeline {
+                    imports: [],
+                    tasks: [
+                        Task {
+                            tags: [
+                                Tag {
+                                    key: "banner.io/owner",
+                                    value: "me",
                                 },
-                                value: TagValue {
-                                    content: "me",
+                                Tag {
+                                    key: "banner.io/company",
+                                    value: "rustl3rs",
                                 },
-                            },
-                            Tag {
-                                key: TagKey {
-                                    content: "banner.io/company",
-                                },
-                                value: TagValue {
-                                    content: "rustl3rs",
-                                },
-                            },
-                        ],
-                        name: Identifier {
+                            ],
                             name: "unit-test",
-                        },
-                        image_identifier: ImageIdentifier {
                             image: "rustl3rs/banner-rust-build",
+                            command: RawString(
+                                "/bin/bash -c",
+                            ),
+                            script: "bash\n            echo testing, testing, 1, 2, 3!",
                         },
-                        execute_command: Raw(
-                            RawString {
-                                content: "/bin/bash -c",
-                            },
-                        ),
-                        script: RawString {
-                            content: "bash\n            echo testing, testing, 1, 2, 3!",
-                        },
+                    ],
+                    eoi: EOI,
+                }"#]],
+        )
+    }
+
+    #[traced_test]
+    #[test]
+    fn can_parse_uri() {
+        let code = r#######"
+        import file://./single_task.ban
+        "#######;
+
+        check(code, expect![[r#"
+            Pipeline {
+                imports: [
+                    Import {
+                        uri: "file://./single_task.ban",
                     },
                 ],
+                tasks: [],
                 eoi: EOI,
-            }"#]],
-        )
+            }"#]])
     }
 }

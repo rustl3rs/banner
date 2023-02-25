@@ -1,7 +1,9 @@
 use crate::grammar::Rule;
 use pest::Span;
+use tracing::debug;
 
 fn span_into_str(span: Span) -> &str {
+    debug!("SPAN: {}", span.as_str());
     span.as_str()
 }
 
@@ -100,8 +102,16 @@ pub struct Tag {
 }
 
 #[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::import_declaration))]
+pub struct Import {
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub uri: String,
+}
+
+#[derive(Debug, FromPest)]
 #[pest_ast(rule(Rule::pipeline_definition))]
 pub struct Pipeline {
+    pub imports: Vec<Import>,
     pub tasks: Vec<Task>,
     eoi: EOI,
 }

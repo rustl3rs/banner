@@ -1,5 +1,5 @@
 pipeline_definition = {
-    SOI ~ (task_definition)* ~ EOI
+    SOI ~(task_definition | import_declaration)* ~ EOI
 }
 
 task_definition = {
@@ -43,3 +43,12 @@ tag_definition = _{ "[" ~ "tag" ~ ":" ~ tag ~ "]" }
 tag = { tag_key ~ "=" ~ tag_value }
 tag_key = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ".")+ }
 tag_value = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ".")+ }
+
+import_declaration = ${ "import" ~ WHITESPACE ~ URI  ~ NEWLINE }
+// URI parsing 😭🤕 https://www.rfc-editor.org/rfc/rfc3986#appendix-A
+// Accept basically anything as a URI on the way in, make any transformations
+// that are required because of the use of variables, and then parse it a touch 
+// later with the iref crate.
+URI = ${ scheme ~ ":" ~ "//" ~ heir_query_fragment }
+scheme = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "+" | "-" | ".")* }
+heir_query_fragment = @{ (ASCII_ALPHA | ASCII_DIGIT | "-" | "." | "_" | "~" | ":" | "/" | "?" | "#" | "[" | "]" | "@" | "!" | "$" | "&" | "'" | "(" | ")" | "*" | "+" | "," | ";" | "=")+ }
