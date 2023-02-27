@@ -1,10 +1,14 @@
-use std::{error::Error, fs, path::PathBuf, process::exit};
+use std::{error::Error, fs, path::PathBuf};
 
 use banner_engine::{Engine, TaskDefinition};
 use banner_parser::parser::validate_pipeline;
 use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
-use tracing::debug;
+use log::{self, LevelFilter};
+use tui_logger::{self, init_logger, set_default_level};
+use ui::terminal::create_terminal_ui;
+
+mod ui;
 
 /// The Banner CLI
 #[derive(Parser)]
@@ -25,21 +29,35 @@ enum Commands {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error>> {
     // install global collector configured based on RUST_LOG env var.
-    tracing_subscriber::fmt::init();
+    // tracing_subscriber::fmt::init();
+    // LogTracer::init()?;
 
+    // Set max_log_level to Trace
+    init_logger(LevelFilter::Trace)?;
+
+    // Set default level for unknown targets to Trace
+    set_default_level(LevelFilter::Info);
+
+    let _ = tokio::join!(execute_command(), create_terminal_ui());
+
+    Ok(())
+}
+
+async fn execute_command() -> Result<(), Box<dyn Error + Send + Sync>> {
     let args = Args::parse();
     match args.command {
         Commands::Local { file } => match execute_pipeline(file).await {
-            Ok(_) => exit(0),
+            Ok(_) => Ok(()),
             Err(e) => {
                 println!("{}", e);
-                exit(1)
+                Err(e)
             }
         },
         Commands::Remote {} => {
-            println!("Hello World!")
+            println!("Hello World!");
+            Ok(())
         }
     }
 }
@@ -58,7 +76,7 @@ async fn execute_pipeline(filepath: PathBuf) -> Result<(), Box<dyn Error + Send 
                     .find(|tag| tag.key() == "banner.io/task")
                     .map(|tag| tag.value())
                     .unwrap();
-                debug!("Running Task: {task_name}");
+                log::info!("Running Task: {task_name}");
                 engine.execute(&task.into()).await?;
             }
             ()

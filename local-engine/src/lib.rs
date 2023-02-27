@@ -99,7 +99,7 @@ async fn stream_logs_from_container_to_stdout(
     let mut logs = docker.logs(container_name, options);
     loop {
         if let Some(log) = logs.try_next().await? {
-            print!("{task_name}: {log}");
+            log::info!("{task_name}: {log}");
             continue;
         } else {
             return Ok(());
