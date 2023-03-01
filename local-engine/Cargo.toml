@@ -13,6 +13,7 @@ description = "A local engine for Banner."
 
 [dependencies]
 async-trait = {workspace = true}
+banner-parser = { path = "../banner-parser" }
 banner-engine = { path = "../banner-engine" }
 bollard = "0.14"
 cap-tempfile = "1.0"

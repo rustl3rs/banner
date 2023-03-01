@@ -12,15 +12,12 @@ description = "A parser for the Banner DSL."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-banner-engine = { path = "../banner-engine" }
 tracing = {workspace = true}
-strum = "0.24.1"
-strum_macros = "0.24.3"
 pest = "2.5.5"
 pest_derive = "2.5.5"
 pest-ast = "0.3.3"
 from-pest = "0.3.1"
-iref = "2.2.3"
+# iref = "2.2.3"
 
 [dev-dependencies]
 expect-test = "1.4.0"

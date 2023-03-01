@@ -1,11 +1,11 @@
-use std::{error::Error, fs, path::PathBuf};
+use std::{error::Error, path::PathBuf, sync::Arc};
 
-use banner_engine::{Engine, TaskDefinition};
-use banner_parser::parser::validate_pipeline;
+use banner_engine::{start_engine, Engine, Event};
 use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
 use log::{self, LevelFilter};
-use tui_logger::{self, init_logger, set_default_level};
+use tokio::sync::mpsc::{self, Receiver, Sender};
+use tui_logger::{self, init_logger, set_default_level, set_level_for_target};
 use ui::terminal::create_terminal_ui;
 
 mod ui;
@@ -31,61 +31,60 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // install global collector configured based on RUST_LOG env var.
-    // tracing_subscriber::fmt::init();
-    // LogTracer::init()?;
-
     // Set max_log_level to Trace
     init_logger(LevelFilter::Trace)?;
 
     // Set default level for unknown targets to Trace
-    set_default_level(LevelFilter::Info);
+    set_default_level(LevelFilter::Off);
+    set_level_for_target("task_log", LevelFilter::Debug);
 
-    let _ = tokio::join!(execute_command(), create_terminal_ui());
+    log::debug!(target: "task_log", "Creating channels");
+    let (tx, rx) = mpsc::channel(100);
+
+    tokio::select! {
+        _ = execute_command(rx, tx.clone()) => {},
+        _ = create_terminal_ui(tx.clone()) => {}
+    };
 
     Ok(())
 }
 
-async fn execute_command() -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn execute_command(
+    rx: Receiver<Event>,
+    tx: Sender<Event>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let args = Args::parse();
     match args.command {
-        Commands::Local { file } => match execute_pipeline(file).await {
+        Commands::Local { file } => match execute_pipeline(file, rx, tx).await {
             Ok(_) => Ok(()),
             Err(e) => {
-                println!("{}", e);
+                log::error!("{}", e);
                 Err(e)
             }
         },
         Commands::Remote {} => {
-            println!("Hello World!");
+            log::info!("Hello World!");
             Ok(())
         }
     }
 }
 
-async fn execute_pipeline(filepath: PathBuf) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let pipeline = fs::read_to_string(&filepath).expect("Should have been able to read the file");
-    match validate_pipeline(pipeline) {
-        Ok(ast) => {
-            let engine = LocalEngine::new();
-            engine.initialise().await?;
-            for task in ast.tasks {
-                let task: TaskDefinition = task.into();
-                let task_name = task
-                    .tags()
-                    .iter()
-                    .find(|tag| tag.key() == "banner.io/task")
-                    .map(|tag| tag.value())
-                    .unwrap();
-                log::info!("Running Task: {task_name}");
-                engine.execute(&task.into()).await?;
-            }
-            ()
-        }
-        Err(e) => {
-            let f = filepath.to_str().unwrap();
-            eprintln!("Error parsing pipeline from file: {f}.\n\n{e}")
-        }
-    }
+async fn execute_pipeline(
+    filepath: PathBuf,
+    rx: Receiver<Event>,
+    tx: Sender<Event>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    log::info!(target: "task_log", "Starting pipeline");
+    let mut engine = LocalEngine::new();
+    engine.with_pipeline_from_file(filepath)?;
+    let engine = Arc::new(engine);
+
+    log::info!(target: "task_log", "Confirming requirements");
+    engine.confirm_requirements().await?;
+
+    log::info!(target: "task_log", "Starting orchestrator");
+    start_engine(engine, rx, tx).await?;
+    log::info!(target: "task_log", "Exiting orchestrator");
 
     Ok(())
 }

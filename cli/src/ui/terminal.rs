@@ -1,5 +1,6 @@
 use std::{error::Error, io, time::Duration};
 
+use banner_engine::{EventType, Metadata, TaskEvent};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode},
     execute,
@@ -8,7 +9,7 @@ use crossterm::{
 use futures_timer::Delay;
 use futures_util::future::FutureExt;
 use futures_util::stream::StreamExt;
-use tokio::select;
+use tokio::{select, sync::mpsc::Sender};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
@@ -18,7 +19,8 @@ use tui::{
 };
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
 
-pub async fn create_terminal_ui(// mut rx: Receiver<AppEvent>,
+pub async fn create_terminal_ui(
+    tx: Sender<banner_engine::Event>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // setup terminal
     let backend = {
@@ -46,11 +48,19 @@ pub async fn create_terminal_ui(// mut rx: Receiver<AppEvent>,
             maybe_event = event => {
                             match maybe_event {
                                 Some(Ok(event)) => {
+                                    log::info!("Event received");
                                     if event == Event::Key(KeyCode::Char('q').into()) {
                                         break;
                                     }
+
+                                    if event == Event::Key(KeyCode::Char('s').into()) {
+                                        log::info!("Event received");
+                                        TaskEvent::new(EventType::System)
+                                            .with_metadata(Metadata::new("banner.io/task".to_string(), "unit-test".to_string()))
+                                            .send_from(&tx).await;
+                                    }
                                 }
-                                Some(Err(e)) => println!("Error: {:?}\r", e),
+                                Some(Err(e)) => log::error!("Error: {:?}\r", e),
                                 None => break,
                             };
                             terminal.draw(|f| {
@@ -90,26 +100,34 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
         .margin(0)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(chunks[1]);
-    let tui_lw: TuiLoggerWidget = TuiLoggerWidget::default()
-        .block(
-            Block::default()
-                .title(" Logs ")
-                .border_style(Style::default().fg(Color::White).bg(Color::Black))
-                .borders(Borders::ALL),
-        )
-        .style_error(Style::default().fg(Color::Red))
-        .style_debug(Style::default().fg(Color::Green))
-        .style_warn(Style::default().fg(Color::Yellow))
-        .style_trace(Style::default().fg(Color::Magenta))
-        .style_info(Style::default().fg(Color::Cyan))
-        .output_separator('|')
-        .output_timestamp(Some("%F %H:%M:%S%.3f".to_string()))
-        .output_level(Some(TuiLoggerLevelOutput::Long))
-        .output_target(false)
-        .output_file(false)
-        .output_line(false)
-        .style(Style::default().fg(Color::White).bg(Color::Black));
-    f.render_widget(tui_lw, logs_events[0]);
+
+    {
+        // let lws = TuiWidgetState::new().set_level_for_target("task_log", log::LevelFilter::Debug);
+        // let mut tui_lw: TuiLoggerWidget = TuiLoggerWidget::default();
+        // let tui_lw = tui_lw.state(&lws);
+        let widget = TuiLoggerWidget::default()
+            .block(
+                Block::default()
+                    .title(" Logs ")
+                    .border_style(Style::default().fg(Color::White).bg(Color::Black))
+                    .borders(Borders::ALL),
+            )
+            .style_error(Style::default().fg(Color::Red))
+            .style_debug(Style::default().fg(Color::Green))
+            .style_warn(Style::default().fg(Color::Yellow))
+            .style_trace(Style::default().fg(Color::Magenta))
+            .style_info(Style::default().fg(Color::Cyan))
+            .output_separator('|')
+            // .output_timestamp(Some("%F %H:%M:%S%.3f".to_string()))
+            .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
+            .output_target(false)
+            .output_file(false)
+            .output_line(false)
+            .style(Style::default().fg(Color::White).bg(Color::Black));
+
+        f.render_widget(widget, logs_events[0]);
+    }
+
     // let block = Block::default().title(" Logs ").borders(Borders::ALL);
     // f.render_widget(block, logs_events[0]);
     let block = Block::default().title(" Events ").borders(Borders::ALL);

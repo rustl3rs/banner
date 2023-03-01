@@ -1,5 +1,9 @@
+mod tag_missing_error;
+
 use async_trait::async_trait;
 use banner_engine::{Engine, ExecutionResult, TaskDefinition};
+use banner_parser::ast::Pipeline;
+use banner_parser::parser::validate_pipeline;
 use bollard::container::{
     Config, CreateContainerOptions, ListContainersOptions, LogsOptions, RemoveContainerOptions,
     StartContainerOptions,
@@ -8,15 +12,39 @@ use bollard::Docker;
 use cap_tempfile::{ambient_authority, TempDir, TempFile};
 use futures_util::stream::TryStreamExt;
 use std::error::Error;
-use std::fmt::Display;
+use std::fs;
 use std::marker::{Send, Sync};
+use std::path::PathBuf;
+use tag_missing_error::TagMissingError;
 
 #[derive(Debug)]
-pub struct LocalEngine {}
+pub struct LocalEngine {
+    pipelines: Vec<Pipeline>,
+}
 
 impl LocalEngine {
     pub fn new() -> Self {
-        Self {}
+        Self { pipelines: vec![] }
+    }
+
+    pub fn with_pipeline_from_file(
+        &mut self,
+        filepath: PathBuf,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let pipeline =
+            fs::read_to_string(&filepath).expect("Should have been able to read the file");
+        match validate_pipeline(pipeline) {
+            Ok(ast) => {
+                self.pipelines.push(ast);
+                ()
+            }
+            Err(e) => {
+                let f = filepath.to_str().unwrap();
+                eprintln!("Error parsing pipeline from file: {f}.\n\n{e}")
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -80,6 +108,10 @@ impl Engine for LocalEngine {
         remove_container(&container_name).await?;
         Ok(ExecutionResult::Success(vec![]))
     }
+
+    async fn get_pipelines(&self) -> &[Pipeline] {
+        &self.pipelines
+    }
 }
 
 async fn stream_logs_from_container_to_stdout(
@@ -99,7 +131,7 @@ async fn stream_logs_from_container_to_stdout(
     let mut logs = docker.logs(container_name, options);
     loop {
         if let Some(log) = logs.try_next().await? {
-            log::info!("{task_name}: {log}");
+            log::info!(target: "task_log", "{task_name}: {log}");
             continue;
         } else {
             return Ok(());
@@ -146,33 +178,10 @@ fn get_task_tag_value<'a>(
     {
         Some(value) => Ok(value),
         None => {
-            let err = TagMissingError::new(String::from(format!(
+            let err = TagMissingError::new(format!(
                 "Expected banner.io tag not present on task: banner.io/{key}"
-            )));
+            ));
             Err(Box::new(err))
         }
     }
 }
-
-#[derive(Debug, Default)]
-pub struct TagMissingError {
-    description: String,
-}
-
-impl TagMissingError {
-    pub fn new(description: String) -> Self {
-        Self { description }
-    }
-
-    pub fn description(&self) -> &str {
-        self.description.as_ref()
-    }
-}
-
-impl Display for TagMissingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.description())
-    }
-}
-
-impl Error for TagMissingError {}

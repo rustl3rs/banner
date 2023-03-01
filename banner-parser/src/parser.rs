@@ -1,11 +1,10 @@
-use banner_engine::{Image, Tag, TaskDefinition};
 use from_pest::FromPest;
 use pest::Parser;
 use std::error::Error;
 use tracing::trace;
 
 use crate::{
-    ast::{self, Pipeline, Task},
+    ast::Pipeline,
     grammar::{BannerParser, Rule},
 };
 
@@ -19,26 +18,6 @@ pub fn validate_pipeline(code: String) -> Result<Pipeline, Box<dyn Error + Send 
     let syntax_tree: Pipeline = Pipeline::from_pest(&mut parse_tree).expect("infallible");
     trace!("syntax tree = {:#?}", syntax_tree);
     Ok(syntax_tree)
-}
-
-impl From<Task> for TaskDefinition {
-    fn from(task: Task) -> Self {
-        let tags = task
-            .tags
-            .into_iter()
-            .map(|t| Tag::new(t.key, t.value))
-            .collect();
-        let image = Image::new(task.image, None);
-        let mut command: Vec<String> = task
-            .command
-            .as_str()
-            .split_whitespace()
-            .map(|s| s.into())
-            .collect();
-        command.push(task.script);
-        let td = Self::new(tags, image, command, vec![], vec![]);
-        td
-    }
 }
 
 #[cfg(test)]
@@ -158,7 +137,9 @@ mod tests {
         import file://./single_task.ban
         "#######;
 
-        check(code, expect![[r#"
+        check(
+            code,
+            expect![[r#"
             Pipeline {
                 imports: [
                     Import {
@@ -167,6 +148,7 @@ mod tests {
                 ],
                 tasks: [],
                 eoi: EOI,
-            }"#]])
+            }"#]],
+        )
     }
 }
