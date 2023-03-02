@@ -16,7 +16,7 @@ async fn starts_task_with_required_tags() {
 
     async fn execute(tags: Vec<Tag>) -> Result<ExecutionResult, Box<dyn Error + Send + Sync>> {
         let engine = LocalEngine::new();
-        let image = Image::new(String::from("alpine"), None);
+        let image = Image::new(String::from("alpine:latest"), None);
         let command = vec![
             String::from("sh"),
             String::from("-ce"),

@@ -65,7 +65,7 @@ pub async fn start_engine(
                         let task = find_task(engine.get_pipelines().await, task_name);
                         let task: TaskDefinition = task.into();
 
-                        log::info!(target: "task_log", "Running Task: {task_name}");
+                        log::info!(target: "event_log", "Running Task: {task_name}");
                         let tx = tx.clone();
                         let e = engine.clone();
                         tokio::spawn(async move {

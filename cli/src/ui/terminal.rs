@@ -17,7 +17,7 @@ use tui::{
     widgets::{Block, Borders},
     Frame, Terminal,
 };
-use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget};
+use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
 
 pub async fn create_terminal_ui(
     tx: Sender<banner_engine::Event>,
@@ -102,10 +102,10 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
         .split(chunks[1]);
 
     {
-        // let lws = TuiWidgetState::new().set_level_for_target("task_log", log::LevelFilter::Debug);
-        // let mut tui_lw: TuiLoggerWidget = TuiLoggerWidget::default();
-        // let tui_lw = tui_lw.state(&lws);
-        let widget = TuiLoggerWidget::default()
+        let lws = TuiWidgetState::new()
+            .set_level_for_target("task_log", log::LevelFilter::Debug)
+            .set_default_display_level(log::LevelFilter::Off);
+        let lwidget = TuiLoggerWidget::default()
             .block(
                 Block::default()
                     .title(" Logs ")
@@ -118,18 +118,40 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
             .style_trace(Style::default().fg(Color::Magenta))
             .style_info(Style::default().fg(Color::Cyan))
             .output_separator('|')
-            // .output_timestamp(Some("%F %H:%M:%S%.3f".to_string()))
             .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
-            .output_target(false)
+            .output_target(true)
             .output_file(false)
             .output_line(false)
-            .style(Style::default().fg(Color::White).bg(Color::Black));
+            .style(Style::default().fg(Color::White).bg(Color::Black))
+            .state(&lws);
 
-        f.render_widget(widget, logs_events[0]);
+        f.render_widget(lwidget, logs_events[0]);
     }
 
-    // let block = Block::default().title(" Logs ").borders(Borders::ALL);
-    // f.render_widget(block, logs_events[0]);
-    let block = Block::default().title(" Events ").borders(Borders::ALL);
-    f.render_widget(block, logs_events[1]);
+    {
+        let ews = TuiWidgetState::new()
+            .set_level_for_target("event_log", log::LevelFilter::Debug)
+            .set_default_display_level(log::LevelFilter::Off);
+        let ewidget = TuiLoggerWidget::default()
+            .block(
+                Block::default()
+                    .title(" Events ")
+                    .border_style(Style::default().fg(Color::White).bg(Color::Black))
+                    .borders(Borders::ALL),
+            )
+            .style_error(Style::default().fg(Color::Red))
+            .style_debug(Style::default().fg(Color::Green))
+            .style_warn(Style::default().fg(Color::Yellow))
+            .style_trace(Style::default().fg(Color::Magenta))
+            .style_info(Style::default().fg(Color::Cyan))
+            .output_separator('|')
+            .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
+            .output_target(true)
+            .output_file(false)
+            .output_line(false)
+            .style(Style::default().fg(Color::White).bg(Color::Black))
+            .state(&ews);
+
+        f.render_widget(ewidget, logs_events[1]);
+    }
 }

@@ -37,6 +37,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Set default level for unknown targets to Trace
     set_default_level(LevelFilter::Off);
     set_level_for_target("task_log", LevelFilter::Debug);
+    set_level_for_target("event_log", LevelFilter::Debug);
 
     log::debug!(target: "task_log", "Creating channels");
     let (tx, rx) = mpsc::channel(100);
