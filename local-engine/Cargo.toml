@@ -17,10 +17,12 @@ banner-parser = { path = "../banner-parser" }
 banner-engine = { path = "../banner-engine" }
 bollard = "0.14"
 cap-tempfile = "1.0"
+futures = "*"
 futures-util = "*"
 tokio = {version = "1.25", features = ["test-util", "macros"]}
 tracing = {workspace = true}
 log = "0.4"
+backon = "0.4"
 
 [features]
 default = ["docker"]

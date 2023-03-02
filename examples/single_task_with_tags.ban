@@ -2,7 +2,7 @@
 [tag: banner.io/job=unit-test]
 [tag: banner.io/task=build]
 [tag: rustl3rs.com/owner=pms1969]
-task unit-test(image: alpine, execute: "sh -c") {
+task unit-test(image: alpine:latest, execute: "sh -c") {
     r#####"
     echo testing....
     echo testing

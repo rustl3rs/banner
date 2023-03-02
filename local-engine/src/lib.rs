@@ -1,6 +1,8 @@
 mod tag_missing_error;
 
 use async_trait::async_trait;
+use backon::ConstantBuilder;
+use backon::Retryable;
 use banner_engine::{Engine, ExecutionResult, TaskDefinition};
 use banner_parser::ast::Pipeline;
 use banner_parser::parser::validate_pipeline;
@@ -8,6 +10,7 @@ use bollard::container::{
     Config, CreateContainerOptions, ListContainersOptions, LogsOptions, RemoveContainerOptions,
     StartContainerOptions,
 };
+use bollard::image::CreateImageOptions;
 use bollard::Docker;
 use cap_tempfile::{ambient_authority, TempDir, TempFile};
 use futures_util::stream::TryStreamExt;
@@ -15,6 +18,7 @@ use std::error::Error;
 use std::fs;
 use std::marker::{Send, Sync};
 use std::path::PathBuf;
+use std::time::Duration;
 use tag_missing_error::TagMissingError;
 
 #[derive(Debug)]
@@ -64,6 +68,7 @@ impl Engine for LocalEngine {
         Ok(())
     }
 
+    // ! TODO: if no label is given, need to add `:latest`
     async fn execute(
         &self,
         task: &TaskDefinition,
@@ -76,6 +81,24 @@ impl Engine for LocalEngine {
         let task_name = get_task_tag_value(&task, "task")?;
         let container_name = format!("banner_{pipeline_name}_{job_name}_{task_name}");
 
+        // TODO: don't pull if the image is already here?
+        // ensure the image is pulled locally.
+        let cio = CreateImageOptions {
+            from_image: task.image().source(),
+            ..Default::default()
+        };
+        let mut ci_logs = docker.create_image(Some(cio), None, None);
+        loop {
+            if let Some(log) = ci_logs.try_next().await? {
+                if let Some(status) = log.status {
+                    log::info!(target: "task_log", "{task_name}: {}", status);
+                }
+                continue;
+            } else {
+                break;
+            }
+        }
+
         // create our container
         let options = Some(CreateContainerOptions {
             name: &container_name,
@@ -87,21 +110,31 @@ impl Engine for LocalEngine {
         let config = Config {
             image: Some(task.image().source()),
             cmd: Some(commands),
+
             ..Default::default()
         };
         docker.create_container(options, config).await?;
 
-        // start the just created container
-        match docker
-            .start_container(&container_name, None::<StartContainerOptions<String>>)
-            .await
-        {
+        // start the just created container retry if something happend.... just twice tho.
+        // it's likely that the image isn't present, so just go grab it.
+        // let docker = Docker::connect_with_local_defaults()?;
+        let start = || async {
+            docker
+                .start_container(&container_name, None::<StartContainerOptions<String>>)
+                .await
+        };
+
+        let backoff = ConstantBuilder::default()
+            .with_delay(Duration::from_secs(2))
+            .with_max_times(2);
+
+        match start.retry(&backoff).await {
             Ok(_) => (),
             Err(e) => {
-                remove_container(&container_name).await?;
+                let _ = remove_container(&container_name).await;
                 return Err(Box::new(e));
             }
-        }
+        };
 
         stream_logs_from_container_to_stdout(&container_name, &task_name).await?;
 
