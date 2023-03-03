@@ -59,7 +59,7 @@ async fn execute_command(
         Commands::Local { file } => match execute_pipeline(file, rx, tx).await {
             Ok(_) => Ok(()),
             Err(e) => {
-                log::error!("{}", e);
+                eprintln!("{}", e);
                 Err(e)
             }
         },

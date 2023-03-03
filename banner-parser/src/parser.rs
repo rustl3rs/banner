@@ -22,6 +22,8 @@ pub fn validate_pipeline(code: String) -> Result<Pipeline, Box<dyn Error + Send 
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use expect_test::{expect, Expect};
     use tracing_test::traced_test;
 
@@ -130,7 +132,7 @@ mod tests {
         )
     }
 
-    #[traced_test]
+    // #[traced_test]
     #[test]
     fn can_parse_uri() {
         let code = r#######"
@@ -149,6 +151,17 @@ mod tests {
                 tasks: [],
                 eoi: EOI,
             }"#]],
+        )
+    }
+
+    #[traced_test]
+    #[test]
+    fn can_parse_banner_pipeline() {
+        let code = fs::read_to_string("pipeline-assets/banner-pipeline.ban").expect("Should have been able to read the file");
+
+        check(
+            &code,
+            expect![""],
         )
     }
 }
