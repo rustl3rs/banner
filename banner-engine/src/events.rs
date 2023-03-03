@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use chrono::{DateTime, TimeZone, Utc};
 use tokio::sync::mpsc::Sender;
 
@@ -49,6 +51,21 @@ impl TaskEvent {
     }
 }
 
+impl Display for TaskEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} | {:?} | [", self.time_emitted, self.r#type())?;
+        let first = true;
+        for md in &self.metadata {
+            if !first {
+                write!(f, ", ")?;
+            }
+            write!(f, "{{{}: {}}}", md.key(), md.value())?;
+        }
+        writeln!(f, "]")?;
+        Ok(())
+    }
+}
+
 pub struct TaskEventBuilder {
     task_event: TaskEvent,
 }
@@ -62,6 +79,7 @@ impl TaskEventBuilder {
     pub async fn send_from(&self, tx: &Sender<Event>) {
         let mut send_task = self.task_event.clone();
         send_task.time_emitted = Utc::now().timestamp();
+        log::info!(target: "event_log", "{send_task}");
         tx.send(Event::Task(send_task)).await.unwrap_or_default();
     }
 }

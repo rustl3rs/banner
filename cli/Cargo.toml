@@ -20,7 +20,7 @@ tracing = {workspace = true}
 tokio = {version = "1.25", features = ["test-util", "macros"]}
 tui = "0.19"
 crossterm = {version = "0.25", features = ["event-stream"]}
-tui-logger = "0.8.2"
+tui-logger = "0.8.3"
 log = "0.4"
 futures-timer = "3.0"
 futures-core = "0.3"
