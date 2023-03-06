@@ -109,11 +109,147 @@ pub struct Import {
 }
 
 #[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::mount))]
+pub struct Mount {
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub source: String,
+    pub destination: StringLiteral,
+}
+
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::env_var))]
+pub struct EnviromentVariable {
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub key: String,
+    pub value: StringLiteral,
+}
+
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::image_specification))]
+pub struct Image {
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub name: String,
+    pub mounts: Vec<Mount>,
+    pub envs: Vec<EnviromentVariable>,
+}
+
+#[derive(Debug, FromPest)]
+#[pest_ast(rule(Rule::let_statement))]
+pub struct Images {
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub name: String,
+    pub image: Image,
+}
+
+#[derive(Debug)]
+pub struct JobSpecification {
+    pub name: String,
+    pub tasks: Vec<String>,
+}
+
+impl<'a> ::from_pest::FromPest<'a> for JobSpecification {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+    fn from_pest(
+        pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
+    ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
+        if pair.as_rule() == Rule::job_specification {
+            let span = pair.as_span();
+            let mut inner = pair.into_inner();
+            let inner = &mut inner;
+            let this = JobSpecification {
+                name: Result::unwrap(str::parse(span_into_str(
+                    inner
+                        .next()
+                        .ok_or(::from_pest::ConversionError::NoMatch)?
+                        .as_span(),
+                ))),
+                tasks: inner
+                    .into_iter()
+                    .map(|p| {
+                        let span = p.as_span();
+                        debug!("THE SPAN: {:?}", span);
+                        span.as_str().to_string()
+                    })
+                    .collect(),
+            };
+            if inner.clone().next().is_some() {
+                {
+                    panic!(
+                        "when converting JobSpecification, found extraneous {0:?}",
+                        inner
+                    )
+                }
+            }
+            *pest = clone;
+            Ok(this)
+        } else {
+            Err(::from_pest::ConversionError::NoMatch)
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PipelineSpecification {
+    pub name: String,
+    pub jobs: Vec<String>,
+}
+
+impl<'a> ::from_pest::FromPest<'a> for PipelineSpecification {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+    fn from_pest(
+        pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
+    ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
+        if pair.as_rule() == Rule::pipeline_specification {
+            let span = pair.as_span();
+            let mut inner = pair.into_inner();
+            let inner = &mut inner;
+            let this = PipelineSpecification {
+                name: Result::unwrap(str::parse(span_into_str(
+                    inner
+                        .next()
+                        .ok_or(::from_pest::ConversionError::NoMatch)?
+                        .as_span(),
+                ))),
+                jobs: inner
+                    .into_iter()
+                    .map(|p| {
+                        let span = p.as_span();
+                        debug!("THE SPAN: {:?}", span);
+                        span.as_str().to_string()
+                    })
+                    .collect(),
+            };
+            if inner.clone().next().is_some() {
+                {
+                    panic!(
+                        "when converting JobSpecification, found extraneous {0:?}",
+                        inner
+                    )
+                }
+            }
+            *pest = clone;
+            Ok(this)
+        } else {
+            Err(::from_pest::ConversionError::NoMatch)
+        }
+    }
+}
+
+#[derive(Debug, FromPest)]
 #[pest_ast(rule(Rule::pipeline_definition))]
 pub struct Pipeline {
     pub imports: Vec<Import>,
+    pub images: Vec<Images>,
     pub tasks: Vec<Task>,
-    eoi: EOI,
+    pub jobs: Option<JobSpecification>,
+    pub pipelines: Option<PipelineSpecification>,
+    _eoi: EOI,
 }
 
 #[derive(Debug, FromPest)]

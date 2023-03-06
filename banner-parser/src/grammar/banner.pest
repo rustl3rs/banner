@@ -1,23 +1,46 @@
 pipeline_definition = {
-    SOI ~(task_definition | import_declaration)* ~ EOI
+    SOI ~ 
+        ( import_declaration 
+        | let_statement 
+        | task_definition 
+        | job_specification 
+        | pipeline_specification 
+        )* 
+    ~ EOI
 }
+
+let_statement = {
+    "let" ~ identifier ~ "=" ~ "Image" ~ "{" ~ image_specification ~ "}"
+}
+
+image_specification = {
+    "name" ~ "=" ~ image_identifier ~ "," ~ 
+    ("mount" ~ "=" ~ "[" ~ mount* ~ "]" ~ ",")? ~ 
+    ("env" ~ "=" ~ "[" ~ env_var* ~ "]" ~ ",")?
+}
+
+mount = { identifier ~ "=>" ~ string_literal ~ "," }
+env_var = { identifier ~ "=" ~ string_literal ~ "," }
 
 task_definition = {
     (tag_definition)* ~ "task" ~ identifier ~ parameter_list ~ block
 }
 
 parameter_list = _{
-    "(" ~ "image" ~ ":" ~ image_identifier ~ "," ~ "execute" ~ ":" ~ string_literal ~ ")"
+    "(" ~ "image" ~ ":" ~ image_definition ~ "," ~ "execute" ~ ":" ~ string_literal ~ ")"
 }
 
 block = _{
     "{" ~ raw_string ~ "}"
 }
 
+image_definition = { (image_identifier|image_specification|variable) }
+
+variable = { "$" ~ "{" ~ identifier ~ "}" }
 identifier = { (ASCII_ALPHANUMERIC | "_" | "-")+ }
 image_identifier = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ":")+ }
-string_literal = { ("\"" ~ identifier ~ "\"" | raw_string){1} }
-string_content = { identifier* }
+string_literal = { ("\"" ~ string_content ~ "\"" | raw_string){1} }
+string_content = { (!("\"") ~ ANY)* }
 
 // raw strings was taken directly from 
 // https://pest.rs/book/grammars/syntax.html#the-stack-wip
@@ -44,7 +67,7 @@ tag = { tag_key ~ "=" ~ tag_value }
 tag_key = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ".")+ }
 tag_value = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ".")+ }
 
-import_declaration = ${ "import" ~ WHITESPACE ~ URI  ~ NEWLINE }
+import_declaration = ${ "import" ~ WHITESPACE ~ URI ~ NEWLINE }
 // URI parsing 😭🤕 https://www.rfc-editor.org/rfc/rfc3986#appendix-A
 // Accept basically anything as a URI on the way in, make any transformations
 // that are required because of the use of variables, and then parse it a touch 
@@ -52,3 +75,9 @@ import_declaration = ${ "import" ~ WHITESPACE ~ URI  ~ NEWLINE }
 URI = ${ scheme ~ ":" ~ "//" ~ heir_query_fragment }
 scheme = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "+" | "-" | ".")* }
 heir_query_fragment = @{ (ASCII_ALPHA | ASCII_DIGIT | "-" | "." | "_" | "~" | ":" | "/" | "?" | "#" | "[" | "]" | "@" | "!" | "$" | "&" | "'" | "(" | ")" | "*" | "+" | "," | ";" | "=")+ }
+
+job_specification = { "job" ~ identifier ~ "[" ~ task* ~ "]" }
+task = { identifier ~ "," }
+
+pipeline_specification = { "pipeline" ~ identifier ~ "[" ~ job* ~ "]" }
+job = {identifier ~ ","}
