@@ -157,7 +157,7 @@ mod tests {
     #[traced_test]
     #[test]
     fn can_parse_banner_pipeline() {
-        let code = fs::read_to_string("pipeline-assets/banner-pipeline.ban").expect("Should have been able to read the file");
+        let code = fs::read_to_string("../pipeline-assets/banner-pipeline.ban").expect("Should have been able to read the file");
 
         check(
             &code,

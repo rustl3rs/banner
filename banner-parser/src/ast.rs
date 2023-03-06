@@ -113,7 +113,7 @@ pub struct Import {
 pub struct Pipeline {
     pub imports: Vec<Import>,
     pub tasks: Vec<Task>,
-    eoi: EOI,
+    _eoi: EOI,
 }
 
 #[derive(Debug, FromPest)]

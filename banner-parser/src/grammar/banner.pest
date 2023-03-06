@@ -1,5 +1,19 @@
 pipeline_definition = {
-    SOI ~(task_definition | import_declaration)* ~ EOI
+    SOI ~(task_definition | import_declaration | let_statement | job_specification | pipeline_specification)* ~ EOI
+}
+
+let_statement = {
+    "let" ~ identifier ~ "=" ~ image_declaration
+}
+
+image_declaration = {
+    "Image" ~ "{" ~ image_specification ~ "}"
+}
+
+image_specification = {
+    "name" ~ "=" ~ image_identifier ~ "," ~ 
+    ("mount" ~ "=" ~ "[" ~ (identifier ~ "=>" ~ string_literal ~ ",")* ~ "]" ~ ",")? ~ 
+    ("env" ~ "=" ~ "[" ~ (identifier ~ "=" ~ string_literal ~ ",")* ~ "]" ~ ",")?
 }
 
 task_definition = {
@@ -7,17 +21,20 @@ task_definition = {
 }
 
 parameter_list = _{
-    "(" ~ "image" ~ ":" ~ image_identifier ~ "," ~ "execute" ~ ":" ~ string_literal ~ ")"
+    "(" ~ "image" ~ ":" ~ image_definition ~ "," ~ "execute" ~ ":" ~ string_literal ~ ")"
 }
 
 block = _{
     "{" ~ raw_string ~ "}"
 }
 
+image_definition = { (image_identifier|image_specification|variable) }
+
+variable = { "$" ~ "{" ~ identifier ~ "}" }
 identifier = { (ASCII_ALPHANUMERIC | "_" | "-")+ }
 image_identifier = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ":")+ }
-string_literal = { ("\"" ~ identifier ~ "\"" | raw_string){1} }
-string_content = { identifier* }
+string_literal = { ("\"" ~ string_content ~ "\"" | raw_string){1} }
+string_content = { (!("\"") ~ ANY)* }
 
 // raw strings was taken directly from 
 // https://pest.rs/book/grammars/syntax.html#the-stack-wip
@@ -52,3 +69,6 @@ import_declaration = ${ "import" ~ WHITESPACE ~ URI  ~ NEWLINE }
 URI = ${ scheme ~ ":" ~ "//" ~ heir_query_fragment }
 scheme = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "+" | "-" | ".")* }
 heir_query_fragment = @{ (ASCII_ALPHA | ASCII_DIGIT | "-" | "." | "_" | "~" | ":" | "/" | "?" | "#" | "[" | "]" | "@" | "!" | "$" | "&" | "'" | "(" | ")" | "*" | "+" | "," | ";" | "=")+ }
+
+job_specification = { "job" ~ identifier ~ "[" ~ (identifier ~ ",")* ~ "]" }
+pipeline_specification = { "pipeline" ~ identifier ~ "[" ~ (identifier ~ ",")* ~ "]" }
