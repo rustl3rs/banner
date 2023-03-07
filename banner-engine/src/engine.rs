@@ -4,7 +4,10 @@ use async_trait::async_trait;
 use banner_parser::ast::{Pipeline, Task};
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::{Event, Events, Image, Metadata, Tag, TaskDefinition, TaskEvent, TaskEventType};
+use crate::{
+    Event, Events, Image, SystemEventResult, SystemEventScope, SystemEventType, Tag,
+    TaskDefinition, TaskEvent, TaskEventType,
+};
 
 // This is the trait that needs to be implemented by all Engines.
 // Haven't thought it thru yet, but might also want a way to
@@ -56,13 +59,18 @@ pub async fn start_engine(
             Some(event) => match event {
                 Event::Task(event) => {
                     if let Some(task_name) = event.metadata().into_iter().find_map(|x| {
-                        if x.key() == "banner.io/task" && event.r#type() == &TaskEventType::System {
-                            Some(x.value())
+                        if x.key() == "banner.io/task"
+                            && event.r#type()
+                                == &TaskEventType::System(SystemEventType::Trigger(
+                                    SystemEventScope::Task,
+                                ))
+                        {
+                            Some(x.value().to_string())
                         } else {
                             None
                         }
                     }) {
-                        let task = find_task(engine.get_pipelines().await, task_name);
+                        let task = find_task(engine.get_pipelines().await, &task_name);
                         let task: TaskDefinition = task.into();
 
                         log::info!(target: "event_log", "Running Task: {task_name}");
@@ -70,21 +78,37 @@ pub async fn start_engine(
                         let e = engine.clone();
                         tokio::spawn(async move {
                             // send a start event
-                            TaskEvent::new(TaskEventType::System)
-                                .with_metadata(Metadata::new("".to_string(), "".to_string()))
-                                .send_from(&tx)
-                                .await;
+                            TaskEvent::new(TaskEventType::System(SystemEventType::Starting(
+                                SystemEventScope::Task,
+                            )))
+                            .with_name(&task_name)
+                            .send_from(&tx)
+                            .await;
 
                             match e.execute(&task).await {
-                                Ok(_) => (),
-                                Err(e) => log::error!(target: "task_log", "{e}"),
-                            }
+                                Ok(_) => {
+                                    // send an end event
+                                    TaskEvent::new(TaskEventType::System(SystemEventType::Done(
+                                        SystemEventScope::Task,
+                                        SystemEventResult::Success,
+                                    )))
+                                    .with_name(&task_name)
+                                    .send_from(&tx)
+                                    .await;
+                                }
+                                Err(e) => {
+                                    log::error!(target: "task_log", "{e}");
 
-                            // send an end event
-                            TaskEvent::new(TaskEventType::System)
-                                .with_metadata(Metadata::new("".to_string(), "".to_string()))
-                                .send_from(&tx)
-                                .await;
+                                    // send an end event
+                                    TaskEvent::new(TaskEventType::System(SystemEventType::Done(
+                                        SystemEventScope::Task,
+                                        SystemEventResult::Failed,
+                                    )))
+                                    .with_name(&task_name)
+                                    .send_from(&tx)
+                                    .await;
+                                }
+                            }
                         });
                     } else {
                         continue;
@@ -119,7 +143,7 @@ impl From<&Task> for TaskDefinition {
         let tags = task
             .tags
             .iter()
-            .map(|t| Tag::new(t.key.clone(), t.value.clone()))
+            .map(|t| Tag::new(&t.key, &t.value))
             .collect();
         let image = Image::new(task.image.clone(), None);
         let mut command: Vec<String> = task

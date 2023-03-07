@@ -46,24 +46,21 @@ async fn starts_task_with_required_tags() {
     )
     .await;
 
-    let pipeline_tag = Tag::new(
-        String::from("banner.io/pipeline"),
-        String::from("test-pipeline"),
-    );
+    let pipeline_tag = Tag::new("banner.io/pipeline", "test-pipeline");
     check_fails(
         "Expected banner.io tag not present on task: banner.io/job",
         vec![pipeline_tag.clone()],
     )
     .await;
 
-    let job_tag = Tag::new(String::from("banner.io/job"), String::from("test-job"));
+    let job_tag = Tag::new("banner.io/job", "test-job");
     check_fails(
         "Expected banner.io tag not present on task: banner.io/task",
         vec![pipeline_tag.clone(), job_tag.clone()],
     )
     .await;
 
-    let task_tag = Tag::new(String::from("banner.io/task"), String::from("test-task"));
+    let task_tag = Tag::new("banner.io/task", "test-task");
     check_succeeds(vec![pipeline_tag.clone(), job_tag.clone(), task_tag]).await;
 }
 

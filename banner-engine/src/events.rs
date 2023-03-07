@@ -71,6 +71,12 @@ pub struct TaskEventBuilder {
 }
 
 impl TaskEventBuilder {
+    pub fn with_name(&mut self, task_name: &str) -> &TaskEventBuilder {
+        let metadata = TaskMetadata::new("banner.io/task", task_name);
+        self.task_event.metadata.push(metadata);
+        self
+    }
+
     pub fn with_metadata(&mut self, metadata: TaskMetadata) -> &TaskEventBuilder {
         self.task_event.metadata.push(metadata);
         self
@@ -115,13 +121,31 @@ pub type PipelineEventType = EventType;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EventType {
     External,
-    System,
-    Success,
-    Failed,
-    Aborted,
-    Errored,
+    System(SystemEventType),
     Metric,
     Log,
     Notification,
     UserDefined,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SystemEventType {
+    Trigger(SystemEventScope),
+    Starting(SystemEventScope),
+    Done(SystemEventScope, SystemEventResult),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SystemEventScope {
+    Pipeline,
+    Job,
+    Task,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SystemEventResult {
+    Success,
+    Failed,
+    Aborted,
+    Errored,
 }

@@ -156,7 +156,6 @@ impl<'a> ::from_pest::FromPest<'a> for JobSpecification {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
         if pair.as_rule() == Rule::job_specification {
-            let span = pair.as_span();
             let mut inner = pair.into_inner();
             let inner = &mut inner;
             let this = JobSpecification {
@@ -206,7 +205,6 @@ impl<'a> ::from_pest::FromPest<'a> for PipelineSpecification {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
         if pair.as_rule() == Rule::pipeline_specification {
-            let span = pair.as_span();
             let mut inner = pair.into_inner();
             let inner = &mut inner;
             let this = PipelineSpecification {

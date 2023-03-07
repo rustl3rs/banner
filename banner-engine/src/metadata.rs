@@ -13,8 +13,11 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub fn new(key: String, value: String) -> Self {
-        Self { key, value }
+    pub fn new(key: &str, value: &str) -> Self {
+        Self {
+            key: key.to_string(),
+            value: value.to_string(),
+        }
     }
 
     pub fn key(&self) -> &str {
