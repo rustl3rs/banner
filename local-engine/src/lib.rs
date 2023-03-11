@@ -3,9 +3,8 @@ mod tag_missing_error;
 use async_trait::async_trait;
 use backon::ConstantBuilder;
 use backon::Retryable;
+use banner_engine::validate_pipeline;
 use banner_engine::{Engine, ExecutionResult, TaskDefinition};
-use banner_parser::ast::Pipeline;
-use banner_parser::parser::validate_pipeline;
 use bollard::container::{
     Config, CreateContainerOptions, ListContainersOptions, LogsOptions, RemoveContainerOptions,
     StartContainerOptions,
@@ -23,7 +22,7 @@ use tag_missing_error::TagMissingError;
 
 #[derive(Debug)]
 pub struct LocalEngine {
-    pipelines: Vec<Pipeline>,
+    pipelines: Vec<PathBuf>,
 }
 
 impl LocalEngine {
@@ -38,8 +37,8 @@ impl LocalEngine {
         let pipeline =
             fs::read_to_string(&filepath).expect("Should have been able to read the file");
         match validate_pipeline(pipeline) {
-            Ok(ast) => {
-                self.pipelines.push(ast);
+            Ok(()) => {
+                self.pipelines.push(filepath);
                 ()
             }
             Err(e) => {
@@ -142,8 +141,13 @@ impl Engine for LocalEngine {
         Ok(ExecutionResult::Success(vec![]))
     }
 
-    async fn get_pipelines(&self) -> &[Pipeline] {
-        &self.pipelines
+    async fn get_pipelines(&self) -> Vec<String> {
+        let pipelines: Vec<String> = self
+            .pipelines
+            .iter()
+            .map(|fb| fs::read_to_string(&fb).expect("Should have been able to read the file"))
+            .collect();
+        pipelines
     }
 }
 

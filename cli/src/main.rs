@@ -1,10 +1,13 @@
-use std::{error::Error, path::PathBuf, sync::Arc};
+use std::{error::Error, fs, path::PathBuf, sync::Arc};
 
-use banner_engine::{start_engine, Engine, Event};
+use banner_engine::{start_engine, validate_pipeline, Engine, Event};
 use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
 use log::{self, LevelFilter};
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::{
+    mpsc::{self, Receiver, Sender},
+    oneshot,
+};
 use tui_logger::{self, init_logger, set_default_level, set_level_for_target};
 use ui::terminal::create_terminal_ui;
 
@@ -26,6 +29,10 @@ enum Commands {
         file: PathBuf,
     },
     Remote {},
+    /// Validates the pipeline so it can be checked without trying to load it.
+    ValidatePipeline {
+        file: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -41,10 +48,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     log::debug!(target: "task_log", "Creating channels");
     let (tx, rx) = mpsc::channel(100);
+    let (ostx, osrx) = oneshot::channel::<bool>();
 
     tokio::select! {
-        _ = execute_command(rx, tx.clone()) => {},
-        _ = create_terminal_ui(tx.clone()) => {}
+        _ = execute_command(rx, tx.clone(), ostx) => {},
+        _ = create_terminal_ui(tx.clone(), osrx) => {}
     };
 
     Ok(())
@@ -53,10 +61,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 async fn execute_command(
     rx: Receiver<Event>,
     tx: Sender<Event>,
+    ostx: oneshot::Sender<bool>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let args = Args::parse();
     match args.command {
-        Commands::Local { file } => match execute_pipeline(file, rx, tx).await {
+        Commands::Local { file } => match execute_pipeline(file, rx, tx, ostx).await {
             Ok(_) => Ok(()),
             Err(e) => {
                 eprintln!("{}", e);
@@ -67,6 +76,20 @@ async fn execute_command(
             log::info!("Hello World!");
             Ok(())
         }
+        Commands::ValidatePipeline { file } => {
+            let pipeline =
+                fs::read_to_string(&file).expect("Should have been able to read the file");
+            match validate_pipeline(pipeline) {
+                Ok(()) => {
+                    println!("Pipeline validated successfully! 👍🏽 🎉 ✅");
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("Error occurred validating pipeline: 😞\n{e}");
+                    Err(e)
+                }
+            }
+        }
     }
 }
 
@@ -74,6 +97,7 @@ async fn execute_pipeline(
     filepath: PathBuf,
     rx: Receiver<Event>,
     tx: Sender<Event>,
+    ostx: oneshot::Sender<bool>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     log::info!(target: "task_log", "Starting pipeline");
     let mut engine = LocalEngine::new();
@@ -82,6 +106,9 @@ async fn execute_pipeline(
 
     log::info!(target: "task_log", "Confirming requirements");
     engine.confirm_requirements().await?;
+
+    // now we are ready to start messing with the terminal window.
+    let _ = ostx.send(true);
 
     log::info!(target: "task_log", "Starting orchestrator");
     start_engine(engine, rx, tx).await?;

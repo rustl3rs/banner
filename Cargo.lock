@@ -941,7 +941,6 @@ dependencies = [
  "async-trait",
  "backon",
  "banner-engine",
- "banner-parser",
  "bollard",
  "cap-tempfile",
  "futures",

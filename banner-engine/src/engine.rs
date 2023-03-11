@@ -1,7 +1,12 @@
 use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
-use banner_parser::ast::{Pipeline, Task};
+use banner_parser::{
+    ast::{Pipeline, Task},
+    grammar::{BannerParser, Rule},
+    FromPest, Parser,
+};
+use log::trace;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::{
@@ -36,7 +41,7 @@ pub trait Engine {
         task: &TaskDefinition,
     ) -> Result<ExecutionResult, Box<dyn Error + Send + Sync>>;
 
-    async fn get_pipelines(&self) -> &[Pipeline];
+    async fn get_pipelines(&self) -> Vec<String>;
 }
 
 #[derive(Debug)]
@@ -70,7 +75,13 @@ pub async fn start_engine(
                             None
                         }
                     }) {
-                        let task = find_task(engine.get_pipelines().await, &task_name);
+                        let pipelines: Vec<Pipeline> = engine
+                            .get_pipelines()
+                            .await
+                            .into_iter()
+                            .map(|pipeline| pipeline_to_ast(&pipeline))
+                            .collect();
+                        let task = find_task(&pipelines, &task_name);
                         let task: TaskDefinition = task.into();
 
                         log::info!(target: "event_log", "Running Task: {task_name}");
@@ -155,5 +166,17 @@ impl From<&Task> for TaskDefinition {
         command.push(task.script.clone());
         let td = Self::new(tags, image, command, vec![], vec![]);
         td
+    }
+}
+// This should be infallible.
+// The pipelines that get passed in should already have undergone transformation and validation
+fn pipeline_to_ast(code: &str) -> Pipeline {
+    let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, &code).unwrap();
+    match Pipeline::from_pest(&mut parse_tree) {
+        Ok(tree) => tree,
+        Err(e) => {
+            trace!("ERROR = {:#?}", e);
+            panic!("{:?}", e);
+        }
     }
 }

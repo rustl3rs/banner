@@ -9,7 +9,10 @@ use crossterm::{
 use futures_timer::Delay;
 use futures_util::future::FutureExt;
 use futures_util::stream::StreamExt;
-use tokio::{select, sync::mpsc::Sender};
+use tokio::{
+    select,
+    sync::{mpsc::Sender, oneshot::Receiver},
+};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
@@ -21,7 +24,11 @@ use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
 
 pub async fn create_terminal_ui(
     tx: Sender<banner_engine::Event>,
+    osrx: Receiver<bool>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    // wait for the signal to start doing this stuff.
+    let _ = osrx.await;
+
     // setup terminal
     let backend = {
         enable_raw_mode()?;

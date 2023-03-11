@@ -1,7 +1,9 @@
 pub mod ast;
+pub mod grammar;
 pub mod parser;
 
-mod grammar;
+pub use from_pest::FromPest;
+pub use pest::Parser;
 
 extern crate pest;
 #[macro_use]

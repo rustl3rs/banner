@@ -11,7 +11,7 @@ use crate::{
 extern crate from_pest;
 extern crate pest;
 
-pub fn validate_pipeline(code: String) -> Result<Pipeline, Box<dyn Error + Send + Sync>> {
+pub fn validate_pipeline(code: String) -> Result<(), Box<dyn Error + Send + Sync>> {
     trace!("code = {:#?}", &code);
     let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, &code)?;
     trace!("parse tree = {:#?}", parse_tree);
@@ -23,7 +23,7 @@ pub fn validate_pipeline(code: String) -> Result<Pipeline, Box<dyn Error + Send 
         }
     };
     trace!("syntax tree = {:#?}", syntax_tree);
-    Ok(syntax_tree)
+    Ok(())
 }
 
 #[cfg(test)]
