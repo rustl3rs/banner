@@ -3,7 +3,8 @@ mod tag_missing_error;
 use async_trait::async_trait;
 use backon::ConstantBuilder;
 use backon::Retryable;
-use banner_engine::validate_pipeline;
+use banner_engine::build_and_validate_pipeline;
+use banner_engine::Pipeline;
 use banner_engine::{Engine, ExecutionResult, TaskDefinition};
 use bollard::container::{
     Config, CreateContainerOptions, ListContainersOptions, LogsOptions, RemoveContainerOptions,
@@ -22,7 +23,7 @@ use tag_missing_error::TagMissingError;
 
 #[derive(Debug)]
 pub struct LocalEngine {
-    pipelines: Vec<PathBuf>,
+    pipelines: Vec<Pipeline>,
 }
 
 impl LocalEngine {
@@ -30,15 +31,15 @@ impl LocalEngine {
         Self { pipelines: vec![] }
     }
 
-    pub fn with_pipeline_from_file(
+    pub async fn with_pipeline_from_file(
         &mut self,
         filepath: PathBuf,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let pipeline =
             fs::read_to_string(&filepath).expect("Should have been able to read the file");
-        match validate_pipeline(pipeline) {
-            Ok(()) => {
-                self.pipelines.push(filepath);
+        match build_and_validate_pipeline(&pipeline).await {
+            Ok(pipeline) => {
+                self.pipelines.push(pipeline);
                 ()
             }
             Err(e) => {
@@ -141,14 +142,42 @@ impl Engine for LocalEngine {
         Ok(ExecutionResult::Success(vec![]))
     }
 
-    async fn get_pipelines(&self) -> Vec<String> {
-        let pipelines: Vec<String> = self
-            .pipelines
-            .iter()
-            .map(|fb| fs::read_to_string(&fb).expect("Should have been able to read the file"))
-            .collect();
-        pipelines
+    // TODO: come back and fix the scope pipeline and job usage.
+    async fn execute_task_name_in_scope(
+        &self,
+        _scope_name: &str,
+        _pipeline_name: &str,
+        _job_name: &str,
+        task_name: &str,
+    ) -> Result<ExecutionResult, Box<dyn Error + Send + Sync>> {
+        let task_definition: &TaskDefinition = get_task_definition(&self.pipelines, task_name);
+        self.execute(task_definition).await
     }
+
+    fn get_pipelines(&self) -> Vec<&banner_engine::Pipeline> {
+        self.pipelines.iter().collect()
+    }
+}
+
+fn get_task_definition<'a>(pipelines: &'a Vec<Pipeline>, task_name: &'a str) -> &'a TaskDefinition {
+    pipelines
+        .iter()
+        .find_map(|pipeline| {
+            Some(
+                pipeline
+                    .tasks
+                    .iter()
+                    .find(|task| {
+                        if (*task).get_name() == task_name {
+                            true
+                        } else {
+                            false
+                        }
+                    })
+                    .unwrap(),
+            )
+        })
+        .unwrap()
 }
 
 async fn stream_logs_from_container_to_stdout(

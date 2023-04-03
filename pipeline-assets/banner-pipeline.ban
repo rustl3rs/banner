@@ -1,4 +1,4 @@
-import https://github.com/rustl3rs/banner/pipeline-assets/echo_task.ban
+import https://raw.githubusercontent.com/rustl3rs/banner/main/pipeline-assets/echo_task.ban
 
 let rust_build_image = Image {
     name=rust:latest,
@@ -15,7 +15,7 @@ let rust_build_image = Image {
 task test(image: ${rust_build_image}, execute: "bash -exo pipefail -c") {
     r#"
     cd /source-code
-    
+
     # would be good to capture code coverage stats here.
     cargo test
     "#
@@ -30,5 +30,5 @@ pipeline banner [
     unit-test,
 ]
 
-// basically a stateless pipeline at present. 
+// basically a stateless pipeline at present.
 // when loaded, it must be manually triggered

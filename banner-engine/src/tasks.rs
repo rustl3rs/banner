@@ -1,6 +1,11 @@
+use banner_parser::ast::Task;
+
 use crate::Metadata;
 
+const TASK_TAG_NAME_KEY: &str = "task.banner.io/name";
+
 pub type Tag = Metadata;
+#[derive(Debug)]
 pub struct TaskDefinition {
     tags: Vec<Tag>,
     image: Image,
@@ -45,9 +50,23 @@ impl TaskDefinition {
     pub fn command(&self) -> &[String] {
         self.command.as_ref()
     }
+
+    pub fn get_name(&self) -> &str {
+        self.tags
+            .iter()
+            .find_map(|tag| {
+                if tag.key() == TASK_TAG_NAME_KEY {
+                    Some(tag.value())
+                } else {
+                    None
+                }
+            })
+            .unwrap()
+    }
 }
 
 pub type Uri = String;
+#[derive(Debug)]
 pub struct Image {
     // TBD
     source: Uri,
@@ -71,6 +90,7 @@ impl Image {
     }
 }
 
+#[derive(Debug)]
 pub enum TaskResource {
     Semver(semver::Version),
     Counter(u128),
@@ -79,7 +99,28 @@ pub enum TaskResource {
     Secret(String),
 }
 
+#[derive(Debug)]
 pub enum ImageRepositoryCredentials {
     UserPass(String, String),
     DockerConfig(String),
+}
+
+impl From<&Task> for TaskDefinition {
+    fn from(task: &Task) -> Self {
+        let tags = task
+            .tags
+            .iter()
+            .map(|t| Tag::new(&t.key, &t.value))
+            .collect();
+        let image = Image::new(task.image.clone(), None);
+        let mut command: Vec<String> = task
+            .command
+            .as_str()
+            .split_whitespace()
+            .map(|s| s.into())
+            .collect();
+        command.push(task.script.clone());
+        let td = Self::new(tags, image, command, vec![], vec![]);
+        td
+    }
 }

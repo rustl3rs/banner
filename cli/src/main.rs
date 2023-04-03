@@ -1,6 +1,6 @@
 use std::{error::Error, fs, path::PathBuf, sync::Arc};
 
-use banner_engine::{start_engine, validate_pipeline, Engine, Event};
+use banner_engine::{parse_file, start_engine, Engine, Event};
 use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
 use log::{self, LevelFilter};
@@ -79,7 +79,7 @@ async fn execute_command(
         Commands::ValidatePipeline { file } => {
             let pipeline =
                 fs::read_to_string(&file).expect("Should have been able to read the file");
-            match validate_pipeline(pipeline) {
+            match parse_file(pipeline) {
                 Ok(()) => {
                     println!("Pipeline validated successfully! 👍🏽 🎉 ✅");
                     Ok(())
@@ -101,7 +101,7 @@ async fn execute_pipeline(
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     log::info!(target: "task_log", "Starting pipeline");
     let mut engine = LocalEngine::new();
-    engine.with_pipeline_from_file(filepath)?;
+    engine.with_pipeline_from_file(filepath).await?;
     let engine = Arc::new(engine);
 
     log::info!(target: "task_log", "Confirming requirements");

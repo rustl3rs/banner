@@ -1,7 +1,7 @@
 // this task does the unit testing of the app
-task unit-test(image: alpine, execute: r#"sh -c"#) {
+task unit-test(image: alpine:latest, execute: r#"sh -c"#) {
     r#####"bash
-    # this is a bash comment  
+    # this is a bash comment
     echo rustl3rs herd!
     # basically a no-op.
     # But a good start to our testing.

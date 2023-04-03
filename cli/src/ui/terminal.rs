@@ -1,6 +1,6 @@
 use std::{error::Error, io, time::Duration};
 
-use banner_engine::{EventType, TaskEvent};
+use banner_engine::EventType;
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode},
     execute,
@@ -62,8 +62,8 @@ pub async fn create_terminal_ui(
 
                                     if event == Event::Key(KeyCode::Char('s').into()) {
                                         log::info!("Event received");
-                                        TaskEvent::new(EventType::System(banner_engine::SystemEventType::Trigger(banner_engine::SystemEventScope::Task)))
-                                            .with_name("unit-test")
+                                        banner_engine::Event::new(EventType::System(banner_engine::SystemEventType::Trigger(banner_engine::SystemEventScope::Task)))
+                                            .with_task_name("unit-test")
                                             .send_from(&tx).await;
                                     }
                                 }

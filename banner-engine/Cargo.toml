@@ -17,4 +17,16 @@ chrono = "0.4"
 semver = "*"
 log = "0.4"
 banner-parser = { path = "../banner-parser" }
-tokio = "*"
+tokio = {version = "1.25", features = ["test-util", "macros"]}
+rune = "*"
+rune-modules = "*"
+tracing = {workspace = true}
+hyper = { version = "*", features = ["client", "http2", "http1"] }
+hyper-tls = "*"
+const_format = "0.2.30"
+serde = "*"
+itertools = "*"
+
+[dev-dependencies]
+expect-test = "1.4.0"
+tracing-test = "0.1"

@@ -5,6 +5,8 @@ pub mod parser;
 pub use from_pest::FromPest;
 pub use pest::Parser;
 
+pub use iref::*;
+
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
