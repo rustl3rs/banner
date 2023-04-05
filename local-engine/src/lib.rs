@@ -5,6 +5,10 @@ use backon::ConstantBuilder;
 use backon::Retryable;
 use banner_engine::build_and_validate_pipeline;
 use banner_engine::Pipeline;
+use banner_engine::BANNER_METADATA_PREFIX;
+use banner_engine::JOB_TAG;
+use banner_engine::PIPELINE_TAG;
+use banner_engine::TASK_TAG;
 use banner_engine::{Engine, ExecutionResult, TaskDefinition};
 use bollard::container::{
     Config, CreateContainerOptions, ListContainersOptions, LogsOptions, RemoveContainerOptions,
@@ -76,9 +80,9 @@ impl Engine for LocalEngine {
         let docker = Docker::connect_with_local_defaults()?;
 
         // construct our container name
-        let pipeline_name = get_task_tag_value(&task, "pipeline")?;
-        let job_name = get_task_tag_value(&task, "job")?;
-        let task_name = get_task_tag_value(&task, "task")?;
+        let pipeline_name = get_task_tag_value(&task, PIPELINE_TAG)?;
+        let job_name = get_task_tag_value(&task, JOB_TAG)?;
+        let task_name = get_task_tag_value(&task, TASK_TAG)?;
         let container_name = format!("banner_{pipeline_name}_{job_name}_{task_name}");
 
         // TODO: don't pull if the image is already here?
@@ -139,6 +143,8 @@ impl Engine for LocalEngine {
         stream_logs_from_container_to_stdout(&container_name, &task_name).await?;
 
         remove_container(&container_name).await?;
+
+        // TODO: handle the container exit code.
         Ok(ExecutionResult::Success(vec![]))
     }
 
@@ -251,15 +257,16 @@ fn get_task_tag_value<'a>(
     match task
         .tags()
         .iter()
-        .filter(|tag| tag.key() == format!("banner.io/{key}"))
+        .filter(|tag| tag.key() == format!(""))
         .find_map(|tag| Some(tag.value()))
     {
         Some(value) => Ok(value),
         None => {
             let err = TagMissingError::new(format!(
-                "Expected banner.io tag not present on task: banner.io/{key}"
+                "Expected tag not present on task: {}/{key}",
+                BANNER_METADATA_PREFIX
             ));
-            Err(Box::new(err))
+            Ok("_")
         }
     }
 }

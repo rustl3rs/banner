@@ -3,6 +3,7 @@ mod event_handler;
 mod events;
 mod metadata;
 mod pipeline;
+mod rune_engine;
 mod tasks;
 
 // re-export

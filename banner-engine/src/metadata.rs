@@ -90,12 +90,12 @@ impl From<&str> for Metadata {
     }
 }
 
-const BANNER_METADATA_PREFIX: &str = "banner.dev";
-pub(crate) const PIPELINE_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "pipeline");
-pub(crate) const JOB_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "job");
-pub(crate) const TASK_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "task");
-pub(crate) const EVENT_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "event");
-pub(crate) const ERROR_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "error");
-pub(crate) const MATCHING_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "matching");
-pub(crate) const LOG_MESSAGE_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "log_message");
-pub(crate) const DESCRIPTION_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "description");
+pub const BANNER_METADATA_PREFIX: &str = "banner.dev";
+pub const PIPELINE_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "pipeline");
+pub const JOB_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "job");
+pub const TASK_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "task");
+pub const EVENT_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "event");
+pub const ERROR_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "error");
+pub const MATCHING_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "matching");
+pub const LOG_MESSAGE_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "log_message");
+pub const DESCRIPTION_TAG: &str = concatcp!(BANNER_METADATA_PREFIX, "/", "description");

@@ -116,7 +116,15 @@ pub async fn build_and_validate_pipeline(
 }
 
 fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
-    let tasks = ast.tasks.iter().map(|task| task.into()).collect();
+    let tasks = ast
+        .tasks
+        .iter()
+        .map(|task| {
+            let task_def = TaskDefinition::from(task);
+
+            task_def
+        })
+        .collect();
 
     // Must convert tasks, jobs and pipelines for now.
     // In future must also support free floating `on_event`
@@ -124,6 +132,7 @@ fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
         .tasks
         .iter()
         .map(|task| {
+            trace!(target: "task_log", "Getting event handlers for task: {}", task.name);
             let jobs: Vec<&JobSpecification> = ast
                 .jobs
                 .iter()
@@ -390,13 +399,8 @@ fn create_finished_pipeline_event_handler(
 fn generate_finish_pipeline_script(pipeline: &str) -> String {
     format!(
         r###"
-        pub fn main () {{
-            Event::new(EventType::System(SystemEventType::Done(
-                SystemEventScope::Pipeline,
-                SystemEventResult::Success,
-            )))
-            .with_pipeline_name({pipeline})
-            .send_from(tx);
+        pub async fn main (engine) {{
+            engine.trigger_pipeline("{pipeline}").await;
         }}
         "###
     )
@@ -405,13 +409,8 @@ fn generate_finish_pipeline_script(pipeline: &str) -> String {
 fn generate_start_job_script(job: &str, pipeline: &str) -> String {
     format!(
         r###"
-        pub fn main () {{
-            Event::new(EventType::System(SystemEventType::Trigger(
-                SystemEventScope::Job,
-            )))
-            .with_pipeline_name({pipeline})
-            .with_job_name({job})
-            .send_from(tx);
+        pub async fn main (engine) {{
+            engine.trigger_job("{pipeline}", "{job}").await;
         }}
         "###
     )
@@ -420,13 +419,8 @@ fn generate_start_job_script(job: &str, pipeline: &str) -> String {
 fn generate_start_pipeline_script(pipeline: &str, job_name: &str) -> String {
     format!(
         r###"
-        pub fn main () {{
-            Event::new(EventType::System(SystemEventType::Trigger(
-                SystemEventScope::Job,
-            )))
-            .with_pipeline_name({pipeline})
-            .with_job_name({job_name})
-            .send_from(tx);
+        pub async fn main (engine) {{
+            engine.trigger_job("{pipeline}", "{job_name}").await;
         }}
         "###
     )
@@ -435,10 +429,8 @@ fn generate_start_pipeline_script(pipeline: &str, job_name: &str) -> String {
 fn generate_pipeline_with_no_jobs_script(pipeline: &str) -> String {
     format!(
         r###"
-        pub fn main () {{
-            Event::new(EventType::Log)
-            .with_log_message("Pipeline [{pipeline}] has no jobs to trigger".to_string())
-            .send_from(tx);
+        pub async fn main (engine) {{
+            engine.log_message("Pipeline [{pipeline}] has no jobs to trigger").await;
         }}
         "###
     )
@@ -517,10 +509,8 @@ fn create_start_empty_job_event_handler(
 fn generate_job_with_no_tasks_script(pipeline: &str, job: &str) -> String {
     format!(
         r###"
-        pub fn main () {{
-            Event::new(EventType::Log)
-            .with_log_message("Job [{pipeline}/{job}] has no tasks to trigger".to_string())
-            .send_from(tx);
+        pub async fn main (engine) {{
+            engine.log_message("Job [{pipeline}/{job}] has no tasks to trigger").await;
         }}
         "###
     )
@@ -552,14 +542,8 @@ fn create_start_job_event_handler(pipeline: &str, job: &str, task: &str) -> Even
 fn generate_start_task_script(pipeline: &str, job: &str, task: &str) -> String {
     format!(
         r###"
-        pub fn main () {{
-            Event::new(EventType::System(SystemEventType::Trigger(
-                SystemEventScope::Task,
-            )))
-            .with_pipeline_name({pipeline})
-            .with_job_name({job})
-            .with_task_name({task})
-            .send_from(tx);
+        pub async fn main (engine) {{
+            engine.trigger_task("{pipeline}", "{job}", "{task}").await;
         }}
         "###
     )
@@ -624,14 +608,8 @@ fn create_finished_job_event_handler(
 fn generate_finish_job_script(pipeline: &str, job_name: &str) -> String {
     format!(
         r###"
-        pub fn main () {{
-            Event::new(EventType::System(SystemEventType::Done(
-                SystemEventScope::Job,
-                SystemEventResult::Success,
-            )))
-            .with_pipeline_name({pipeline})
-            .with_job_name({job_name})
-            .send_from(tx);
+        pub async fn main (engine) {{
+            engine.job_success("{pipeline}", "{job_name}").await;
         }}
         "###
     )

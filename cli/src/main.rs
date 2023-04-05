@@ -1,4 +1,4 @@
-use std::{error::Error, fs, path::PathBuf, sync::Arc, time::Duration};
+use std::{error::Error, fs, path::PathBuf, sync::Arc};
 
 use banner_engine::{parse_file, start_engine, Engine, Event};
 use clap::{Parser, Subcommand};

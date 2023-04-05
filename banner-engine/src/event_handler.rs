@@ -7,11 +7,9 @@ use rune::{
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    Engine, Event, EventType, Events, Metadata, SystemEventResult, SystemEventScope,
-    SystemEventType, Tag, JOB_TAG, PIPELINE_TAG, TASK_TAG,
+    rune_engine::RuneEngineWrapper, Engine, Event, EventType, Events, Metadata, SystemEventResult,
+    SystemEventScope, SystemEventType, Tag, JOB_TAG, PIPELINE_TAG, TASK_TAG,
 };
-
-use self::rune_engine::RuneEngineWrapper;
 
 #[derive(Debug, Clone)]
 pub struct EventHandler {
@@ -152,6 +150,13 @@ fn module() -> Result<Module, ContextError> {
     module.async_inst_fn("trigger_pipeline", RuneEngineWrapper::trigger_pipeline)?;
     module.async_inst_fn("trigger_job", RuneEngineWrapper::trigger_job)?;
     module.async_inst_fn("trigger_task", RuneEngineWrapper::trigger_task)?;
+    module.async_inst_fn("log_message", RuneEngineWrapper::log_message)?;
+    module.async_inst_fn("job_success", RuneEngineWrapper::job_success)?;
+    // module.async_inst_fn("job_failure", RuneEngineWrapper::job_failure)?;
+    module.async_inst_fn(
+        "execute_task_name_in_scope",
+        RuneEngineWrapper::execute_task_name_in_scope,
+    )?;
     Ok(module)
 }
 
@@ -166,9 +171,7 @@ mod tests {
 
     use super::*;
 
-    struct MockEngine {
-        pub call_count: u8,
-    }
+    struct MockEngine {}
 
     #[async_trait]
     impl Engine for MockEngine {
@@ -209,7 +212,7 @@ mod tests {
 
     // #[tokio::test]
     // async fn can_trigger_task() {
-    //     let e = MockEngine { call_count: 0 };
+    //     let e = MockEngine { };
     //     let script = "";
     //     let result = execute_event_script(&e, script).await;
     //     assert!(result.is_ok());
@@ -226,7 +229,7 @@ mod tests {
         "###;
 
         let (tx, mut rx) = mpsc::channel::<Event>(100);
-        let eng = Arc::new(MockEngine { call_count: 0 });
+        let eng = Arc::new(MockEngine {});
 
         let result = execute_event_script(eng, tx, script).await;
         assert!(result.is_ok());
@@ -254,52 +257,5 @@ mod tests {
             )))
             .build()
         );
-    }
-}
-
-mod rune_engine {
-    use std::sync::Arc;
-
-    use rune::Any;
-    use tokio::sync::mpsc::Sender;
-
-    use crate::{Engine, Event, EventType, SystemEventScope, SystemEventType};
-
-    #[derive(Any)]
-    pub struct RuneEngineWrapper {
-        pub engine: Arc<dyn Engine + Send + Sync>,
-        pub tx: Sender<Event>,
-    }
-
-    impl RuneEngineWrapper {
-        pub async fn trigger_pipeline(&self, pipeline: &str) {
-            Event::new(EventType::System(SystemEventType::Trigger(
-                SystemEventScope::Pipeline,
-            )))
-            .with_pipeline_name(pipeline)
-            .send_from(&self.tx)
-            .await;
-        }
-
-        pub async fn trigger_job(&self, pipeline: &str, job: &str) {
-            Event::new(EventType::System(SystemEventType::Trigger(
-                SystemEventScope::Job,
-            )))
-            .with_pipeline_name(pipeline)
-            .with_job_name(job)
-            .send_from(&self.tx)
-            .await;
-        }
-
-        pub async fn trigger_task(&self, pipeline: &str, job: &str, task: &str) {
-            Event::new(EventType::System(SystemEventType::Trigger(
-                SystemEventScope::Task,
-            )))
-            .with_pipeline_name(pipeline)
-            .with_job_name(job)
-            .with_task_name(task)
-            .send_from(&self.tx)
-            .await;
-        }
     }
 }

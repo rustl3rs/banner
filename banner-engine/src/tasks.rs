@@ -1,8 +1,8 @@
 use banner_parser::ast::Task;
+use itertools::Itertools;
+use log::debug;
 
-use crate::Metadata;
-
-const TASK_TAG_NAME_KEY: &str = "task.banner.io/name";
+use crate::{Metadata, TASK_TAG};
 
 pub type Tag = Metadata;
 #[derive(Debug)]
@@ -52,10 +52,12 @@ impl TaskDefinition {
     }
 
     pub fn get_name(&self) -> &str {
+        debug!(target: "task_log", "Searching for name tag in: {:?}", self);
         self.tags
             .iter()
             .find_map(|tag| {
-                if tag.key() == TASK_TAG_NAME_KEY {
+                debug!(target: "task_log", "tag: {:?}", tag);
+                if tag.key() == TASK_TAG {
                     Some(tag.value())
                 } else {
                     None
@@ -111,6 +113,7 @@ impl From<&Task> for TaskDefinition {
             .tags
             .iter()
             .map(|t| Tag::new(&t.key, &t.value))
+            .chain(Some(Tag::new_banner_task(&task.name)))
             .collect();
         let image = Image::new(task.image.clone(), None);
         let mut command: Vec<String> = task

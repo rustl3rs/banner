@@ -6,6 +6,7 @@ use async_trait::async_trait;
 //     FromPest, Parser,
 // };
 
+use log::debug;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::{event_handler::EventHandler, pipeline::Pipeline, Event, Events, TaskDefinition};
@@ -65,6 +66,8 @@ pub async fn start_engine(
 
     loop {
         let event = rx.recv().await;
+        debug!("received event: {:?}", event);
+
         if let Some(event) = event {
             // get all event handlers that are listening for this event.
             let pipelines = engine.get_pipelines();
