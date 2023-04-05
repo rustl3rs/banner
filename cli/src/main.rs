@@ -1,6 +1,6 @@
 use std::{error::Error, fs, path::PathBuf, sync::Arc};
 
-use banner_engine::{parse_file, start_engine, Engine, Event};
+use banner_engine::{parse_file, start_engine, Engine, Event, MATCHING_TAG};
 use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
 use log::{self, LevelFilter};
@@ -45,8 +45,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Set default level for unknown targets to Trace
     set_default_level(LevelFilter::Off);
-    set_level_for_target("task_log", LevelFilter::Debug);
-    set_level_for_target("event_log", LevelFilter::Debug);
+    let log_level = match std::env::var("RUST_LOG") {
+        Ok(level) => level.parse::<LevelFilter>()?,
+        Err(_) => LevelFilter::Debug,
+    };
+    set_level_for_target("task_log", log_level);
+    set_level_for_target("event_log", log_level);
 
     log::debug!(target: "task_log", "Creating channels");
     let (tx, rx) = mpsc::channel(100);

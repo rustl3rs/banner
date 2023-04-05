@@ -183,10 +183,6 @@ impl EventBuilder {
 // Well, in some part this is the list of possible states of a job/task in Concourse.
 // External: an event triggered by an external system.
 // System: something that might trigger a task for instance, set by the banner server.
-// Success: represents successful completion of the task/job/pipeline (called a stop)
-// Failed: represents faulty completion
-// Aborted: means the step was cut short by some kind of intervention via Banner
-// Errored: means the step was cut short by some external means; might be best to merge Errored and Aborted with a descriminator.
 // Metric: emit a metric for Banner to interpret and track
 // Log: informational event with data.
 // Notification: informational event that should result in a notification being sent to system users/operational systems.
@@ -217,6 +213,10 @@ pub enum SystemEventScope {
     EventHandler,
 }
 
+// Success: represents successful completion of the task/job/pipeline (called a stop)
+// Failed: represents faulty completion
+// Aborted: means the step was cut short by some kind of intervention via Banner
+// Errored: means the step was cut short by some external means; might be best to merge Errored and Aborted with a descriminator.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SystemEventResult {
     Success,
