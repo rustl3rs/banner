@@ -1,15 +1,17 @@
 use std::sync::Arc;
 
 use rune::{
-    termcolor::{BufferWriter, ColorChoice, StandardStream},
+    termcolor::{BufferWriter, ColorChoice},
     ContextError, Diagnostics, Module, Source, Sources, Vm,
 };
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    pipeline, Engine, Event, EventType, Events, Metadata, SystemEventResult, SystemEventScope,
+    Engine, Event, EventType, Events, Metadata, SystemEventResult, SystemEventScope,
     SystemEventType, Tag, JOB_TAG, PIPELINE_TAG, TASK_TAG,
 };
+
+use self::rune_engine::RuneEngineWrapper;
 
 #[derive(Debug, Clone)]
 pub struct EventHandler {
@@ -101,7 +103,7 @@ async fn execute_event_script(
     tx: Sender<Event>,
     script: &str,
 ) -> rune::Result<()> {
-    let m = module(engine, tx.clone())?;
+    let m = module()?;
 
     let mut context = rune_modules::default_context()?;
     context.install(&m)?;
@@ -130,24 +132,27 @@ async fn execute_event_script(
             .await;
     }
 
-    let mut vm = Vm::new(runtime, Arc::new(unit.unwrap()));
-    let output = vm.call(["main"], ())?;
-    // let output = Foo::from_value(output)?;
+    let wrapper = RuneEngineWrapper { engine, tx };
+    let vm = Vm::new(runtime, Arc::new(unit.unwrap())).send_execute(&["main"], (wrapper,))?;
+
+    // spawn this off into it's own thread so we can continue to process events. This is only required because
+    // we give users the capability to define their own event handlers. User defined event handlers could potentially
+    // be long running and we don't want to block the event loop.
+    tokio::spawn(async move {
+        vm.async_complete().await.unwrap();
+    });
+
     Ok(())
 }
 
-fn module(
-    engine: Arc<dyn Engine + Sync + Send>,
-    tx: Sender<Event>,
-) -> Result<Module, ContextError> {
-    let e = rune_engine::RuneEngineWrapper { engine, tx };
-    let mut m = Module::with_item(["module"]);
-    // m.ty::<Engine>()?;
-    // m.inst_fn(
-    //     "execute_task_name_in_scope",
-    //     Engine::execute_task_name_in_scope,
-    // )?;
-    Ok(m)
+// create a module for rune to use the rune_engine::RuneEngineWrapper and everything required by Event::new including rune_engine::RuneEngineWrapper::trigger_job(pipeline, job)
+fn module() -> Result<Module, ContextError> {
+    let mut module = Module::default();
+    module.ty::<RuneEngineWrapper>()?;
+    module.async_inst_fn("trigger_pipeline", RuneEngineWrapper::trigger_pipeline)?;
+    module.async_inst_fn("trigger_job", RuneEngineWrapper::trigger_job)?;
+    module.async_inst_fn("trigger_task", RuneEngineWrapper::trigger_task)?;
+    Ok(module)
 }
 
 #[cfg(test)]
@@ -213,42 +218,88 @@ mod tests {
     #[tokio::test]
     async fn rune_script_setup() {
         let script = r###"
-        pub fn main () {{
-            trigger_job("pipeline_1", "job_1")
+        pub async fn main (engine) {{
+            engine.trigger_pipeline("pipeline_1").await;
+            engine.trigger_job("pipeline_1", "job_1").await;
+            engine.trigger_task("pipeline_1", "job_1", "task_1").await;
         }}
         "###;
 
-        let (tx, rx) = mpsc::channel::<Event>(100);
-        let e = rune_engine::RuneEngineWrapper {
-            engine: Arc::new(MockEngine { call_count: 0 }),
-            tx,
-        };
+        let (tx, mut rx) = mpsc::channel::<Event>(100);
+        let eng = Arc::new(MockEngine { call_count: 0 });
 
-        let result = execute_event_script(&e, tx, script).await;
+        let result = execute_event_script(eng, tx, script).await;
         assert!(result.is_ok());
+        let message = rx.recv().await;
+        assert_eq!(
+            message.unwrap(),
+            Event::new(EventType::System(SystemEventType::Trigger(
+                SystemEventScope::Pipeline
+            )))
+            .build()
+        );
+        let message = rx.recv().await;
+        assert_eq!(
+            message.unwrap(),
+            Event::new(EventType::System(SystemEventType::Trigger(
+                SystemEventScope::Job
+            )))
+            .build()
+        );
+        let message = rx.recv().await;
+        assert_eq!(
+            message.unwrap(),
+            Event::new(EventType::System(SystemEventType::Trigger(
+                SystemEventScope::Task
+            )))
+            .build()
+        );
     }
 }
 
 mod rune_engine {
     use std::sync::Arc;
 
+    use rune::Any;
     use tokio::sync::mpsc::Sender;
 
     use crate::{Engine, Event, EventType, SystemEventScope, SystemEventType};
 
+    #[derive(Any)]
     pub struct RuneEngineWrapper {
         pub engine: Arc<dyn Engine + Send + Sync>,
         pub tx: Sender<Event>,
     }
 
     impl RuneEngineWrapper {
-        pub fn trigger_job(&self, pipeline: &str, job: &str) {
+        pub async fn trigger_pipeline(&self, pipeline: &str) {
+            Event::new(EventType::System(SystemEventType::Trigger(
+                SystemEventScope::Pipeline,
+            )))
+            .with_pipeline_name(pipeline)
+            .send_from(&self.tx)
+            .await;
+        }
+
+        pub async fn trigger_job(&self, pipeline: &str, job: &str) {
             Event::new(EventType::System(SystemEventType::Trigger(
                 SystemEventScope::Job,
             )))
             .with_pipeline_name(pipeline)
             .with_job_name(job)
-            .blocking_send_from(&self.tx);
+            .send_from(&self.tx)
+            .await;
+        }
+
+        pub async fn trigger_task(&self, pipeline: &str, job: &str, task: &str) {
+            Event::new(EventType::System(SystemEventType::Trigger(
+                SystemEventScope::Task,
+            )))
+            .with_pipeline_name(pipeline)
+            .with_job_name(job)
+            .with_task_name(task)
+            .send_from(&self.tx)
+            .await;
         }
     }
 }

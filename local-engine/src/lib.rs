@@ -215,20 +215,32 @@ async fn remove_container(container_name: &str) -> Result<(), Box<dyn Error + Se
 }
 
 async fn check_availability_of_docker() -> Result<(), Box<dyn Error + Send + Sync>> {
+    println!("Checking availability of docker...");
     // check for the existence of docker
     let docker = Docker::connect_with_local_defaults()?;
-    docker
+    let result = docker
         .list_containers(Some(ListContainersOptions::<String> {
             all: true,
             ..Default::default()
         }))
-        .await?;
-    Ok(())
+        .await;
+    match result {
+        Ok(_) => {
+            println!("Docker is available.");
+            Ok(())
+        }
+        Err(e) => {
+            println!("Docker is not available.");
+            Err(Box::new(e))
+        }
+    }
 }
 
 async fn check_access_to_temp() -> Result<(), Box<dyn Error + Send + Sync>> {
+    println!("Checking access to temp...");
     let dir = TempDir::new(ambient_authority())?;
     let _file = TempFile::new(&dir)?;
+    println!("Access to temp is good.");
     Ok(())
 }
 

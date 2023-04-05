@@ -80,16 +80,13 @@ pub async fn start_engine(
                 })
                 .flatten()
                 .collect();
-            // and execute thema all.
-            event_handlers.into_iter().for_each(|eh| {
+            // and execute them all.
+            for eh in event_handlers.into_iter() {
                 let e = engine.clone();
                 let tx = tx.clone();
                 let ev = event.clone();
-                tokio::spawn(async move {
-                    // execute event
-                    eh.execute(&(*e), tx, ev).await;
-                });
-            })
+                eh.execute(e, tx, ev).await;
+            }
         }
     }
 }
