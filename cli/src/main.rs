@@ -1,6 +1,6 @@
 use std::{error::Error, fs, path::PathBuf, sync::Arc};
 
-use banner_engine::{parse_file, start_engine, Engine, Event, MATCHING_TAG};
+use banner_engine::{parse_file, start_engine, Engine, Event};
 use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
 use log::{self, LevelFilter};

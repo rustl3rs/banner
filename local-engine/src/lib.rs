@@ -18,6 +18,7 @@ use bollard::image::CreateImageOptions;
 use bollard::Docker;
 use cap_tempfile::{ambient_authority, TempDir, TempFile};
 use futures_util::stream::TryStreamExt;
+use log::warn;
 use std::error::Error;
 use std::fs;
 use std::marker::{Send, Sync};
@@ -266,6 +267,7 @@ fn get_task_tag_value<'a>(
                 "Expected tag not present on task: {}/{key}",
                 BANNER_METADATA_PREFIX
             ));
+            warn!("{err:?}");
             Ok("_")
         }
     }

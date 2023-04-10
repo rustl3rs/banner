@@ -170,7 +170,9 @@ impl<'a> ::from_pest::FromPest<'a> for JobSpecification {
                 tasks: inner
                     .into_iter()
                     .map(|p| {
-                        let span = p.as_span();
+                        // we need to strip out the trailing ","
+                        let inner = p.into_inner().into_iter().next().unwrap();
+                        let span = inner.as_span();
                         debug!("THE SPAN: {:?}", span);
                         span.as_str().to_string()
                     })
@@ -219,7 +221,9 @@ impl<'a> ::from_pest::FromPest<'a> for PipelineSpecification {
                 jobs: inner
                     .into_iter()
                     .map(|p| {
-                        let span = p.as_span();
+                        // we need to strip out the trailing ","
+                        let inner = p.into_inner().into_iter().next().unwrap();
+                        let span = inner.as_span();
                         debug!("THE SPAN: {:?}", span);
                         span.as_str().to_string()
                     })

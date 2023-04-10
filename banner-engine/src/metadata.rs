@@ -85,7 +85,7 @@ impl Metadata {
 }
 
 impl From<&str> for Metadata {
-    fn from(value: &str) -> Self {
+    fn from(_value: &str) -> Self {
         todo!()
     }
 }

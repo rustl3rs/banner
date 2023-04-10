@@ -1,5 +1,4 @@
 use banner_parser::ast::Task;
-use itertools::Itertools;
 use log::debug;
 
 use crate::{Metadata, TASK_TAG};

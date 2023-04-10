@@ -3,7 +3,7 @@ use std::fmt::Display;
 use chrono::{DateTime, TimeZone, Utc};
 use tokio::sync::mpsc::Sender;
 
-use crate::{metadata::Metadata, PIPELINE_TAG};
+use crate::metadata::Metadata;
 
 pub type Events = Vec<Event>;
 
@@ -109,15 +109,15 @@ pub(crate) fn matching_banner_metadata(lhs: &[Metadata], rhs: &[Metadata]) -> bo
     lhs.iter().all(|tag| rhs.iter().any(|t| t == tag))
 }
 
-fn get_pipeline_name(e: &Event) -> Option<&str> {
-    e.metadata.iter().find_map(|t| {
-        if t.key() == PIPELINE_TAG {
-            Some(t.value())
-        } else {
-            None
-        }
-    })
-}
+// fn get_pipeline_name(e: &Event) -> Option<&str> {
+//     e.metadata.iter().find_map(|t| {
+//         if t.key() == PIPELINE_TAG {
+//             Some(t.value())
+//         } else {
+//             None
+//         }
+//     })
+// }
 
 pub struct EventBuilder {
     event: Event,
@@ -264,7 +264,7 @@ mod tests {
 
     #[test]
     fn construct_log_event() {
-        let event = Event::new(EventType::Log)
+        Event::new(EventType::Log)
             .with_job_name("job_name")
             .with_pipeline_name("pipeline_name")
             .with_log_message("my log message")

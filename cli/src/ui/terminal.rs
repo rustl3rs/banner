@@ -61,8 +61,14 @@ pub async fn create_terminal_ui(
                                     }
 
                                     if event == Event::Key(KeyCode::Char('s').into()) {
-                                        log::info!("Event received");
+                                        log::info!("Start Pipeline UI Event received");
                                         banner_engine::Event::new(EventType::System(SystemEventType::Trigger(SystemEventScope::Pipeline)))
+                                            .with_pipeline_name("banner")
+                                            .send_from(&tx).await;
+                                    }
+                                    if event == Event::Key(KeyCode::Char('h').into()) {
+                                        log::info!("Print EventHandler UI Event received");
+                                        banner_engine::Event::new(EventType::)
                                             .with_pipeline_name("banner")
                                             .send_from(&tx).await;
                                     }
