@@ -97,6 +97,26 @@ impl RuneEngineWrapper {
         .await;
     }
 
+    pub async fn pipeline_success(&self, pipeline: &str, job: &str, task: &str) {
+        Event::new(EventType::System(SystemEventType::Done(
+            SystemEventScope::Pipeline,
+            SystemEventResult::Success,
+        )))
+        .with_pipeline_name(pipeline)
+        .send_from(&self.tx)
+        .await;
+    }
+
+    pub async fn pipeline_fail(&self, pipeline: &str, job: &str, task: &str) {
+        Event::new(EventType::System(SystemEventType::Done(
+            SystemEventScope::Pipeline,
+            SystemEventResult::Errored,
+        )))
+        .with_pipeline_name(pipeline)
+        .send_from(&self.tx)
+        .await;
+    }
+
     pub async fn execute_task_name_in_scope(
         &self,
         scope: &str,

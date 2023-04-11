@@ -12,7 +12,7 @@ let rust_build_image = Image {
 }
 
 [tag: rustl3rs.com/owner=pms1969]
-task test(image: ${rust_build_image}, execute: "bash -exo pipefail -c") {
+task test(image: rust:latest, execute: "bash -exo pipefail -c") {
     r#"
     cd /source-code
 

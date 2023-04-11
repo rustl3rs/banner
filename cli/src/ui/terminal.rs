@@ -61,19 +61,19 @@ pub async fn create_terminal_ui(
                                     }
 
                                     if event == Event::Key(KeyCode::Char('s').into()) {
-                                        log::info!("Start Pipeline UI Event received");
+                                        log::info!(target: "task_log", "Start Pipeline UI Event received");
                                         banner_engine::Event::new(EventType::System(SystemEventType::Trigger(SystemEventScope::Pipeline)))
                                             .with_pipeline_name("banner")
                                             .send_from(&tx).await;
                                     }
                                     if event == Event::Key(KeyCode::Char('h').into()) {
-                                        log::info!("Print EventHandler UI Event received");
-                                        banner_engine::Event::new(EventType::)
+                                        log::info!(target: "task_log", "Print EventHandler UI Event received");
+                                        banner_engine::Event::new(EventType::UserDefined)
                                             .with_pipeline_name("banner")
                                             .send_from(&tx).await;
                                     }
                                 }
-                                Some(Err(e)) => log::error!("Error: {:?}\r", e),
+                                Some(Err(e)) => log::error!(target: "task_log", "Error: {:?}\r", e),
                                 None => break,
                             };
                             terminal.draw(|f| {

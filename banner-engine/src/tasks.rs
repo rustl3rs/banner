@@ -111,8 +111,10 @@ impl From<&Task> for TaskDefinition {
         let tags = task
             .tags
             .iter()
-            .map(|t| Tag::new(&t.key, &t.value))
-            .chain(Some(Tag::new_banner_task(&task.name)))
+            .map(|t| Tag::new(&t.key, &t.value)) // Add all the tags described with the task
+            // .chain(Some(Tag::new_banner_task(&task.name))) // Add task tag
+            // .chain(Some(Tag::new_banner_job(job))) // Add job tag
+            // .chain(Some(Tag::new_banner_pipeline(pipeline))) // Add pipeline tag
             .collect();
         let image = Image::new(task.image.clone(), None);
         let mut command: Vec<String> = task

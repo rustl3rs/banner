@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use chrono::{DateTime, TimeZone, Utc};
-use tokio::sync::mpsc::Sender;
+use tokio::{sync::mpsc::Sender, time::sleep};
 
 use crate::metadata::Metadata;
 
@@ -98,7 +98,7 @@ impl PartialEq for Event {
             | (EventType::Metric, EventType::Metric)
             | (EventType::Log, EventType::Log)
             | (EventType::Notification, EventType::Notification) => true,
-            (EventType::UserDefined, EventType::UserDefined) => todo!(),
+            (EventType::UserDefined, EventType::UserDefined) => true,
             (_, _) => false,
         }
     }

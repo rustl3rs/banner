@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use log::debug;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::{event_handler::EventHandler, pipeline::Pipeline, Event, Events, TaskDefinition};
+use crate::{event_handler::EventHandler, Event, Events, Pipeline, TaskDefinition};
 
 // This is the trait that needs to be implemented by all Engines.
 // Haven't thought it thru yet, but might also want a way to
@@ -61,14 +61,31 @@ pub async fn start_engine(
     mut rx: Receiver<Event>,
     tx: Sender<Event>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    log::info!("initialising");
+    log::info!(target: "task_log", "initialising");
     engine.initialise().await?;
 
     loop {
         let event = rx.recv().await;
-        debug!("received event: {:?}", event);
+        debug!(target: "task_log", "received event: {:?}", event);
+
+        // artificial_pause().await;
 
         if let Some(event) = event {
+            if event == Event::new(crate::EventType::UserDefined).build() {
+                log::debug!(target: "task_log", "received user defined event");
+                // engine.get_pipelines().into_iter().for_each(|p| {
+                //     p.event_handlers
+                //         .iter()
+                //         .for_each(|eh| log::debug!(target: "task_log", "event handler: {:?}", eh))
+                // });
+                engine.get_pipelines().into_iter().for_each(|p| {
+                    p.tasks.iter().for_each(|t| {
+                        log::debug!(target: "task_log", "task: {:?}", t);
+                    });
+                });
+                continue;
+            }
+
             // get all event handlers that are listening for this event.
             let pipelines = engine.get_pipelines();
             let event_handlers: Vec<EventHandler> = pipelines
@@ -92,4 +109,10 @@ pub async fn start_engine(
             }
         }
     }
+}
+
+#[inline]
+async fn artificial_pause() {
+    let pause = 10000;
+    tokio::time::sleep(std::time::Duration::from_millis(pause)).await;
 }

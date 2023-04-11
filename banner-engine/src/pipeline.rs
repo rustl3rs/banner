@@ -201,6 +201,7 @@ fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
         })
         .flatten()
         .collect();
+
     let pipeline_events: Vec<EventHandler> = ast
         .pipelines
         .iter()
@@ -210,6 +211,7 @@ fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
         })
         .flatten()
         .collect();
+
     let event_handlers = pipeline_events
         .into_iter()
         .chain(job_events.into_iter())
@@ -280,11 +282,14 @@ fn get_eventhandlers_for_pipeline(pipeline: &ast::PipelineSpecification) -> Vec<
 
     let mut iterator = pipeline.jobs.iter().rev();
     let mut some_job = iterator.next();
-    while let Some(job) = some_job {
-        // Create event handler to emit an event when the last job finishes.
+
+    // Create event handler to emit an event when the last job finishes.
+    if let Some(job) = some_job {
         let eh = create_finished_pipeline_event_handler(pipeline, job);
         event_handlers.push(eh);
+    }
 
+    while let Some(job) = some_job {
         // For every job we need to create:
         //   * an event handler to trigger on successful completion of the previous job.
         let next = iterator.clone().next();
@@ -400,7 +405,7 @@ fn generate_finish_pipeline_script(pipeline: &str) -> String {
     format!(
         r###"
         pub async fn main (engine) {{
-            engine.trigger_pipeline("{pipeline}").await;
+            engine.pipeline_success("{pipeline}").await;
         }}
         "###
     )
@@ -458,11 +463,14 @@ fn get_eventhandlers_for_job(
 
     let mut iterator = job.tasks.iter().rev();
     let mut some_task = iterator.next();
-    while let Some(task) = some_task {
-        // Create event handler to emit an event when the last task finishes.
+
+    // Create event handler to emit an event when the last task finishes.
+    if let Some(task) = some_task {
         let eh = create_finished_job_event_handler(pipeline, job, task);
         event_handlers.push(eh);
+    }
 
+    while let Some(task) = some_task {
         // For every job we need to create:
         //   * an event handler to trigger on successful completion of the previous task.
         let next = iterator.clone().next();
@@ -591,11 +599,12 @@ fn create_finished_job_event_handler(
         pipeline, &job.name, task
     ));
     let listen_for_event = Event::new(EventType::System(SystemEventType::Done(
-        SystemEventScope::Job,
+        SystemEventScope::Task,
         SystemEventResult::Success,
     )))
     .with_pipeline_name(pipeline)
     .with_job_name(&job.name)
+    .with_task_name(task)
     .build();
     let script = generate_finish_job_script(pipeline, &job.name);
     EventHandler::new(
