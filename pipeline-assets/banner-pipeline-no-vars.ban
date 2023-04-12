@@ -1,18 +1,7 @@
 import https://gist.githubusercontent.com/pms1969/464d6304014f9376be7e07b3ccf3a972/raw/a929e3feccd5384a00fe4e7ce6431f46dbb02951/cowsay.ban
 
-let rust_build_image = Image {
-    name=rust:latest,
-    mount=[
-        src => "/source-code",
-    ],
-    env=[
-        RUSTLOG="${log_level}",
-        RUST_BACKTRACE="1",
-    ],
-}
-
 [tag: rustl3rs.com/owner=pms1969]
-task test(image: ${rust_build_image}, execute: "bash -exo pipefail -c") {
+task test(image: rust:latest, execute: "bash -exo pipefail -c") {
     r#"
     cd /source-code
 
