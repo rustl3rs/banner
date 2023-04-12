@@ -269,3 +269,13 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod event_handler_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_is_listening_for() {
+        let eh = EventHandler::new(tags, listen_for_events, script)
+    }
+}

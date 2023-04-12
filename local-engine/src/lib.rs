@@ -7,6 +7,7 @@ use banner_engine::{
     build_and_validate_pipeline, Engine, ExecutionResult, Pipeline, TaskDefinition, JOB_TAG,
     PIPELINE_TAG, TASK_TAG,
 };
+use bollard::container::InspectContainerOptions;
 use bollard::container::{
     Config, CreateContainerOptions, ListContainersOptions, LogsOptions, RemoveContainerOptions,
     StartContainerOptions,
@@ -83,7 +84,6 @@ impl Engine for LocalEngine {
         let task_name = get_task_tag_value(&task, TASK_TAG)?;
         let container_name = format!("banner_{pipeline_name}_{job_name}_{task_name}");
 
-        // TODO: don't pull if the image is already here?
         // ensure the image is pulled locally.
         let cio = CreateImageOptions {
             from_image: task.image().source(),
@@ -143,12 +143,19 @@ impl Engine for LocalEngine {
         stream_logs_from_container_to_stdout(&container_name, &task_name).await?;
 
         // get the container status so we can get it's exit code.
+        let inspect_options = InspectContainerOptions { size: false };
+        let inspect_result = docker
+            .inspect_container(&container_name, Some(inspect_options))
+            .await?;
 
         // clean up.
         remove_container(&container_name).await?;
 
-        // TODO: handle the container exit code.
-        Ok(ExecutionResult::Success(vec![]))
+        // handle the container exit code.
+        match inspect_result.state.unwrap().exit_code.unwrap() {
+            0 => Ok(ExecutionResult::Success(vec![])),
+            _ => Ok(ExecutionResult::Failed(vec![])),
+        }
     }
 
     // TODO: fix the scope pipeline and job usage.

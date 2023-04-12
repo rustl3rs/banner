@@ -217,7 +217,7 @@ pub enum SystemEventScope {
 // Failed: represents faulty completion
 // Aborted: means the step was cut short by some kind of intervention via Banner
 // Errored: means the step was cut short by some external means; might be best to merge Errored and Aborted with a descriminator.
-// TODO: Events are either successful or not.  if not, then they have a result of execution-failed, aborted or system-errored. Maybe, think it thru more.
+// TODO: Executions are either successful or not.  if not, then they have a result of execution-failed, aborted or system-errored. Maybe, think it thru more.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SystemEventResult {
     Success,
@@ -259,8 +259,18 @@ mod tests {
             metadata: vec![],
         };
 
+        let e4 = Event {
+            r#type: EventType::System(SystemEventType::Done(
+                SystemEventScope::Task,
+                SystemEventResult::Failed,
+            )),
+            time_emitted: 0,
+            metadata: vec![],
+        };
+
         assert_eq!(e1, e2);
         assert_ne!(e1, e3);
+        assert_ne!(e2, e4);
     }
 
     #[test]
