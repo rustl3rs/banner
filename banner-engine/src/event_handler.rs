@@ -34,15 +34,15 @@ impl EventHandler {
         trigger: Event,
     ) {
         let (pipeline_name, job_name, task_name) = get_target_pipeline_and_task(trigger.metadata());
-        Event::new(EventType::System(SystemEventType::Starting(
-            SystemEventScope::EventHandler,
-        )))
-        .with_pipeline_name(pipeline_name)
-        .with_job_name(job_name)
-        .with_task_name(task_name)
-        .with_event(&trigger)
-        .send_from(&tx)
-        .await;
+        // Event::new(EventType::System(SystemEventType::Starting(
+        //     SystemEventScope::EventHandler,
+        // )))
+        // .with_pipeline_name(pipeline_name)
+        // .with_job_name(job_name)
+        // .with_task_name(task_name)
+        // .with_event(&trigger)
+        // .send_from(&tx)
+        // .await;
 
         let script: &str = &self.script;
         let result = execute_event_script(engine, tx.clone(), script).await;
@@ -136,8 +136,14 @@ async fn execute_event_script(
     // spawn this off into it's own thread so we can continue to process events. This is only required because
     // we give users the capability to define their own event handlers. User defined event handlers could potentially
     // be long running and we don't want to block the event loop.
+    let scr = script.to_owned();
     tokio::spawn(async move {
-        vm.async_complete().await.unwrap();
+        match vm.async_complete().await {
+            Ok(_) => {}
+            Err(e) => {
+                log::error!(target: "task_log", "There was an error running rune script: {e}\nfor: {scr}")
+            }
+        }
     });
 
     Ok(())

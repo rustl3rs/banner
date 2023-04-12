@@ -65,7 +65,7 @@ impl RuneEngineWrapper {
     pub async fn job_fail(&self, pipeline: &str, job: &str) {
         Event::new(EventType::System(SystemEventType::Done(
             SystemEventScope::Job,
-            SystemEventResult::Errored,
+            SystemEventResult::Failed,
         )))
         .with_pipeline_name(pipeline)
         .with_job_name(job)
@@ -75,7 +75,7 @@ impl RuneEngineWrapper {
 
     pub async fn task_success(&self, pipeline: &str, job: &str, task: &str) {
         Event::new(EventType::System(SystemEventType::Done(
-            SystemEventScope::Job,
+            SystemEventScope::Task,
             SystemEventResult::Success,
         )))
         .with_pipeline_name(pipeline)
@@ -87,8 +87,8 @@ impl RuneEngineWrapper {
 
     pub async fn task_fail(&self, pipeline: &str, job: &str, task: &str) {
         Event::new(EventType::System(SystemEventType::Done(
-            SystemEventScope::Job,
-            SystemEventResult::Errored,
+            SystemEventScope::Task,
+            SystemEventResult::Failed,
         )))
         .with_pipeline_name(pipeline)
         .with_job_name(job)
@@ -97,7 +97,7 @@ impl RuneEngineWrapper {
         .await;
     }
 
-    pub async fn pipeline_success(&self, pipeline: &str, job: &str, task: &str) {
+    pub async fn pipeline_success(&self, pipeline: &str) {
         Event::new(EventType::System(SystemEventType::Done(
             SystemEventScope::Pipeline,
             SystemEventResult::Success,
@@ -107,10 +107,10 @@ impl RuneEngineWrapper {
         .await;
     }
 
-    pub async fn pipeline_fail(&self, pipeline: &str, job: &str, task: &str) {
+    pub async fn pipeline_fail(&self, pipeline: &str) {
         Event::new(EventType::System(SystemEventType::Done(
             SystemEventScope::Pipeline,
-            SystemEventResult::Errored,
+            SystemEventResult::Failed,
         )))
         .with_pipeline_name(pipeline)
         .send_from(&self.tx)

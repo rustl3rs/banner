@@ -3,13 +3,10 @@ mod tag_missing_error;
 use async_trait::async_trait;
 use backon::ConstantBuilder;
 use backon::Retryable;
-use banner_engine::build_and_validate_pipeline;
-use banner_engine::Pipeline;
-use banner_engine::BANNER_METADATA_PREFIX;
-use banner_engine::JOB_TAG;
-use banner_engine::PIPELINE_TAG;
-use banner_engine::TASK_TAG;
-use banner_engine::{Engine, ExecutionResult, TaskDefinition};
+use banner_engine::{
+    build_and_validate_pipeline, Engine, ExecutionResult, Pipeline, TaskDefinition, JOB_TAG,
+    PIPELINE_TAG, TASK_TAG,
+};
 use bollard::container::{
     Config, CreateContainerOptions, ListContainersOptions, LogsOptions, RemoveContainerOptions,
     StartContainerOptions,
@@ -141,15 +138,20 @@ impl Engine for LocalEngine {
             }
         };
 
+        // TODO: spawn this and a metrics task.
+        //       metrics task to gather CPU/Memory and Network usage of the container and make them available for prometheus? emit as metrics events.
         stream_logs_from_container_to_stdout(&container_name, &task_name).await?;
 
+        // get the container status so we can get it's exit code.
+
+        // clean up.
         remove_container(&container_name).await?;
 
         // TODO: handle the container exit code.
         Ok(ExecutionResult::Success(vec![]))
     }
 
-    // TODO: come back and fix the scope pipeline and job usage.
+    // TODO: fix the scope pipeline and job usage.
     async fn execute_task_name_in_scope(
         &self,
         _scope_name: &str,
@@ -255,19 +257,11 @@ fn get_task_tag_value<'a>(
     task: &'a TaskDefinition,
     key: &str,
 ) -> Result<&'a str, Box<dyn Error + Send + Sync>> {
-    match task
-        .tags()
-        .iter()
-        .filter(|tag| tag.key() == format!(""))
-        .find_map(|tag| Some(tag.value()))
-    {
+    match task.tags().iter().find_map(|tag| Some(tag.value())) {
         Some(value) => Ok(value),
         None => {
-            let err = TagMissingError::new(format!(
-                "Expected tag not present on task: {}/{key}",
-                BANNER_METADATA_PREFIX
-            ));
-            warn!("{err:?}");
+            let err = TagMissingError::new(format!("Expected tag not present on task: {key}",));
+            warn!(target: "task_log", "{err:?}");
             Ok("_")
         }
     }

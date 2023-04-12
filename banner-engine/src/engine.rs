@@ -73,11 +73,12 @@ pub async fn start_engine(
         if let Some(event) = event {
             if event == Event::new(crate::EventType::UserDefined).build() {
                 log::debug!(target: "task_log", "received user defined event");
-                // engine.get_pipelines().into_iter().for_each(|p| {
-                //     p.event_handlers
-                //         .iter()
-                //         .for_each(|eh| log::debug!(target: "task_log", "event handler: {:?}", eh))
-                // });
+                engine.get_pipelines().into_iter().for_each(|p| {
+                    log::debug!(target: "task_log", "Number of event handlers: {}", p.event_handlers.len());
+                    p.event_handlers
+                        .iter()
+                        .for_each(|eh| log::debug!(target: "task_log", "event handler: {:?}", eh))
+                });
                 engine.get_pipelines().into_iter().for_each(|p| {
                     p.tasks.iter().for_each(|t| {
                         log::debug!(target: "task_log", "task: {:?}", t);

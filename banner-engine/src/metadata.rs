@@ -14,12 +14,12 @@ pub struct Metadata {
 
 impl Metadata {
     pub fn new(key: &str, value: &str) -> Self {
-        if key.starts_with(&BANNER_METADATA_PREFIX) {
-            panic!(
-                "You may not use banner annotations directly. This is a reserved prefix. {}",
-                BANNER_METADATA_PREFIX
-            )
-        };
+        // if key.starts_with(&BANNER_METADATA_PREFIX) {
+        //     panic!(
+        //         "You may not use banner annotations directly. This is a reserved prefix. {}",
+        //         BANNER_METADATA_PREFIX
+        //     )
+        // };
         Self {
             key: key.to_string(),
             value: value.to_string(),
