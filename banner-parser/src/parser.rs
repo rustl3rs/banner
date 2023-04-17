@@ -11,7 +11,7 @@ use crate::{
 extern crate from_pest;
 extern crate pest;
 
-pub fn validate_pipeline(code: String) -> Result<(), Box<dyn Error + Send + Sync>> {
+pub fn parse_file(code: String) -> Result<(), Box<dyn Error + Send + Sync>> {
     trace!("code = {:#?}", &code);
     let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, &code)?;
     trace!("parse tree = {:#?}", parse_tree);
@@ -36,7 +36,7 @@ mod tests {
     use super::*;
 
     fn check(code: &str, expect: Expect) {
-        match validate_pipeline(code.to_owned()) {
+        match parse_file(code.to_owned()) {
             Ok(ast) => {
                 let actual = format!("{:#?}", ast);
                 expect.assert_eq(&actual);
@@ -52,18 +52,7 @@ mod tests {
     #[test]
     fn can_parse_comment() {
         let code = String::from("// a test");
-        check(
-            &code,
-            expect![[r#"
-                Pipeline {
-                    imports: [],
-                    images: [],
-                    tasks: [],
-                    jobs: None,
-                    pipelines: None,
-                    _eoi: EOI,
-                }"#]],
-        )
+        check(&code, expect!["()"])
     }
 
     // #[traced_test]
@@ -78,28 +67,7 @@ mod tests {
         }
         "#######;
 
-        check(
-            code,
-            expect![[r#"
-                Pipeline {
-                    imports: [],
-                    images: [],
-                    tasks: [
-                        Task {
-                            tags: [],
-                            name: "unit-test",
-                            image: "rustl3rs/banner-rust-build:latest",
-                            command: RawString(
-                                "/bin/bash -c",
-                            ),
-                            script: "bash\n            echo testing, testing, 1, 2, 3!",
-                        },
-                    ],
-                    jobs: None,
-                    pipelines: None,
-                    _eoi: EOI,
-                }"#]],
-        )
+        check(code, expect!["()"])
     }
 
     // #[traced_test]
@@ -115,37 +83,7 @@ mod tests {
         }
         "#######;
 
-        check(
-            code,
-            expect![[r#"
-                Pipeline {
-                    imports: [],
-                    images: [],
-                    tasks: [
-                        Task {
-                            tags: [
-                                Tag {
-                                    key: "banner.io/owner",
-                                    value: "me",
-                                },
-                                Tag {
-                                    key: "banner.io/company",
-                                    value: "rustl3rs",
-                                },
-                            ],
-                            name: "unit-test",
-                            image: "rustl3rs/banner-rust-build",
-                            command: RawString(
-                                "/bin/bash -c",
-                            ),
-                            script: "bash\n            echo testing, testing, 1, 2, 3!",
-                        },
-                    ],
-                    jobs: None,
-                    pipelines: None,
-                    _eoi: EOI,
-                }"#]],
-        )
+        check(code, expect!["()"])
     }
 
     // #[traced_test]
@@ -156,22 +94,7 @@ mod tests {
         // import https://github.com/rustl3rs/banner/pipeline-assets/echo_task.ban
         "#######;
 
-        check(
-            code,
-            expect![[r#"
-                Pipeline {
-                    imports: [
-                        Import {
-                            uri: "file://./single_task.ban",
-                        },
-                    ],
-                    images: [],
-                    tasks: [],
-                    jobs: None,
-                    pipelines: None,
-                    _eoi: EOI,
-                }"#]],
-        )
+        check(code, expect!["()"])
     }
 
     #[traced_test]
@@ -180,79 +103,161 @@ mod tests {
         let code = fs::read_to_string("../pipeline-assets/banner-pipeline.ban")
             .expect("Should have been able to read the file");
 
+        check(&code, expect!["()"])
+    }
+}
+
+#[cfg(test)]
+mod pipeline_from_ast_tests {
+    use expect_test::{expect, Expect};
+    use tracing_test::traced_test;
+
+    use super::*;
+
+    fn check(code: &str, expect: Expect) {
+        let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, &code).unwrap();
+        match Pipeline::from_pest(&mut parse_tree) {
+            Ok(tree) => {
+                let actual = format!("{:#?}", tree);
+                expect.assert_eq(&actual);
+            }
+            Err(e) => {
+                trace!("ERROR = {:#?}", e);
+                panic!("{:?}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_syntax() {
+        let code = r#######"
+        [tag: banner.io/owner=me]
+        [tag: banner.io/company=rustl3rs]
+        task unit-test(image: rustl3rs/banner-rust-build, execute: r#"/bin/bash -c"#) {
+            r#####"bash
+            echo testing, testing, 1, 2, 3!
+            "#####
+        }
+        "#######;
+
+        check(
+            &code,
+            expect![[r#"
+            Pipeline {
+                imports: [],
+                images: [],
+                tasks: [
+                    Task {
+                        tags: [
+                            Tag {
+                                key: "banner.io/owner",
+                                value: "me",
+                            },
+                            Tag {
+                                key: "banner.io/company",
+                                value: "rustl3rs",
+                            },
+                        ],
+                        name: "unit-test",
+                        image: "rustl3rs/banner-rust-build",
+                        command: RawString(
+                            "/bin/bash -c",
+                        ),
+                        script: "bash\n            echo testing, testing, 1, 2, 3!",
+                    },
+                ],
+                jobs: [],
+                pipelines: [],
+                eoi: EOI,
+            }"#]],
+        )
+    }
+
+    #[test]
+    fn can_parse_pipeline_with_job_and_task() {
+        let code = r#######"
+        task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
+
+        job build [
+            cowsay,
+        ]
+
+        pipeline test [
+            build,
+        ]
+        "#######;
+
         check(
             &code,
             expect![[r#"
                 Pipeline {
-                    imports: [
-                        Import {
-                            uri: "https://github.com/rustl3rs/banner/pipeline-assets/echo_task.ban",
-                        },
-                    ],
-                    images: [
-                        Images {
-                            name: "rust_build_image",
-                            image: Image {
-                                name: "rust:latest",
-                                mounts: [
-                                    Mount {
-                                        source: "src",
-                                        destination: RawString(
-                                            "/source-code",
-                                        ),
-                                    },
-                                ],
-                                envs: [
-                                    EnviromentVariable {
-                                        key: "RUSTLOG",
-                                        value: RawString(
-                                            "${log_level}",
-                                        ),
-                                    },
-                                    EnviromentVariable {
-                                        key: "RUST_BACKTRACE",
-                                        value: RawString(
-                                            "1",
-                                        ),
-                                    },
-                                ],
-                            },
-                        },
-                    ],
+                    imports: [],
+                    images: [],
                     tasks: [
                         Task {
-                            tags: [
-                                Tag {
-                                    key: "rustl3rs.com/owner",
-                                    value: "pms1969",
-                                },
-                            ],
-                            name: "test",
-                            image: "${rust_build_image}",
+                            tags: [],
+                            name: "cowsay",
+                            image: "kmcgivern/cowsay-alpine:latest",
                             command: RawString(
-                                "bash -exo pipefail -c",
+                                "",
                             ),
-                            script: "cd /source-code\n    \n    # would be good to capture code coverage stats here.\n    cargo test",
+                            script: "",
                         },
                     ],
-                    jobs: Some(
+                    jobs: [
                         JobSpecification {
-                            name: "unit-test",
+                            name: "build",
                             tasks: [
-                                "cowsay,",
-                                "test,",
+                                "cowsay",
                             ],
                         },
-                    ),
-                    pipelines: Some(
+                    ],
+                    pipelines: [
                         PipelineSpecification {
-                            name: "banner",
+                            name: "test",
                             jobs: [
-                                "unit-test,",
+                                "build",
                             ],
                         },
-                    ),
-                    _eoi: EOI,
+                    ],
+                    eoi: EOI,
+                }"#]],
+        )
+    }
+
+    #[traced_test]
+    #[test]
+    fn can_parse_pipeline_with_job() {
+        let code = r#######"
+        job build []
+
+        pipeline test [
+            build,
+        ]
+        "#######;
+
+        check(
+            &code,
+            expect![[r#"
+                Pipeline {
+                    imports: [],
+                    images: [],
+                    tasks: [],
+                    jobs: [
+                        JobSpecification {
+                            name: "build",
+                            tasks: [],
+                        },
+                    ],
+                    pipelines: [
+                        PipelineSpecification {
+                            name: "test",
+                            jobs: [
+                                "build",
+                            ],
+                        },
+                    ],
+                    eoi: EOI,
                 }"#]],
         )
     }

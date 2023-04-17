@@ -1,6 +1,6 @@
 use std::{error::Error, fs, path::PathBuf, sync::Arc};
 
-use banner_engine::{start_engine, validate_pipeline, Engine, Event};
+use banner_engine::{parse_file, start_engine, Engine, Event};
 use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
 use log::{self, LevelFilter};
@@ -37,14 +37,20 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    println!("Starting Banner CLI...");
+
     // install global collector configured based on RUST_LOG env var.
     // Set max_log_level to Trace
     init_logger(LevelFilter::Trace)?;
 
     // Set default level for unknown targets to Trace
     set_default_level(LevelFilter::Off);
-    set_level_for_target("task_log", LevelFilter::Debug);
-    set_level_for_target("event_log", LevelFilter::Debug);
+    let log_level = match std::env::var("RUST_LOG") {
+        Ok(level) => level.parse::<LevelFilter>()?,
+        Err(_) => LevelFilter::Debug,
+    };
+    set_level_for_target("task_log", log_level);
+    set_level_for_target("event_log", log_level);
 
     log::debug!(target: "task_log", "Creating channels");
     let (tx, rx) = mpsc::channel(100);
@@ -79,7 +85,7 @@ async fn execute_command(
         Commands::ValidatePipeline { file } => {
             let pipeline =
                 fs::read_to_string(&file).expect("Should have been able to read the file");
-            match validate_pipeline(pipeline) {
+            match parse_file(pipeline) {
                 Ok(()) => {
                     println!("Pipeline validated successfully! 👍🏽 🎉 ✅");
                     Ok(())
@@ -99,18 +105,21 @@ async fn execute_pipeline(
     tx: Sender<Event>,
     ostx: oneshot::Sender<bool>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    println!("Loading pipeline from file: {:?}", filepath);
     log::info!(target: "task_log", "Starting pipeline");
     let mut engine = LocalEngine::new();
-    engine.with_pipeline_from_file(filepath)?;
+    engine.with_pipeline_from_file(filepath).await?;
     let engine = Arc::new(engine);
 
     log::info!(target: "task_log", "Confirming requirements");
+    println!("Confirming requirements...");
     engine.confirm_requirements().await?;
 
     // now we are ready to start messing with the terminal window.
     let _ = ostx.send(true);
 
     log::info!(target: "task_log", "Starting orchestrator");
+    println!("Starting orchestrator...");
     start_engine(engine, rx, tx).await?;
     log::info!(target: "task_log", "Exiting orchestrator");
 

@@ -1,18 +1,15 @@
 use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
-use banner_parser::{
-    ast::{Pipeline, Task},
-    grammar::{BannerParser, Rule},
-    FromPest, Parser,
-};
-use log::trace;
+// use banner_parser::{
+//     grammar::{BannerParser, Rule},
+//     FromPest, Parser,
+// };
+
+use log::debug;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::{
-    Event, Events, Image, SystemEventResult, SystemEventScope, SystemEventType, Tag,
-    TaskDefinition, TaskEvent, TaskEventType,
-};
+use crate::{event_handler::EventHandler, Event, Events, Pipeline, TaskDefinition};
 
 // This is the trait that needs to be implemented by all Engines.
 // Haven't thought it thru yet, but might also want a way to
@@ -41,7 +38,16 @@ pub trait Engine {
         task: &TaskDefinition,
     ) -> Result<ExecutionResult, Box<dyn Error + Send + Sync>>;
 
-    async fn get_pipelines(&self) -> Vec<String>;
+    // found a need for this when writing the pipeline event_handling stuff.
+    async fn execute_task_name_in_scope(
+        &self,
+        scope_name: &str,
+        pipeline_name: &str,
+        job_name: &str,
+        task_name: &str,
+    ) -> Result<ExecutionResult, Box<dyn Error + Send + Sync>>;
+
+    fn get_pipelines(&self) -> Vec<&Pipeline>;
 }
 
 #[derive(Debug)]
@@ -55,128 +61,60 @@ pub async fn start_engine(
     mut rx: Receiver<Event>,
     tx: Sender<Event>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    log::info!("initialising");
+    log::info!(target: "task_log", "initialising");
     engine.initialise().await?;
 
     loop {
         let event = rx.recv().await;
-        match event {
-            Some(event) => match event {
-                Event::Task(event) => {
-                    if let Some(task_name) = event.metadata().into_iter().find_map(|x| {
-                        if x.key() == "banner.io/task"
-                            && event.r#type()
-                                == &TaskEventType::System(SystemEventType::Trigger(
-                                    SystemEventScope::Task,
-                                ))
-                        {
-                            Some(x.value().to_string())
-                        } else {
-                            None
-                        }
-                    }) {
-                        let pipelines: Vec<Pipeline> = engine
-                            .get_pipelines()
-                            .await
-                            .into_iter()
-                            .map(|pipeline| pipeline_to_ast(&pipeline))
-                            .collect();
-                        let task = find_task(&pipelines, &task_name);
-                        let task: TaskDefinition = task.into();
+        debug!(target: "task_log", "received event: {:?}", event);
 
-                        log::info!(target: "event_log", "Running Task: {task_name}");
-                        let tx = tx.clone();
-                        let e = engine.clone();
-                        tokio::spawn(async move {
-                            // send a start event
-                            TaskEvent::new(TaskEventType::System(SystemEventType::Starting(
-                                SystemEventScope::Task,
-                            )))
-                            .with_name(&task_name)
-                            .send_from(&tx)
-                            .await;
+        // artificial_pause().await;
 
-                            match e.execute(&task).await {
-                                Ok(_) => {
-                                    // send an end event
-                                    TaskEvent::new(TaskEventType::System(SystemEventType::Done(
-                                        SystemEventScope::Task,
-                                        SystemEventResult::Success,
-                                    )))
-                                    .with_name(&task_name)
-                                    .send_from(&tx)
-                                    .await;
-                                }
-                                Err(e) => {
-                                    log::error!(target: "task_log", "{e}");
+        if let Some(event) = event {
+            if event == Event::new(crate::EventType::UserDefined).build() {
+                log::debug!(target: "task_log", "received user defined event");
+                engine.get_pipelines().into_iter().for_each(|p| {
+                    log::debug!(target: "task_log", "Number of event handlers: {}", p.event_handlers.len());
+                    p.event_handlers
+                        .iter()
+                        .for_each(|eh| log::debug!(target: "task_log", "event handler: {:?}", eh))
+                });
+                engine.get_pipelines().into_iter().for_each(|p| {
+                    p.tasks.iter().for_each(|t| {
+                        log::debug!(target: "task_log", "task: {:?}", t);
+                    });
+                });
+                continue;
+            }
 
-                                    // send an end event
-                                    TaskEvent::new(TaskEventType::System(SystemEventType::Done(
-                                        SystemEventScope::Task,
-                                        SystemEventResult::Failed,
-                                    )))
-                                    .with_name(&task_name)
-                                    .send_from(&tx)
-                                    .await;
-                                }
-                            }
-                        });
+            // get all event handlers that are listening for this event.
+            let pipelines = engine.get_pipelines();
+            let event_handlers: Vec<EventHandler> = pipelines
+                .into_iter()
+                .filter_map(|pipeline| {
+                    let handlers = pipeline.events_matching(&event);
+                    log::debug!(target: "event_log", "handlers: {:?}", handlers);
+                    if handlers.len() > 0 {
+                        Some(handlers)
                     } else {
-                        continue;
-                    };
-                }
-                Event::Job(_event) => todo!(),
-                Event::Pipeline(_event) => todo!(),
-            },
-            None => (),
+                        None
+                    }
+                })
+                .flatten()
+                .collect();
+            // and execute them all.
+            for eh in event_handlers.into_iter() {
+                let e = engine.clone();
+                let tx = tx.clone();
+                let ev = event.clone();
+                eh.execute(e, tx, ev).await;
+            }
         }
     }
 }
 
-fn find_task(pipelines: &[Pipeline], task_name: &str) -> TaskDefinition {
-    pipelines
-        .iter()
-        .find_map(|pipeline| {
-            let tasks = pipeline.tasks.iter();
-            tasks.into_iter().find_map(|task| {
-                if task.name == task_name {
-                    Some(task.into())
-                } else {
-                    None
-                }
-            })
-        })
-        .unwrap()
-}
-
-impl From<&Task> for TaskDefinition {
-    fn from(task: &Task) -> Self {
-        let tags = task
-            .tags
-            .iter()
-            .map(|t| Tag::new(&t.key, &t.value))
-            .collect();
-        let image = Image::new(task.image.clone(), None);
-        let mut command: Vec<String> = task
-            .command
-            .as_str()
-            .split_whitespace()
-            .map(|s| s.into())
-            .collect();
-        command.push(task.script.clone());
-        let td = Self::new(tags, image, command, vec![], vec![]);
-        td
-    }
-}
-// This should be infallible.
-// The pipelines that get passed in should already have undergone transformation and validation
-fn pipeline_to_ast(code: &str) -> Pipeline {
-    let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, &code).unwrap();
-    match Pipeline::from_pest(&mut parse_tree) {
-        Ok(tree) => tree,
-        Err(e) => {
-            trace!("ERROR = {:#?}", e);
-            panic!("{:?}", e);
-        }
-    }
+#[inline]
+async fn artificial_pause() {
+    let pause = 10000;
+    tokio::time::sleep(std::time::Duration::from_millis(pause)).await;
 }

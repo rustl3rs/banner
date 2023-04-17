@@ -4,4 +4,5 @@ members = ["cli", "banner-engine", "k8s-engine", "local-engine", "banner-parser"
 
 [workspace.dependencies]
 tracing = "0.1"
+tracing-test = "0.2.4"
 async-trait = "*"

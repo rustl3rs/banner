@@ -1,6 +1,6 @@
 use std::{error::Error, io, time::Duration};
 
-use banner_engine::{EventType, TaskEvent};
+use banner_engine::{EventType, SystemEventScope, SystemEventType};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode},
     execute,
@@ -61,13 +61,19 @@ pub async fn create_terminal_ui(
                                     }
 
                                     if event == Event::Key(KeyCode::Char('s').into()) {
-                                        log::info!("Event received");
-                                        TaskEvent::new(EventType::System(banner_engine::SystemEventType::Trigger(banner_engine::SystemEventScope::Task)))
-                                            .with_name("unit-test")
+                                        log::info!(target: "task_log", "Start Pipeline UI Event received");
+                                        banner_engine::Event::new(EventType::System(SystemEventType::Trigger(SystemEventScope::Pipeline)))
+                                            .with_pipeline_name("banner")
+                                            .send_from(&tx).await;
+                                    }
+                                    if event == Event::Key(KeyCode::Char('h').into()) {
+                                        log::info!(target: "task_log", "Print EventHandler UI Event received");
+                                        banner_engine::Event::new(EventType::UserDefined)
+                                            .with_pipeline_name("banner")
                                             .send_from(&tx).await;
                                     }
                                 }
-                                Some(Err(e)) => log::error!("Error: {:?}\r", e),
+                                Some(Err(e)) => log::error!(target: "task_log", "Error: {:?}\r", e),
                                 None => break,
                             };
                             terminal.draw(|f| {
@@ -95,7 +101,7 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+        .constraints([Constraint::Percentage(10), Constraint::Percentage(90)].as_ref())
         .split(f.size());
     let block = Block::default()
         .title(" Pipeline (test) ")

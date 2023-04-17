@@ -1,2 +1,2 @@
 // this task does the unit testing of the app
-task cowsay(image: kmcgivern/cowsay-alpine) {}
+task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}

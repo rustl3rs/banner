@@ -3,8 +3,11 @@ mod tag_missing_error;
 use async_trait::async_trait;
 use backon::ConstantBuilder;
 use backon::Retryable;
-use banner_engine::validate_pipeline;
-use banner_engine::{Engine, ExecutionResult, TaskDefinition};
+use banner_engine::{
+    build_and_validate_pipeline, Engine, ExecutionResult, Pipeline, TaskDefinition, JOB_TAG,
+    PIPELINE_TAG, TASK_TAG,
+};
+use bollard::container::InspectContainerOptions;
 use bollard::container::{
     Config, CreateContainerOptions, ListContainersOptions, LogsOptions, RemoveContainerOptions,
     StartContainerOptions,
@@ -13,6 +16,7 @@ use bollard::image::CreateImageOptions;
 use bollard::Docker;
 use cap_tempfile::{ambient_authority, TempDir, TempFile};
 use futures_util::stream::TryStreamExt;
+use log::warn;
 use std::error::Error;
 use std::fs;
 use std::marker::{Send, Sync};
@@ -22,7 +26,7 @@ use tag_missing_error::TagMissingError;
 
 #[derive(Debug)]
 pub struct LocalEngine {
-    pipelines: Vec<PathBuf>,
+    pipelines: Vec<Pipeline>,
 }
 
 impl LocalEngine {
@@ -30,15 +34,15 @@ impl LocalEngine {
         Self { pipelines: vec![] }
     }
 
-    pub fn with_pipeline_from_file(
+    pub async fn with_pipeline_from_file(
         &mut self,
         filepath: PathBuf,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let pipeline =
             fs::read_to_string(&filepath).expect("Should have been able to read the file");
-        match validate_pipeline(pipeline) {
-            Ok(()) => {
-                self.pipelines.push(filepath);
+        match build_and_validate_pipeline(&pipeline).await {
+            Ok(pipeline) => {
+                self.pipelines.push(pipeline);
                 ()
             }
             Err(e) => {
@@ -75,12 +79,11 @@ impl Engine for LocalEngine {
         let docker = Docker::connect_with_local_defaults()?;
 
         // construct our container name
-        let pipeline_name = get_task_tag_value(&task, "pipeline")?;
-        let job_name = get_task_tag_value(&task, "job")?;
-        let task_name = get_task_tag_value(&task, "task")?;
+        let pipeline_name = get_task_tag_value(&task, PIPELINE_TAG)?;
+        let job_name = get_task_tag_value(&task, JOB_TAG)?;
+        let task_name = get_task_tag_value(&task, TASK_TAG)?;
         let container_name = format!("banner_{pipeline_name}_{job_name}_{task_name}");
 
-        // TODO: don't pull if the image is already here?
         // ensure the image is pulled locally.
         let cio = CreateImageOptions {
             from_image: task.image().source(),
@@ -135,20 +138,62 @@ impl Engine for LocalEngine {
             }
         };
 
+        // TODO: spawn this and a metrics task.
+        //       metrics task to gather CPU/Memory and Network usage of the container and make them available for prometheus? emit as metrics events.
         stream_logs_from_container_to_stdout(&container_name, &task_name).await?;
 
+        // get the container status so we can get it's exit code.
+        let inspect_options = InspectContainerOptions { size: false };
+        let inspect_result = docker
+            .inspect_container(&container_name, Some(inspect_options))
+            .await?;
+
+        // clean up.
         remove_container(&container_name).await?;
-        Ok(ExecutionResult::Success(vec![]))
+
+        // handle the container exit code.
+        match inspect_result.state.unwrap().exit_code.unwrap() {
+            0 => Ok(ExecutionResult::Success(vec![])),
+            _ => Ok(ExecutionResult::Failed(vec![])),
+        }
     }
 
-    async fn get_pipelines(&self) -> Vec<String> {
-        let pipelines: Vec<String> = self
-            .pipelines
-            .iter()
-            .map(|fb| fs::read_to_string(&fb).expect("Should have been able to read the file"))
-            .collect();
-        pipelines
+    // TODO: fix the scope pipeline and job usage.
+    async fn execute_task_name_in_scope(
+        &self,
+        _scope_name: &str,
+        _pipeline_name: &str,
+        _job_name: &str,
+        task_name: &str,
+    ) -> Result<ExecutionResult, Box<dyn Error + Send + Sync>> {
+        let task_definition: &TaskDefinition = get_task_definition(&self.pipelines, task_name);
+        self.execute(task_definition).await
     }
+
+    fn get_pipelines(&self) -> Vec<&banner_engine::Pipeline> {
+        self.pipelines.iter().collect()
+    }
+}
+
+fn get_task_definition<'a>(pipelines: &'a Vec<Pipeline>, task_name: &'a str) -> &'a TaskDefinition {
+    pipelines
+        .iter()
+        .find_map(|pipeline| {
+            Some(
+                pipeline
+                    .tasks
+                    .iter()
+                    .find(|task| {
+                        if (*task).get_name() == task_name {
+                            true
+                        } else {
+                            false
+                        }
+                    })
+                    .unwrap(),
+            )
+        })
+        .unwrap()
 }
 
 async fn stream_logs_from_container_to_stdout(
@@ -186,20 +231,32 @@ async fn remove_container(container_name: &str) -> Result<(), Box<dyn Error + Se
 }
 
 async fn check_availability_of_docker() -> Result<(), Box<dyn Error + Send + Sync>> {
+    println!("Checking availability of docker...");
     // check for the existence of docker
     let docker = Docker::connect_with_local_defaults()?;
-    docker
+    let result = docker
         .list_containers(Some(ListContainersOptions::<String> {
             all: true,
             ..Default::default()
         }))
-        .await?;
-    Ok(())
+        .await;
+    match result {
+        Ok(_) => {
+            println!("Docker is available.");
+            Ok(())
+        }
+        Err(e) => {
+            println!("Docker is not available.");
+            Err(Box::new(e))
+        }
+    }
 }
 
 async fn check_access_to_temp() -> Result<(), Box<dyn Error + Send + Sync>> {
+    println!("Checking access to temp...");
     let dir = TempDir::new(ambient_authority())?;
     let _file = TempFile::new(&dir)?;
+    println!("Access to temp is good.");
     Ok(())
 }
 
@@ -207,18 +264,12 @@ fn get_task_tag_value<'a>(
     task: &'a TaskDefinition,
     key: &str,
 ) -> Result<&'a str, Box<dyn Error + Send + Sync>> {
-    match task
-        .tags()
-        .iter()
-        .filter(|tag| tag.key() == format!("banner.io/{key}"))
-        .find_map(|tag| Some(tag.value()))
-    {
+    match task.tags().iter().find_map(|tag| Some(tag.value())) {
         Some(value) => Ok(value),
         None => {
-            let err = TagMissingError::new(format!(
-                "Expected banner.io tag not present on task: banner.io/{key}"
-            ));
-            Err(Box::new(err))
+            let err = TagMissingError::new(format!("Expected tag not present on task: {key}",));
+            warn!(target: "task_log", "{err:?}");
+            Ok("_")
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::ops;
+
 use crate::grammar::Rule;
 use pest::Span;
 use tracing::debug;
@@ -7,7 +9,7 @@ fn span_into_str(span: Span) -> &str {
     span.as_str()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StringLiteral {
     RawString(String),
     StringLiteral(String),
@@ -79,7 +81,7 @@ impl StringLiteral {
     }
 }
 
-#[derive(Debug, FromPest)]
+#[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::task_definition))]
 pub struct Task {
     pub tags: Vec<Tag>,
@@ -92,7 +94,7 @@ pub struct Task {
     pub script: String,
 }
 
-#[derive(Debug, FromPest)]
+#[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::tag))]
 pub struct Tag {
     #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
@@ -101,14 +103,14 @@ pub struct Tag {
     pub value: String,
 }
 
-#[derive(Debug, FromPest)]
+#[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::import_declaration))]
 pub struct Import {
     #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub uri: String,
 }
 
-#[derive(Debug, FromPest)]
+#[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::mount))]
 pub struct Mount {
     #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
@@ -116,7 +118,7 @@ pub struct Mount {
     pub destination: StringLiteral,
 }
 
-#[derive(Debug, FromPest)]
+#[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::env_var))]
 pub struct EnviromentVariable {
     #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
@@ -124,7 +126,7 @@ pub struct EnviromentVariable {
     pub value: StringLiteral,
 }
 
-#[derive(Debug, FromPest)]
+#[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::image_specification))]
 pub struct Image {
     #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
@@ -133,7 +135,7 @@ pub struct Image {
     pub envs: Vec<EnviromentVariable>,
 }
 
-#[derive(Debug, FromPest)]
+#[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::let_statement))]
 pub struct Images {
     #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
@@ -141,7 +143,7 @@ pub struct Images {
     pub image: Image,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct JobSpecification {
     pub name: String,
     pub tasks: Vec<String>,
@@ -168,7 +170,9 @@ impl<'a> ::from_pest::FromPest<'a> for JobSpecification {
                 tasks: inner
                     .into_iter()
                     .map(|p| {
-                        let span = p.as_span();
+                        // we need to strip out the trailing ","
+                        let inner = p.into_inner().into_iter().next().unwrap();
+                        let span = inner.as_span();
                         debug!("THE SPAN: {:?}", span);
                         span.as_str().to_string()
                     })
@@ -190,7 +194,7 @@ impl<'a> ::from_pest::FromPest<'a> for JobSpecification {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PipelineSpecification {
     pub name: String,
     pub jobs: Vec<String>,
@@ -217,7 +221,9 @@ impl<'a> ::from_pest::FromPest<'a> for PipelineSpecification {
                 jobs: inner
                     .into_iter()
                     .map(|p| {
-                        let span = p.as_span();
+                        // we need to strip out the trailing ","
+                        let inner = p.into_inner().into_iter().next().unwrap();
+                        let span = inner.as_span();
                         debug!("THE SPAN: {:?}", span);
                         span.as_str().to_string()
                     })
@@ -239,17 +245,44 @@ impl<'a> ::from_pest::FromPest<'a> for PipelineSpecification {
     }
 }
 
-#[derive(Debug, FromPest)]
+#[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::pipeline_definition))]
 pub struct Pipeline {
     pub imports: Vec<Import>,
     pub images: Vec<Images>,
     pub tasks: Vec<Task>,
-    pub jobs: Option<JobSpecification>,
-    pub pipelines: Option<PipelineSpecification>,
-    _eoi: EOI,
+    pub jobs: Vec<JobSpecification>,
+    pub pipelines: Vec<PipelineSpecification>,
+    eoi: EOI,
 }
 
-#[derive(Debug, FromPest)]
+impl ops::Add<Pipeline> for Pipeline {
+    type Output = Pipeline;
+
+    fn add(self, rhs: Pipeline) -> Pipeline {
+        Pipeline {
+            imports: self
+                .imports
+                .into_iter()
+                .chain(rhs.imports)
+                .collect::<Vec<_>>(),
+            images: self
+                .images
+                .into_iter()
+                .chain(rhs.images)
+                .collect::<Vec<_>>(),
+            tasks: self.tasks.into_iter().chain(rhs.tasks).collect::<Vec<_>>(),
+            jobs: self.jobs.into_iter().chain(rhs.jobs).collect::<Vec<_>>(),
+            pipelines: self
+                .pipelines
+                .into_iter()
+                .chain(rhs.pipelines)
+                .collect::<Vec<_>>(),
+            eoi: self.eoi,
+        }
+    }
+}
+
+#[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::EOI))]
 struct EOI;
