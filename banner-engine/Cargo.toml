@@ -29,4 +29,4 @@ itertools = "*"
 
 [dev-dependencies]
 expect-test = "1.4.0"
-tracing-test = "0.1"
+tracing-test = {workspace = true}

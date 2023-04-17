@@ -62,7 +62,9 @@ impl PartialEq for Event {
                     match (sesl, sesr) {
                         (SystemEventScope::Pipeline, SystemEventScope::Pipeline)
                         | (SystemEventScope::Job, SystemEventScope::Job)
-                        | (SystemEventScope::Task, SystemEventScope::Task) => true,
+                        | (SystemEventScope::Task, SystemEventScope::Task) => {
+                            matching_banner_metadata(&self.metadata, &other.metadata)
+                        }
                         (_, _) => false,
                     }
                 }
@@ -71,7 +73,9 @@ impl PartialEq for Event {
                         (SystemEventScope::Pipeline, SystemEventScope::Pipeline)
                         | (SystemEventScope::Job, SystemEventScope::Job)
                         | (SystemEventScope::Task, SystemEventScope::Task)
-                        | (SystemEventScope::EventHandler, SystemEventScope::EventHandler) => true,
+                        | (SystemEventScope::EventHandler, SystemEventScope::EventHandler) => {
+                            matching_banner_metadata(&self.metadata, &other.metadata)
+                        }
                         (_, _) => false,
                     }
                 }
@@ -85,7 +89,9 @@ impl PartialEq for Event {
                                 (SystemEventResult::Success, SystemEventResult::Success)
                                 | (SystemEventResult::Failed, SystemEventResult::Failed)
                                 | (SystemEventResult::Aborted, SystemEventResult::Aborted)
-                                | (SystemEventResult::Errored, SystemEventResult::Errored) => true,
+                                | (SystemEventResult::Errored, SystemEventResult::Errored) => {
+                                    matching_banner_metadata(&self.metadata, &other.metadata)
+                                }
                                 (_, _) => false,
                             }
                         }
@@ -97,8 +103,12 @@ impl PartialEq for Event {
             (EventType::External, EventType::External)
             | (EventType::Metric, EventType::Metric)
             | (EventType::Log, EventType::Log)
-            | (EventType::Notification, EventType::Notification) => true,
-            (EventType::UserDefined, EventType::UserDefined) => true,
+            | (EventType::Notification, EventType::Notification) => {
+                matching_banner_metadata(&self.metadata, &other.metadata)
+            }
+            (EventType::UserDefined, EventType::UserDefined) => {
+                matching_banner_metadata(&self.metadata, &other.metadata)
+            }
             (_, _) => false,
         }
     }
@@ -232,23 +242,23 @@ mod tests {
 
     #[test]
     fn events_like_each_other() {
-        let e1 = Event {
-            r#type: EventType::System(SystemEventType::Done(
-                SystemEventScope::Task,
-                SystemEventResult::Success,
-            )),
-            time_emitted: 0,
-            metadata: vec![],
-        };
+        let e1 = Event::new(EventType::System(SystemEventType::Done(
+            SystemEventScope::Task,
+            SystemEventResult::Success,
+        )))
+        .with_pipeline_name("pipeline_1")
+        .with_job_name("job_1")
+        .with_task_name("task_1")
+        .build();
 
-        let e2 = Event {
-            r#type: EventType::System(SystemEventType::Done(
-                SystemEventScope::Task,
-                SystemEventResult::Success,
-            )),
-            time_emitted: 1000,
-            metadata: vec![],
-        };
+        let e2 = Event::new(EventType::System(SystemEventType::Done(
+            SystemEventScope::Task,
+            SystemEventResult::Success,
+        )))
+        .with_pipeline_name("pipeline_1")
+        .with_job_name("job_1")
+        .with_task_name("task_1")
+        .build();
 
         let e3 = Event {
             r#type: EventType::System(SystemEventType::Done(
@@ -259,18 +269,28 @@ mod tests {
             metadata: vec![],
         };
 
-        let e4 = Event {
-            r#type: EventType::System(SystemEventType::Done(
-                SystemEventScope::Task,
-                SystemEventResult::Failed,
-            )),
-            time_emitted: 0,
-            metadata: vec![],
-        };
+        let e4 = Event::new(EventType::System(SystemEventType::Done(
+            SystemEventScope::Task,
+            SystemEventResult::Failed,
+        )))
+        .with_pipeline_name("pipeline_1")
+        .with_job_name("job_1")
+        .with_task_name("task_1")
+        .build();
+
+        let e5 = Event::new(EventType::System(SystemEventType::Done(
+            SystemEventScope::Task,
+            SystemEventResult::Success,
+        )))
+        .with_pipeline_name("pipeline_1")
+        .with_job_name("job_1")
+        .with_task_name("task_2")
+        .build();
 
         assert_eq!(e1, e2);
         assert_ne!(e1, e3);
         assert_ne!(e2, e4);
+        assert_ne!(e2, e5);
     }
 
     #[test]

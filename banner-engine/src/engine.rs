@@ -93,6 +93,7 @@ pub async fn start_engine(
                 .into_iter()
                 .filter_map(|pipeline| {
                     let handlers = pipeline.events_matching(&event);
+                    log::debug!(target: "event_log", "handlers: {:?}", handlers);
                     if handlers.len() > 0 {
                         Some(handlers)
                     } else {

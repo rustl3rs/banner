@@ -67,7 +67,11 @@ impl EventHandler {
     pub fn is_listening_for(&self, event: &Event) -> bool {
         self.listen_for_events
             .iter()
-            .filter(|e| *e == event)
+            .filter(|e| {
+                let is_listening = *e == event;
+                tracing::debug!(is_listening, "is listening for event: {:?}", e);
+                is_listening
+            })
             .count()
             > 0
     }
@@ -274,8 +278,29 @@ mod tests {
 mod event_handler_tests {
     use super::*;
 
+    #[tracing_test::traced_test]
     #[tokio::test]
     async fn test_is_listening_for() {
-        let eh = EventHandler::new(tags, listen_for_events, script)
+        let tags = vec![];
+        let listen_for_events = vec![Event::new(EventType::System(SystemEventType::Done(
+            SystemEventScope::Task,
+            SystemEventResult::Success,
+        )))
+        .build()];
+        let script = String::from("");
+        let eh = EventHandler::new(tags, listen_for_events, script);
+        let listen_for = Event::new(EventType::System(SystemEventType::Done(
+            SystemEventScope::Task,
+            SystemEventResult::Success,
+        )))
+        .build();
+        assert!(eh.is_listening_for(&listen_for));
+
+        let listen_for = Event::new(EventType::System(SystemEventType::Done(
+            SystemEventScope::Task,
+            SystemEventResult::Failed,
+        )))
+        .build();
+        assert!(!eh.is_listening_for(&listen_for));
     }
 }
