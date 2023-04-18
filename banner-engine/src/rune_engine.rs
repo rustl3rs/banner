@@ -129,10 +129,17 @@ impl RuneEngineWrapper {
             .execute_task_name_in_scope(scope, pipeline, job, task)
             .await;
         match result {
-            Ok(er) => {
-                info!(target: "task_log", "Task completed successfully: {:?}", er);
-                self.task_success(pipeline, job, task).await;
-            }
+            Ok(er) => match er {
+                crate::ExecutionResult::Success(_) => {
+                    info!(target: "task_log", "Task completed successfully: {:?}", er);
+                    self.task_success(pipeline, job, task).await;
+                }
+                crate::ExecutionResult::Failed(e) => {
+                    // TODO: iterate over and log the events raised by the execution target.
+                    error!(target: "task_log", "Task execution failed: {:?}", e);
+                    self.task_fail(pipeline, job, task).await;
+                }
+            },
             Err(e) => {
                 error!(target: "task_log", "Task execution failed: {:?}", e);
                 self.task_fail(pipeline, job, task).await;
