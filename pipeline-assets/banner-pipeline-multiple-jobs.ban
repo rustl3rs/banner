@@ -1,0 +1,34 @@
+import https://gist.githubusercontent.com/pms1969/464d6304014f9376be7e07b3ccf3a972/raw/a929e3feccd5384a00fe4e7ce6431f46dbb02951/cowsay.ban
+
+[tag: rustl3rs.com/owner=pms1969]
+task test(image: rust:latest, execute: "bash -exo pipefail -c") {
+    r#"
+    cd /source-code
+
+    # would be good to capture code coverage stats here.
+    cargo test
+    "#
+}
+
+job unit-test [
+    cowsay,
+    test,
+]
+
+job pre-load [
+    cowsay,
+]
+
+job finish [
+    cowsay,
+]
+
+pipeline banner [
+    pre-load,
+    unit-test,
+    finish,
+]
+
+// basically a stateless pipeline at present.
+// when loaded, it must be manually triggered
+// bigger pipeline than the others to test out that multiple jobs are triggered correctly.

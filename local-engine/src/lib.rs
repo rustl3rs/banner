@@ -16,7 +16,6 @@ use bollard::image::CreateImageOptions;
 use bollard::Docker;
 use cap_tempfile::{ambient_authority, TempDir, TempFile};
 use futures_util::stream::TryStreamExt;
-use log::warn;
 use std::error::Error;
 use std::fs;
 use std::marker::{Send, Sync};
@@ -83,6 +82,7 @@ impl Engine for LocalEngine {
         let job_name = get_task_tag_value(&task, JOB_TAG)?;
         let task_name = get_task_tag_value(&task, TASK_TAG)?;
         let container_name = format!("banner_{pipeline_name}_{job_name}_{task_name}");
+        log::info!(target: "task_log", "Starting container: {container_name}");
 
         // ensure the image is pulled locally.
         let cio = CreateImageOptions {
@@ -264,11 +264,21 @@ fn get_task_tag_value<'a>(
     task: &'a TaskDefinition,
     key: &str,
 ) -> Result<&'a str, Box<dyn Error + Send + Sync>> {
-    match task.tags().iter().find_map(|tag| Some(tag.value())) {
-        Some(value) => Ok(value),
+    log::trace!(target: "task_log", "Looking for {key} in {:?}", task.tags());
+    match task.tags().iter().find_map(|tag| {
+        if tag.key() == key {
+            Some(tag.value())
+        } else {
+            None
+        }
+    }) {
+        Some(value) => {
+            log::trace!(target: "task_log", "Found: {value}");
+            Ok(value)
+        }
         None => {
             let err = TagMissingError::new(format!("Expected tag not present on task: {key}",));
-            warn!(target: "task_log", "{err:?}");
+            log::warn!(target: "task_log", "{err:?}");
             Ok("_")
         }
     }

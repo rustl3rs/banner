@@ -52,6 +52,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     set_level_for_target("task_log", log_level);
     set_level_for_target("event_log", log_level);
 
+    log::info!(target: "task_log", "Log level set to: {log_level}");
     log::debug!(target: "task_log", "Creating channels");
     let (tx, rx) = mpsc::channel(100);
     let (ostx, osrx) = oneshot::channel::<bool>();
