@@ -68,8 +68,6 @@ pub async fn start_engine(
         let event = rx.recv().await;
         debug!(target: "task_log", "received event: {:?}", event);
 
-        // artificial_pause().await;
-
         if let Some(event) = event {
             if event == Event::new(crate::EventType::UserDefined).build() {
                 log::debug!(target: "task_log", "received user defined event");
@@ -111,10 +109,4 @@ pub async fn start_engine(
             }
         }
     }
-}
-
-#[inline]
-async fn artificial_pause() {
-    let pause = 10000;
-    tokio::time::sleep(std::time::Duration::from_millis(pause)).await;
 }

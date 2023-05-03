@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod grammar;
+pub mod image_ref;
 pub mod parser;
 
 pub use from_pest::FromPest;

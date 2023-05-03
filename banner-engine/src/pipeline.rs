@@ -3,6 +3,7 @@ use std::{collections::HashSet, error::Error, fmt::Display, fs, path::PathBuf};
 use banner_parser::{
     ast::{self, Import, JobSpecification, PipelineSpecification},
     grammar::{BannerParser, Rule},
+    image_ref::{self, parse_docker_uri, ImageRefParser},
     FromPest, Iri, Parser,
 };
 use hyper::client::HttpConnector;
@@ -111,14 +112,32 @@ pub async fn build_and_validate_pipeline(
         return Err(Box::new(error));
     }
 
-    post_process(&mut main_segment);
+    post_process(&mut main_segment)?;
     let pipeline = ast_to_repr(main_segment);
     Ok(pipeline)
 }
 
-fn post_process(ast: &mut ast::Pipeline) {
+fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sync>> {
     // annotate all tasks with their task, job and pipeline names
+    // validate the docker image references and add the `latest` tag to any image ref
+    // that doesn't have an explicit tag or digest
     for task in ast.tasks.iter_mut() {
+        let mut tree = ImageRefParser::parse(image_ref::Rule::reference, &task.image)?;
+        let image_ref = match image_ref::ImageRef::from_pest(&mut tree) {
+            Ok(tree) => tree,
+            Err(e) => {
+                trace!("ERROR = {:#?}", e);
+                panic!(
+                    r#"Failed to parse image reference "{}", {:?}"#,
+                    task.image, e
+                );
+            }
+        };
+        match (image_ref.tag, image_ref.digest) {
+            (None, None) => task.image = format!("{}:latest", task.image), // no tag or digest, so add latest
+            (None, Some(_)) | (Some(_), None) | (Some(_), Some(_)) => {} // do nothing, there is already a tag or digest associated to the image.
+        };
+
         // first the task tag
         let task_tag = Tag::new_banner_task(&task.name);
         task.tags.push(ast::Tag {
@@ -162,6 +181,8 @@ fn post_process(ast: &mut ast::Pipeline) {
             value: pipeline_tag.value().to_string(),
         });
     }
+
+    Ok(())
 }
 
 fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
