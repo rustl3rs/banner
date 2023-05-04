@@ -120,7 +120,7 @@ pub struct Mount {
 
 #[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::env_var))]
-pub struct EnviromentVariable {
+pub struct EnvironmentVariable {
     #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub key: String,
     pub value: StringLiteral,
@@ -132,7 +132,7 @@ pub struct Image {
     #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub name: String,
     pub mounts: Vec<Mount>,
-    pub envs: Vec<EnviromentVariable>,
+    pub envs: Vec<EnvironmentVariable>,
 }
 
 #[derive(Debug, FromPest, Clone)]

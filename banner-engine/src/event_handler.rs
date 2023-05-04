@@ -31,19 +31,8 @@ impl EventHandler {
         &self,
         engine: Arc<dyn Engine + Sync + Send>,
         tx: Sender<Event>,
-        trigger: Event,
+        _trigger: Event,
     ) {
-        let (pipeline_name, job_name, task_name) = get_target_pipeline_and_task(trigger.metadata());
-        // Event::new(EventType::System(SystemEventType::Starting(
-        //     SystemEventScope::EventHandler,
-        // )))
-        // .with_pipeline_name(pipeline_name)
-        // .with_job_name(job_name)
-        // .with_task_name(task_name)
-        // .with_event(&trigger)
-        // .send_from(&tx)
-        // .await;
-
         let script: &str = &self.script;
         let result = execute_event_script(engine, tx.clone(), script).await;
 
@@ -253,6 +242,7 @@ mod tests {
             Event::new(EventType::System(SystemEventType::Trigger(
                 SystemEventScope::Pipeline
             )))
+            .with_metadata(Metadata::new_banner_pipeline("pipeline_1"))
             .build()
         );
         let message = rx.recv().await;
@@ -261,6 +251,8 @@ mod tests {
             Event::new(EventType::System(SystemEventType::Trigger(
                 SystemEventScope::Job
             )))
+            .with_metadata(Metadata::new_banner_pipeline("pipeline_1"))
+            .with_metadata(Metadata::new_banner_job("job_1"))
             .build()
         );
         let message = rx.recv().await;
@@ -269,6 +261,9 @@ mod tests {
             Event::new(EventType::System(SystemEventType::Trigger(
                 SystemEventScope::Task
             )))
+            .with_metadata(Metadata::new_banner_pipeline("pipeline_1"))
+            .with_metadata(Metadata::new_banner_job("job_1"))
+            .with_metadata(Metadata::new_banner_task("task_1"))
             .build()
         );
     }

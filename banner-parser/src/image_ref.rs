@@ -2,7 +2,7 @@ use std::error::Error;
 
 use from_pest::FromPest;
 use pest::{Parser, Span};
-use tracing::{debug, trace};
+use tracing::trace;
 
 use crate::image_ref;
 
@@ -33,11 +33,13 @@ fn span_into_optional_str(span: Span) -> Option<String> {
 }
 
 #[derive(Debug, Clone)]
-// #[pest_ast(rule(Rule::reference))]
 pub struct ImageRef {
     pub r#ref: String,
     pub tag: Option<String>,
     pub digest: Option<String>,
+
+    // without this, the compiler complains that EOI is never used. But it is used, in the FromPest impl.
+    #[allow(dead_code)]
     eoi: EOI,
 }
 
@@ -54,7 +56,6 @@ impl<'a> ::from_pest::FromPest<'a> for ImageRef {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
         if pair.as_rule() == Rule::reference {
-            let span = pair.as_span();
             let mut inner = pair.into_inner();
             let inner = &mut inner;
             let this = ImageRef {

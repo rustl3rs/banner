@@ -3,7 +3,7 @@ use std::{collections::HashSet, error::Error, fmt::Display, fs, path::PathBuf};
 use banner_parser::{
     ast::{self, Import, JobSpecification, PipelineSpecification},
     grammar::{BannerParser, Rule},
-    image_ref::{self, parse_docker_uri, ImageRefParser},
+    image_ref::{self, ImageRefParser},
     FromPest, Iri, Parser,
 };
 use hyper::client::HttpConnector;
