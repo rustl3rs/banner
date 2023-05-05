@@ -19,7 +19,7 @@ image_specification = {
     ("env" ~ "=" ~ "[" ~ env_var* ~ "]" ~ ",")?
 }
 
-mount = { identifier ~ "=>" ~ string_literal ~ "," }
+mount = { string_literal ~ "=>" ~ string_literal ~ "," }
 env_var = { identifier ~ "=" ~ string_literal ~ "," }
 
 task_definition = {
@@ -34,7 +34,7 @@ block = _{
     "{" ~ raw_string ~ "}"
 }
 
-image_definition = { (image_identifier|image_specification|variable) }
+image_definition = { image_identifier | variable }
 
 variable = { "$" ~ "{" ~ identifier ~ "}" }
 identifier = { (ASCII_ALPHANUMERIC | "_" | "-")+ }

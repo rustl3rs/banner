@@ -1,11 +1,12 @@
 import https://gist.githubusercontent.com/pms1969/464d6304014f9376be7e07b3ccf3a972/raw/a929e3feccd5384a00fe4e7ce6431f46dbb02951/cowsay.ban
 
 let rust_build_image = Image {
-    name=rust:latest,
+    name=rust,
     mount=[
-        src => "/source-code",
+        "/tmp/source-code" => "/source-code",
     ],
     env=[
+        BANNER_ENV_VAR="hello banner!",
         RUSTLOG="${log_level}",
         RUST_BACKTRACE="1",
     ],
@@ -14,6 +15,8 @@ let rust_build_image = Image {
 [tag: rustl3rs.com/owner=pms1969]
 task test(image: ${rust_build_image}, execute: "bash -exo pipefail -c") {
     r#"
+    env | grep BANNER
+    
     cd /source-code
 
     # would be good to capture code coverage stats here.

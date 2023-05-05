@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     set_default_level(LevelFilter::Off);
     let log_level = match std::env::var("RUST_LOG") {
         Ok(level) => level.parse::<LevelFilter>()?,
-        Err(_) => LevelFilter::Debug,
+        Err(_) => LevelFilter::Info,
     };
     set_level_for_target("task_log", log_level);
     set_level_for_target("event_log", log_level);

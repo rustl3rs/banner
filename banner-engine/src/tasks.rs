@@ -38,6 +38,38 @@ impl TaskDefinition {
         self.tags.as_ref()
     }
 
+    pub(crate) fn set_image(&mut self, image: Image) {
+        self.image = image;
+    }
+
+    pub(crate) fn append_inputs(&mut self, input: TaskResource) {
+        self.inputs.push(input);
+    }
+
+    pub(crate) fn append_outputs(&mut self, output: TaskResource) {
+        self.outputs.push(output);
+    }
+
+    pub fn env_vars(&self) -> Vec<EnvironmentVariable> {
+        self.inputs
+            .iter()
+            .filter_map(|r| match r {
+                TaskResource::EnvVar(key, value) => Some(EnvironmentVariable { key, value }),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn mounts(&self) -> Vec<&MountPoint> {
+        self.inputs
+            .iter()
+            .filter_map(|r| match r {
+                TaskResource::Mount(mp) => Some(mp),
+                _ => None,
+            })
+            .collect()
+    }
+
     pub fn inputs(&self) -> &[TaskResource] {
         self.inputs.as_ref()
     }
@@ -91,12 +123,21 @@ impl Image {
     }
 }
 
+impl From<banner_parser::ast::Image> for Image {
+    fn from(value: banner_parser::ast::Image) -> Self {
+        Self {
+            source: value.name.clone(),
+            credentials: None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum TaskResource {
     Semver(semver::Version),
     Counter(u128),
-    Path(String),
-    EnvVar(String),
+    Mount(MountPoint),
+    EnvVar(String, String),
     Secret(String),
 }
 
@@ -124,4 +165,16 @@ impl From<&Task> for TaskDefinition {
         let td = Self::new(tags, image, command, vec![], vec![]);
         td
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct EnvironmentVariable<'a> {
+    pub key: &'a str,
+    pub value: &'a str,
+}
+
+#[derive(Debug, Clone)]
+pub struct MountPoint {
+    pub host_path: String,
+    pub container_path: String,
 }

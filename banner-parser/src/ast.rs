@@ -46,10 +46,16 @@ impl<'a> ::from_pest::FromPest<'a> for StringLiteral {
                 })
                 .or_else(|_: ::from_pest::ConversionError<::from_pest::Void>| {
                     let mut inner = pair.clone().into_inner();
-                    let inner = &mut inner;
+                    println!("inner: {inner:?}");
+                    let mut inner_content = inner
+                        .next()
+                        .ok_or(::from_pest::ConversionError::NoMatch)?
+                        .into_inner();
+                    let inner_content = &mut inner_content;
+                    println!("inner_content: {inner_content:?}");
                     let this =
                         StringLiteral::StringLiteral(Result::unwrap(str::parse(span_into_str(
-                            inner
+                            inner_content
                                 .next()
                                 .ok_or(::from_pest::ConversionError::NoMatch)?
                                 .as_span(),
@@ -113,8 +119,8 @@ pub struct Import {
 #[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::mount))]
 pub struct Mount {
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
-    pub source: String,
+    // #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub source: StringLiteral,
     pub destination: StringLiteral,
 }
 

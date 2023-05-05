@@ -11,8 +11,9 @@ use hyper_tls::HttpsConnector;
 use log::trace;
 
 use crate::{
-    event_handler::EventHandler, matching_banner_metadata, Event, EventType, Metadata,
-    SystemEventResult, SystemEventScope, SystemEventType, Tag, TaskDefinition, MATCHING_TAG,
+    event_handler::EventHandler, matching_banner_metadata, Event, EventType, Metadata, MountPoint,
+    SystemEventResult, SystemEventScope, SystemEventType, Tag, TaskDefinition, TaskResource,
+    MATCHING_TAG,
 };
 
 #[derive(Debug)]
@@ -118,10 +119,13 @@ pub async fn build_and_validate_pipeline(
 }
 
 fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sync>> {
-    // annotate all tasks with their task, job and pipeline names
-    // validate the docker image references and add the `latest` tag to any image ref
-    // that doesn't have an explicit tag or digest
+    // 1. validate the docker image references in task definitions and add the `latest` tag to any image ref
+    //    that doesn't have an explicit tag or digest
     for task in ast.tasks.iter_mut() {
+        if task.image.starts_with("${") {
+            continue;
+        }
+
         let mut tree = ImageRefParser::parse(image_ref::Rule::reference, &task.image)?;
         let image_ref = match image_ref::ImageRef::from_pest(&mut tree) {
             Ok(tree) => tree,
@@ -137,7 +141,30 @@ fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sy
             (None, None) => task.image = format!("{}:latest", task.image), // no tag or digest, so add latest
             (None, Some(_)) | (Some(_), None) | (Some(_), Some(_)) => {} // do nothing, there is already a tag or digest associated to the image.
         };
+    }
 
+    // 2. validate the docker references in image definitions and add the `latest` tag to any image ref
+    //    that doesn't have an explicit tag or digest
+    for image_def in ast.images.iter_mut() {
+        let mut tree = ImageRefParser::parse(image_ref::Rule::reference, &image_def.image.name)?;
+        let image_ref = match image_ref::ImageRef::from_pest(&mut tree) {
+            Ok(tree) => tree,
+            Err(e) => {
+                trace!("ERROR = {:#?}", e);
+                panic!(
+                    r#"Failed to parse image reference "{:?}", {:?}"#,
+                    image_def.image, e
+                );
+            }
+        };
+        match (image_ref.tag, image_ref.digest) {
+            (None, None) => image_def.image.name = format!("{}:latest", image_def.image.name), // no tag or digest, so add latest
+            (None, Some(_)) | (Some(_), None) | (Some(_), Some(_)) => {} // do nothing, there is already a tag or digest associated to the image.
+        };
+    }
+
+    // 3. annotate all tasks with their task, job and pipeline names
+    for task in ast.tasks.iter_mut() {
         // first the task tag
         let task_tag = Tag::new_banner_task(&task.name);
         task.tags.push(ast::Tag {
@@ -190,8 +217,38 @@ fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
         .tasks
         .iter()
         .map(|task| {
-            let task_def = TaskDefinition::from(task);
-
+            let mut task_def = TaskDefinition::from(task);
+            println!("task.image = {}", task.image);
+            if task.image.contains("${") {
+                // do variable substitution on images
+                let replacement = ast
+                    .images
+                    .iter()
+                    .find_map(|image| {
+                        if format!("${{{}}}", image.name) == task.image {
+                            Some(image)
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap();
+                // replace the image
+                task_def.set_image(replacement.image.clone().into());
+                // add in all env vars defined on the image ref
+                replacement.image.envs.iter().for_each(|env| {
+                    let env = TaskResource::EnvVar(env.key.clone(), env.value.as_str().to_string());
+                    task_def.append_inputs(env);
+                });
+                // add all the volumes defined on the image ref
+                replacement.image.mounts.iter().for_each(|volume| {
+                    println!("volume = {:#?}", volume);
+                    let volume = TaskResource::Mount(MountPoint {
+                        host_path: volume.source.as_str().to_string(),
+                        container_path: volume.destination.as_str().to_string(),
+                    });
+                    task_def.append_inputs(volume);
+                });
+            }
             task_def
         })
         .collect();

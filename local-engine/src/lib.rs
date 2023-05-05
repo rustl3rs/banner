@@ -13,6 +13,8 @@ use bollard::container::{
     StartContainerOptions,
 };
 use bollard::image::CreateImageOptions;
+use bollard::service::HostConfig;
+use bollard::service::Mount;
 use bollard::Docker;
 use cap_tempfile::{ambient_authority, TempDir, TempFile};
 use futures_util::stream::TryStreamExt;
@@ -109,10 +111,41 @@ impl Engine for LocalEngine {
 
         // one must first create the container before starting it.
         let commands: Vec<&str> = task.command().iter().map(|s| s.as_ref()).collect();
+        let mut env_vars = vec![
+            format!("BANNER_PIPELINE={}", pipeline_name),
+            format!("BANNER_JOB={}", job_name),
+            format!("BANNER_TASK={}", task_name),
+        ];
+        env_vars.extend(
+            task.env_vars()
+                .iter()
+                .map(|env_var| format!("{}={}", env_var.key, env_var.value)),
+        );
+
+        // create a host config to mount any volumes requested in the task.
+        let mounts: Vec<Mount> = task
+            .mounts()
+            .into_iter()
+            .map(|mount| {
+                let mut m = Mount::default();
+                m.target = Some(mount.container_path.clone());
+                m.source = Some(mount.host_path.clone());
+                m.typ = Some(bollard::service::MountTypeEnum::BIND);
+                m.read_only = Some(false);
+                m
+            })
+            .collect();
+        let host_config = HostConfig {
+            mounts: Some(mounts),
+            ..Default::default()
+        };
+        log::trace!(target: "task_log", "host_config: {host_config:?}");
         let config = Config {
             image: Some(task.image().source()),
             cmd: Some(commands),
 
+            env: Some(env_vars.iter().map(|s| s.as_ref()).collect()),
+            host_config: Some(host_config),
             ..Default::default()
         };
         docker.create_container(options, config).await?;
