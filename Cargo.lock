@@ -100,15 +100,15 @@ dependencies = [
  "banner-engine",
  "banner-parser",
  "clap",
- "crossterm",
+ "crossterm 0.25.0",
  "futures-core",
  "futures-timer",
  "futures-util",
  "local-engine",
  "log",
+ "ratatui",
  "tokio",
  "tracing",
- "tui",
  "tui-logger",
 ]
 
@@ -409,6 +409,22 @@ dependencies = [
  "bitflags",
  "crossterm_winapi",
  "futures-core",
+ "libc",
+ "mio",
+ "parking_lot",
+ "signal-hook",
+ "signal-hook-mio",
+ "winapi",
+]
+
+[[package]]
+name = "crossterm"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a84cda67535339806297f1b331d6dd6320470d2a0fe65381e79ee9e156dd3d13"
+dependencies = [
+ "bitflags",
+ "crossterm_winapi",
  "libc",
  "mio",
  "parking_lot",
@@ -1563,6 +1579,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ratatui"
+version = "0.20.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dcc0d032bccba900ee32151ec0265667535c230169f5a011154cdcd984e16829"
+dependencies = [
+ "bitflags",
+ "cassowary",
+ "crossterm 0.26.1",
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1865,12 +1894,6 @@ checksum = "4614a76b2a8be0058caa9dbbaf66d988527d86d003c11a94fbd335d7661edcef"
 dependencies = [
  "autocfg",
 ]
-
-[[package]]
-name = "slog"
-version = "2.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8347046d4ebd943127157b94d63abb990fcf729dc4e9978927fdf4ac3c998d06"
 
 [[package]]
 name = "smallvec"
@@ -2193,31 +2216,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3528ecfd12c466c6f163363caf2d02a71161dd5e1cc6ae7b34207ea2d42d81ed"
 
 [[package]]
-name = "tui"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccdd26cbd674007e649a272da4475fb666d3aa0ad0531da7136db6fab0e5bad1"
-dependencies = [
- "bitflags",
- "cassowary",
- "crossterm",
- "unicode-segmentation",
- "unicode-width",
-]
-
-[[package]]
 name = "tui-logger"
-version = "0.8.3"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "625647d10e6e215d448915ac099f682d0838d5ba1a6825e06f296fcdf5cf0f1c"
+checksum = "aad9900f2273f4a3c3d78405dfc48fa0197c276a139f4d87a5805a7a50223528"
 dependencies = [
  "chrono",
  "fxhash",
  "lazy_static",
  "log",
  "parking_lot",
- "slog",
- "tui",
+ "ratatui",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

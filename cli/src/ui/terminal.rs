@@ -9,16 +9,16 @@ use crossterm::{
 use futures_timer::Delay;
 use futures_util::future::FutureExt;
 use futures_util::stream::StreamExt;
-use tokio::{
-    select,
-    sync::{mpsc::Sender, oneshot::Receiver},
-};
-use tui::{
+use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     widgets::{Block, Borders},
     Frame, Terminal,
+};
+use tokio::{
+    select,
+    sync::{mpsc::Sender, oneshot::Receiver},
 };
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
 
