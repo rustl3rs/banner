@@ -16,7 +16,7 @@ use crate::{
     MATCHING_TAG,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Pipeline {
     pub tasks: Vec<TaskDefinition>,
     pub event_handlers: Vec<EventHandler>,
@@ -218,7 +218,7 @@ fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
         .iter()
         .map(|task| {
             let mut task_def = TaskDefinition::from(task);
-            println!("task.image = {}", task.image);
+            tracing::trace!("task.image = {}", task.image);
             if task.image.contains("${") {
                 // do variable substitution on images
                 let replacement = ast
@@ -241,9 +241,19 @@ fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
                 });
                 // add all the volumes defined on the image ref
                 replacement.image.mounts.iter().for_each(|volume| {
-                    println!("volume = {:#?}", volume);
+                    tracing::trace!("volume = {:#?}", volume);
                     let volume = TaskResource::Mount(MountPoint {
-                        host_path: volume.source.as_str().to_string(),
+                        host_path: match volume.source.clone() {
+                            ast::MountSource::EngineSupplied(dir) => {
+                                crate::HostPath::EngineInit(dir)
+                            }
+                            ast::MountSource::Identifier(dir) => {
+                                crate::HostPath::EngineFromTask(dir.clone())
+                            }
+                            ast::MountSource::StringLiteral(dir) => {
+                                crate::HostPath::Path(dir.clone())
+                            }
+                        },
                         container_path: volume.destination.as_str().to_string(),
                     });
                     task_def.append_inputs(volume);
@@ -259,7 +269,7 @@ fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
         .tasks
         .iter()
         .map(|task| {
-            trace!(target: "task_log", "Getting event handlers for task: {}", task.name);
+            log::trace!(target: "task_log", "Getting event handlers for task: {}", task.name);
             let jobs: Vec<&JobSpecification> = ast
                 .jobs
                 .iter()
@@ -866,12 +876,18 @@ fn load_file(uri: &Iri) -> Result<ast::Pipeline, Box<dyn Error + Send + Sync>> {
 // This should be infallible.
 // The pipelines that get passed in should already have undergone transformation and validation
 fn code_to_ast(code: &str) -> ast::Pipeline {
-    let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, &code).unwrap();
-    match ast::Pipeline::from_pest(&mut parse_tree) {
-        Ok(tree) => tree,
+    let parsed = BannerParser::parse(Rule::pipeline_definition, &code);
+    match parsed {
+        Ok(mut parse_tree) => match ast::Pipeline::from_pest(&mut parse_tree) {
+            Ok(tree) => tree,
+            Err(e) => {
+                println!("{:#?}", e);
+                panic!("Creating the AST failed");
+            }
+        },
         Err(e) => {
-            trace!("ERROR = {:#?}", e);
-            panic!("{:?}", e);
+            println!("{:#?}", e);
+            panic!("Parsing of the pipeline failed");
         }
     }
 }

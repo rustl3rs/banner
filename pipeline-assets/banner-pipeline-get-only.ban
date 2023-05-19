@@ -1,0 +1,16 @@
+let git_image = Image {
+    name=rancher/alpine-git:latest,
+    mount=[
+        ${src} => "/source",
+    ]
+}
+
+task get-source(image: ${git_image}, execute: r#"clone https://github.com/rustl3rs/banner.git /source"#) {r#""#}
+
+job unit-test [
+    get-source,
+]
+
+pipeline banner [
+    unit-test,
+]

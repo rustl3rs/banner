@@ -14,13 +14,16 @@ let_statement = {
 }
 
 image_specification = {
-    "name" ~ "=" ~ image_identifier ~ "," ~ 
-    ("mount" ~ "=" ~ "[" ~ mount* ~ "]" ~ ",")? ~ 
-    ("env" ~ "=" ~ "[" ~ env_var* ~ "]" ~ ",")?
+    "name" ~ "=" ~ image_identifier ~  
+    ( "," ~ "mount" ~ "=" ~ "[" ~ mount* ~ "]" )? ~ 
+    ( "," ~ "env" ~ "=" ~ "[" ~ env_var* ~ "]" )?
 }
 
-mount = { string_literal ~ "=>" ~ string_literal ~ "," }
+mount = { ( string_literal | pipe_job_task_identifier | variable ) ~ "=>" ~ string_literal ~ "," }
 env_var = { identifier ~ "=" ~ string_literal ~ "," }
+// one of these identifiers is just a `pipeline.job.task.var` to completely differentiate the source directory from
+// all other potential directories.
+pipe_job_task_identifier = @{ identifier ~ ( "." ~ identifier ){3} }
 
 task_definition = {
     (tag_definition)* ~ "task" ~ identifier ~ parameter_list ~ block
@@ -34,12 +37,15 @@ block = _{
     "{" ~ raw_string ~ "}"
 }
 
-image_definition = { image_identifier | variable }
+image_definition = _{ image_identifier | variable }
 
 variable = { "$" ~ "{" ~ identifier ~ "}" }
 identifier = { (ASCII_ALPHANUMERIC | "_" | "-")+ }
-image_identifier = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ":")+ }
-string_literal = { ("\"" ~ string_content ~ "\"" | raw_string){1} }
+//image_identifier = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ":")+ }
+image_identifier = { image_var | image_def }
+image_def = @{ !"${" ~ (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ":")+ }
+image_var = @{ "${" ~ identifier ~ "}" }
+string_literal = { raw_string | "\"" ~ string_content ~ "\"" }
 string_content = { (!("\"") ~ ANY)* }
 
 // raw strings was taken directly from 
@@ -80,4 +86,4 @@ job_specification = { "job" ~ identifier ~ "[" ~ task* ~ "]" }
 task = { identifier ~ "," }
 
 pipeline_specification = { "pipeline" ~ identifier ~ "[" ~ job* ~ "]" }
-job = {identifier ~ ","}
+job = { identifier ~ "," }

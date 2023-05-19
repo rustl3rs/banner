@@ -118,7 +118,7 @@ impl RuneEngineWrapper {
     }
 
     pub async fn execute_task_name_in_scope(
-        &self,
+        &mut self,
         scope: &str,
         pipeline: &str,
         job: &str,

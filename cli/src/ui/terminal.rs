@@ -66,6 +66,7 @@ pub async fn create_terminal_ui(
                                             .with_pipeline_name("banner")
                                             .send_from(&tx).await;
                                     }
+
                                     if event == Event::Key(KeyCode::Char('h').into()) {
                                         log::info!(target: "task_log", "Print EventHandler UI Event received");
                                         banner_engine::Event::new(EventType::UserDefined)

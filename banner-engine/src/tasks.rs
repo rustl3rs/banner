@@ -4,7 +4,7 @@ use log::debug;
 use crate::{Metadata, TASK_TAG};
 
 pub type Tag = Metadata;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TaskDefinition {
     tags: Vec<Tag>,
     image: Image,
@@ -99,7 +99,7 @@ impl TaskDefinition {
 }
 
 pub type Uri = String;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Image {
     // TBD
     source: Uri,
@@ -132,7 +132,7 @@ impl From<banner_parser::ast::Image> for Image {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TaskResource {
     Semver(semver::Version),
     Counter(u128),
@@ -141,7 +141,7 @@ pub enum TaskResource {
     Secret(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ImageRepositoryCredentials {
     UserPass(String, String),
     DockerConfig(String),
@@ -175,6 +175,14 @@ pub struct EnvironmentVariable<'a> {
 
 #[derive(Debug, Clone)]
 pub struct MountPoint {
-    pub host_path: String,
+    pub host_path: HostPath,
     pub container_path: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum HostPath {
+    Path(String),
+    Volume(String),
+    EngineInit(String),
+    EngineFromTask(String),
 }

@@ -1,4 +1,4 @@
-use std::ops;
+use std::{ops, println};
 
 use crate::grammar::Rule;
 use pest::Span;
@@ -23,6 +23,7 @@ impl<'a> ::from_pest::FromPest<'a> for StringLiteral {
     ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("pair: {pair:?}");
         if pair.as_rule() == Rule::string_literal {
             let this = Err(::from_pest::ConversionError::NoMatch)
                 .or_else(|_: ::from_pest::ConversionError<::from_pest::Void>| {
@@ -46,13 +47,13 @@ impl<'a> ::from_pest::FromPest<'a> for StringLiteral {
                 })
                 .or_else(|_: ::from_pest::ConversionError<::from_pest::Void>| {
                     let mut inner = pair.clone().into_inner();
-                    println!("inner: {inner:?}");
+                    tracing::trace!("inner: {inner:?}");
                     let mut inner_content = inner
                         .next()
                         .ok_or(::from_pest::ConversionError::NoMatch)?
                         .into_inner();
                     let inner_content = &mut inner_content;
-                    println!("inner_content: {inner_content:?}");
+                    tracing::trace!("inner_content: {inner_content:?}");
                     let this =
                         StringLiteral::StringLiteral(Result::unwrap(str::parse(span_into_str(
                             inner_content
@@ -73,6 +74,7 @@ impl<'a> ::from_pest::FromPest<'a> for StringLiteral {
             *pest = clone;
             Ok(this)
         } else {
+            tracing::trace!("StringLiteral NoMatch");
             Err(::from_pest::ConversionError::NoMatch)
         }
     }
@@ -116,11 +118,71 @@ pub struct Import {
     pub uri: String,
 }
 
+#[derive(Debug, Clone)]
+pub enum MountSource {
+    EngineSupplied(String),
+    Identifier(String),
+    StringLiteral(String),
+}
+impl<'a> ::from_pest::FromPest<'a> for MountSource {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+    fn from_pest(
+        pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
+    ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
+        match pair.as_rule() {
+            Rule::variable => {
+                let mut inner = pair.clone().into_inner();
+                let inner = &mut inner;
+                let this = MountSource::EngineSupplied(Result::unwrap(str::parse(span_into_str(
+                    inner
+                        .next()
+                        .ok_or(::from_pest::ConversionError::NoMatch)?
+                        .as_span(),
+                ))));
+                tracing::trace!("variable = {this:?}");
+                *pest = clone;
+                Ok(this)
+            }
+            Rule::pipe_job_task_identifier => {
+                let this = MountSource::Identifier(pair.clone().as_span().as_str().to_string());
+                *pest = clone;
+                Ok(this)
+            }
+            Rule::string_literal => {
+                let mut inner = pair.clone().into_inner();
+                let inner = &mut inner;
+                let this = MountSource::StringLiteral(Result::unwrap(str::parse(span_into_str(
+                    inner
+                        .next()
+                        .ok_or(::from_pest::ConversionError::NoMatch)?
+                        .as_span(),
+                ))));
+                if inner.clone().next().is_some() {
+                    {
+                        panic!(
+                            "when converting MountSource::StringLiteral, found extraneous {0:?}",
+                            inner
+                        )
+                    }
+                }
+                *pest = clone;
+                Ok(this)
+            }
+            _ => {
+                tracing::trace!("MountSource NoMatch");
+                Err(::from_pest::ConversionError::NoMatch)
+            }
+        }
+    }
+}
+
 #[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::mount))]
 pub struct Mount {
-    // #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
-    pub source: StringLiteral,
+    pub source: MountSource,
     pub destination: StringLiteral,
 }
 
@@ -179,7 +241,7 @@ impl<'a> ::from_pest::FromPest<'a> for JobSpecification {
                         // we need to strip out the trailing ","
                         let inner = p.into_inner().into_iter().next().unwrap();
                         let span = inner.as_span();
-                        debug!("THE SPAN: {:?}", span);
+                        debug!("THE JOB SPAN: {:?}", span);
                         span.as_str().to_string()
                     })
                     .collect(),
@@ -195,6 +257,7 @@ impl<'a> ::from_pest::FromPest<'a> for JobSpecification {
             *pest = clone;
             Ok(this)
         } else {
+            tracing::trace!("JobSpec NoMatch: {pair:?}");
             Err(::from_pest::ConversionError::NoMatch)
         }
     }
@@ -230,7 +293,7 @@ impl<'a> ::from_pest::FromPest<'a> for PipelineSpecification {
                         // we need to strip out the trailing ","
                         let inner = p.into_inner().into_iter().next().unwrap();
                         let span = inner.as_span();
-                        debug!("THE SPAN: {:?}", span);
+                        debug!("THE PIPELINE SPAN: {:?}", span);
                         span.as_str().to_string()
                     })
                     .collect(),
@@ -246,6 +309,7 @@ impl<'a> ::from_pest::FromPest<'a> for PipelineSpecification {
             *pest = clone;
             Ok(this)
         } else {
+            println!("PipelineSpec NoMatch: {pair:?}");
             Err(::from_pest::ConversionError::NoMatch)
         }
     }

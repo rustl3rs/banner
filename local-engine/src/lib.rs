@@ -3,6 +3,7 @@ mod tag_missing_error;
 use async_trait::async_trait;
 use backon::ConstantBuilder;
 use backon::Retryable;
+use banner_engine::HostPath;
 use banner_engine::{
     build_and_validate_pipeline, Engine, ExecutionResult, Pipeline, TaskDefinition, JOB_TAG,
     PIPELINE_TAG, TASK_TAG,
@@ -18,21 +19,43 @@ use bollard::service::Mount;
 use bollard::Docker;
 use cap_tempfile::{ambient_authority, TempDir, TempFile};
 use futures_util::stream::TryStreamExt;
+use rand::distributions::{Alphanumeric, DistString};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::marker::{Send, Sync};
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::RwLock;
 use std::time::Duration;
 use tag_missing_error::TagMissingError;
+
+// #[derive(Debug)]
+// pub enum StateDirectory {
+//     TempDir(TempDir),
+//     Path(PathBuf),
+// }
 
 #[derive(Debug)]
 pub struct LocalEngine {
     pipelines: Vec<Pipeline>,
+    directories: Arc<RwLock<HashMap<String, String>>>,
+    state_dir: PathBuf,
 }
 
 impl LocalEngine {
     pub fn new() -> Self {
-        Self { pipelines: vec![] }
+        Self {
+            pipelines: vec![],
+            directories: Arc::new(RwLock::new(HashMap::new())),
+            state_dir: {
+                let dir = Alphanumeric.sample_string(&mut rand::thread_rng(), 8);
+                let path = PathBuf::from("/tmp/banner").join(dir);
+                log::info!(target: "task_log", "Creating state directory: {:?}", path);
+                std::fs::create_dir_all(path.as_path()).unwrap();
+                path
+            },
+        }
     }
 
     pub async fn with_pipeline_from_file(
@@ -54,6 +77,46 @@ impl LocalEngine {
 
         Ok(())
     }
+
+    fn get_dir_for_mount_source(
+        &self,
+        host_path: &HostPath,
+        pipeline_name: &str,
+        job_name: &str,
+        task_name: &str,
+    ) -> (Option<String>, Option<bollard::service::MountTypeEnum>) {
+        match host_path {
+            HostPath::Path(dir) => (
+                Some(dir.to_string()),
+                Some(bollard::service::MountTypeEnum::BIND),
+            ),
+            HostPath::Volume(_name) => todo!(),
+            HostPath::EngineInit(name) => {
+                let key = format!("{}.{}.{}.{}", pipeline_name, job_name, task_name, name);
+                let mut path = PathBuf::new();
+                path.push(&self.state_dir);
+                path.push(&key);
+                std::fs::create_dir(path.as_path()).unwrap();
+                let dir = path.to_str().unwrap();
+                self.directories
+                    .write()
+                    .unwrap()
+                    .insert(key, dir.to_string());
+                (
+                    Some(dir.to_string()),
+                    Some(bollard::service::MountTypeEnum::BIND),
+                )
+            }
+            HostPath::EngineFromTask(task) => {
+                let dirs = self.directories.read().unwrap();
+                let dir = dirs.get(task).expect("Should have found the directory");
+                (
+                    Some(dir.to_string()),
+                    Some(bollard::service::MountTypeEnum::BIND),
+                )
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -72,7 +135,6 @@ impl Engine for LocalEngine {
         Ok(())
     }
 
-    // ! TODO: if no label is given, need to add `:latest`
     async fn execute(
         &self,
         task: &TaskDefinition,
@@ -110,7 +172,12 @@ impl Engine for LocalEngine {
         });
 
         // one must first create the container before starting it.
-        let commands: Vec<&str> = task.command().iter().map(|s| s.as_ref()).collect();
+        let commands: Vec<&str> = task
+            .command()
+            .iter()
+            .filter_map(|s| if s.is_empty() { None } else { Some(s.as_ref()) })
+            .collect();
+        log::info!(target: "task_log", "{commands:?}");
         let mut env_vars = vec![
             format!("BANNER_PIPELINE={}", pipeline_name),
             format!("BANNER_JOB={}", job_name),
@@ -127,10 +194,16 @@ impl Engine for LocalEngine {
             .mounts()
             .into_iter()
             .map(|mount| {
+                let (source, mount_type) = self.get_dir_for_mount_source(
+                    &mount.host_path,
+                    &pipeline_name,
+                    &job_name,
+                    &task_name,
+                );
                 let mut m = Mount::default();
                 m.target = Some(mount.container_path.clone());
-                m.source = Some(mount.host_path.clone());
-                m.typ = Some(bollard::service::MountTypeEnum::BIND);
+                m.source = source;
+                m.typ = mount_type;
                 m.read_only = Some(false);
                 m
             })
@@ -199,7 +272,8 @@ impl Engine for LocalEngine {
         _job_name: &str,
         task_name: &str,
     ) -> Result<ExecutionResult, Box<dyn Error + Send + Sync>> {
-        let task_definition: &TaskDefinition = get_task_definition(&self.pipelines, task_name);
+        let pipelines = self.pipelines.clone();
+        let task_definition: &TaskDefinition = get_task_definition(&pipelines, task_name);
         self.execute(task_definition).await
     }
 

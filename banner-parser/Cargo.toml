@@ -13,10 +13,10 @@ description = "A parser for the Banner DSL."
 
 [dependencies]
 tracing = {workspace = true}
-pest = "2.5.5"
-pest_derive = "2.5.5"
-pest-ast = "0.3.3"
-from-pest = "0.3.1"
+pest = "2.6"
+pest_derive = "2.6"
+pest-ast = "0.3"
+from-pest = "0.3"
 iref = "2.2.3"
 
 [dev-dependencies]

@@ -1,10 +1,6 @@
 use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
-// use banner_parser::{
-//     grammar::{BannerParser, Rule},
-//     FromPest, Parser,
-// };
 
 use log::debug;
 use tokio::sync::mpsc::{Receiver, Sender};

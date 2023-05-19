@@ -1,18 +1,22 @@
-import https://gist.githubusercontent.com/pms1969/464d6304014f9376be7e07b3ccf3a972/raw/a929e3feccd5384a00fe4e7ce6431f46dbb02951/cowsay.ban
-
 let rust_build_image = Image {
     name=rust,
     mount=[
-        "/tmp/source-code" => "/source-code",
+        banner.unit-test.get-source.src => "/source-code",
     ],
     env=[
         BANNER_ENV_VAR="hello banner!",
         RUSTLOG="${log_level}",
         RUST_BACKTRACE="1",
-    ],
+    ]
 }
 
-[tag: rustl3rs.com/owner=pms1969]
+let git_image = Image {
+    name=rancher/alpine-git:latest,
+    mount=[
+        ${src} => "/source",
+    ]
+}
+
 task test(image: ${rust_build_image}, execute: "bash -exo pipefail -c") {
     r#"
     env | grep BANNER
@@ -24,14 +28,13 @@ task test(image: ${rust_build_image}, execute: "bash -exo pipefail -c") {
     "#
 }
 
+task get-source(image: ${git_image}, execute: r#"clone https://github.com/rustl3rs/banner.git /source"#) { r#""# }
+
 job unit-test [
-    cowsay,
+    get-source,
     test,
 ]
 
 pipeline banner [
     unit-test,
 ]
-
-// basically a stateless pipeline at present.
-// when loaded, it must be manually triggered
