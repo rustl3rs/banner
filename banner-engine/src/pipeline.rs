@@ -1449,18 +1449,19 @@ mod event_handler_creation_tests {
         check_pipeline(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the pipeline: test; Last job was: unit-test" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "unit-test" }] }], script: "\n            pub async fn main (engine) {\n                engine.pipeline_success(\"test\").await;\n            }\n            " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the pipeline: test; Last job was: unit-test" }], listen_for_events: [Event { type: System(Done(Job, Failed)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "unit-test" }] }], script: "\n            pub async fn main (engine) {\n                engine.pipeline_fail(\"test\").await;\n            }\n            " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the pipeline: test/unit-test" }], listen_for_events: [Event { type: System(Trigger(Pipeline)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test\", \"unit-test\").await;\n        }\n        " }]"#]]).await;
     }
 
-    #[traced_test]
-    #[tokio::test]
-    async fn test_empty_pipeline() {
-        let ast = get_ast_for(
-            r#"
-            pipeline test [
-            ]
-            "#,
-        );
+    // not sure this should be a thing.  if you define a pipeline, it should have at least one job.
+    // #[traced_test]
+    // #[tokio::test]
+    // async fn test_empty_pipeline() {
+    //     let ast = get_ast_for(
+    //         r#"
+    //         pipeline test [
+    //         ]
+    //         "#,
+    //     );
 
-        check_pipeline(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the pipeline: test" }], listen_for_events: [Event { type: System(Trigger(Pipeline)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }] }], script: "\n        pub async fn main (engine) {\n            engine.log_message(\"Pipeline [test] has no jobs to trigger\").await;\n        }\n        " }]"#]]).await;
-    }
+    //     check_pipeline(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the pipeline: test" }], listen_for_events: [Event { type: System(Trigger(Pipeline)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }] }], script: "\n        pub async fn main (engine) {\n            engine.log_message(\"Pipeline [test] has no jobs to trigger\").await;\n        }\n        " }]"#]]).await;
+    // }
 
     #[traced_test]
     #[tokio::test]
@@ -1477,18 +1478,19 @@ mod event_handler_creation_tests {
         check_pipeline(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the pipeline: test; Last job was: build-artefacts" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "build-artefacts" }] }], script: "\n            pub async fn main (engine) {\n                engine.pipeline_success(\"test\").await;\n            }\n            " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the pipeline: test; Last job was: build-artefacts" }], listen_for_events: [Event { type: System(Done(Job, Failed)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "build-artefacts" }] }], script: "\n            pub async fn main (engine) {\n                engine.pipeline_fail(\"test\").await;\n            }\n            " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "build-artefacts" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the job: test/build-artefacts" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "unit-test" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test\", \"build-artefacts\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the pipeline: test/unit-test" }], listen_for_events: [Event { type: System(Trigger(Pipeline)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test\", \"unit-test\").await;\n        }\n        " }]"#]]).await;
     }
 
-    #[traced_test]
-    #[tokio::test]
-    async fn test_empty_job() {
-        let ast = get_ast_for(
-            r#"
-            job build [
-            ]
-            "#,
-        );
+    // not sure this should be a thing. If you define a job, it should have some tasks in it to run
+    // #[traced_test]
+    // #[tokio::test]
+    // async fn test_empty_job() {
+    //     let ast = get_ast_for(
+    //         r#"
+    //         job build [
+    //         ]
+    //         "#,
+    //     );
 
-        check_job(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/description", value: "Trigger the start of empty job: _/build" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }] }], script: "\n        pub async fn main (engine) {\n            engine.log_message(\"Job [_/build] has no tasks to trigger\").await;\n        }\n        " }]"#]]).await;
-    }
+    //     check_job(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/description", value: "Trigger the start of empty job: _/build" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }] }], script: "\n        pub async fn main (engine) {\n            engine.log_message(\"Job [_/build] has no tasks to trigger\").await;\n        }\n        " }]"#]]).await;
+    // }
 
     #[traced_test]
     #[tokio::test]

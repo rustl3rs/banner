@@ -1,22 +1,32 @@
 use std::ops;
 
-use crate::grammar::Rule;
-use pest::{iterators::Pairs, Span};
-use tracing::debug;
+use crate::grammar::{BannerParser, Rule};
+use from_pest::FromPest;
+use pest::{Parser, Span};
 
 fn span_into_str(span: Span) -> &str {
+    println!("SPAN(span_into_str): {:?}", span.as_str());
     span.as_str()
 }
 
-fn inner_into_vec_of_string(span: Span) -> Vec<String> {
+fn identifier_list_span_into_vec_of_string(span: Span) -> Vec<String> {
     println!("span_into_vec_of_string: {:#?}", span);
-    let result = span
-        .as_str()
-        .split_whitespace()
-        .map(|s| s.trim_end_matches(",").to_string())
-        .collect();
-    println!("{result:?}");
-    result
+    let mut parse_tree = BannerParser::parse(Rule::identifier_list, &span.as_str()).unwrap();
+    // println!(
+    //     "span_into_vec_of_string => PARSED: {:#?}",
+    //     parse_tree.next().unwrap().into_inner()
+    // );
+    match IdentifierList::from_pest(&mut parse_tree) {
+        Ok(tree) => tree
+            .identifiers
+            .into_iter()
+            .map(|s| s.name)
+            .collect::<Vec<String>>(),
+        Err(e) => {
+            tracing::trace!("ERROR = {:#?}", e);
+            panic!("{:?}", e);
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -123,55 +133,6 @@ pub struct Task {
     pub command: StringLiteral,
     pub script: StringLiteral,
 }
-
-// impl<'a> ::from_pest::FromPest<'a> for Task {
-//     type Rule = Rule;
-//     type FatalError = ::from_pest::Void;
-//     fn from_pest(
-//         pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
-//     ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
-//         let mut clone = pest.clone();
-//         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
-//         println!("=====> TASK_SPEC: {pair:?}");
-//         if pair.as_rule() == Rule::task_definition {
-//             let mut inner = pair.into_inner();
-//             let inner = &mut inner;
-//             let this = Task { tags: ::from_pest::FromPest(), name: (), image: (), command: (), script: () } {
-//                 name: Result::unwrap(str::parse(span_into_str(
-//                     inner
-//                         .next()
-//                         .ok_or(::from_pest::ConversionError::NoMatch)?
-//                         .as_span(),
-//                 ))),
-//                 tasks: inner
-//                     .into_iter()
-//                     .map(|p| {
-//                         // we need to strip out the trailing ","
-//                         let inner = p.into_inner().into_iter().next().unwrap();
-//                         let span = inner.as_span();
-//                         debug!("THE JOB SPAN: {:?}", span);
-//                         span.as_str().to_string()
-//                     })
-//                     .collect(),
-//             };
-//             if inner.clone().next().is_some() {
-//                 {
-//                     panic!(
-//                         "when converting JobSpecification, found extraneous {0:?}",
-//                         inner
-//                     )
-//                 }
-//             }
-//             println!("=====> {clone:?}");
-//             // let clone = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?; // need to be rid of the NEWLINE
-//             *pest = clone; // need to be rid of the NEWLINE
-//             Ok(this)
-//         } else {
-//             tracing::trace!("JobSpec NoMatch: {pair:?}");
-//             Err(::from_pest::ConversionError::NoMatch)
-//         }
-//     }
-// }
 
 #[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::tag))]
@@ -282,29 +243,17 @@ pub struct Images {
     pub image: Image,
 }
 
-#[derive(Debug, FromPest, Clone)]
+#[derive(Debug, Clone, FromPest)]
+#[pest_ast(rule(Rule::identifier_list))]
+pub struct IdentifierList {
+    pub identifiers: Vec<Identifier>,
+}
+
+#[derive(Debug, Clone, FromPest)]
 #[pest_ast(rule(Rule::identifier))]
 pub struct Identifier {
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub name: String,
-}
-
-impl Identifier {
-    pub fn as_str(&self) -> &str {
-        &self.name
-    }
-}
-
-impl From<String> for Identifier {
-    fn from(name: String) -> Self {
-        Self { name }
-    }
-}
-
-impl PartialEq for Identifier {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-    }
 }
 
 #[derive(Debug, Clone, FromPest)]
@@ -312,113 +261,18 @@ impl PartialEq for Identifier {
 pub struct JobSpecification {
     #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub name: String,
-    #[pest_ast(inner(with(inner_into_vec_of_string)))]
+    #[pest_ast(inner(with(identifier_list_span_into_vec_of_string)))]
     pub tasks: Vec<String>,
 }
-
-// impl<'a> ::from_pest::FromPest<'a> for JobSpecification {
-//     type Rule = Rule;
-//     type FatalError = ::from_pest::Void;
-//     fn from_pest(
-//         pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
-//     ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
-//         let mut clone = pest.clone();
-//         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
-//         println!("=====> JOB_SPEC: {pair:?}");
-//         if pair.as_rule() == Rule::job_specification {
-//             let mut inner = pair.into_inner();
-//             let inner = &mut inner;
-//             let this = JobSpecification {
-//                 name: Result::unwrap(str::parse(span_into_str(
-//                     inner
-//                         .next()
-//                         .ok_or(::from_pest::ConversionError::NoMatch)?
-//                         .as_span(),
-//                 ))),
-//                 tasks: inner
-//                     .into_iter()
-//                     .map(|p| {
-//                         // we need to strip out the trailing ","
-//                         let inner = p.into_inner().into_iter().next().unwrap();
-//                         let span = inner.as_span();
-//                         debug!("THE JOB SPAN: {:?}", span);
-//                         span.as_str().to_string()
-//                     })
-//                     .collect(),
-//             };
-//             if inner.clone().next().is_some() {
-//                 {
-//                     panic!(
-//                         "when converting JobSpecification, found extraneous {0:?}",
-//                         inner
-//                     )
-//                 }
-//             }
-//             println!("=====> {clone:?}");
-//             // let clone = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?; // need to be rid of the NEWLINE
-//             *pest = clone; // need to be rid of the NEWLINE
-//             Ok(this)
-//         } else {
-//             tracing::trace!("JobSpec NoMatch: {pair:?}");
-//             Err(::from_pest::ConversionError::NoMatch)
-//         }
-//     }
-// }
 
 #[derive(Debug, Clone, FromPest)]
 #[pest_ast(rule(Rule::pipeline_specification))]
 pub struct PipelineSpecification {
     #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub name: String,
-    #[pest_ast(inner(with(inner_into_vec_of_string)))]
+    #[pest_ast(inner(with(identifier_list_span_into_vec_of_string)))]
     pub jobs: Vec<String>,
 }
-
-// impl<'a> ::from_pest::FromPest<'a> for PipelineSpecification {
-//     type Rule = Rule;
-//     type FatalError = ::from_pest::Void;
-//     fn from_pest(
-//         pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
-//     ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
-//         let mut clone = pest.clone();
-//         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
-//         if pair.as_rule() == Rule::pipeline_specification {
-//             let mut inner = pair.into_inner();
-//             let inner = &mut inner;
-//             let this = PipelineSpecification {
-//                 name: Result::unwrap(str::parse(span_into_str(
-//                     inner
-//                         .next()
-//                         .ok_or(::from_pest::ConversionError::NoMatch)?
-//                         .as_span(),
-//                 ))),
-//                 jobs: inner
-//                     .into_iter()
-//                     .map(|p| {
-//                         // we need to strip out the trailing ","
-//                         let inner = p.into_inner().into_iter().next().unwrap();
-//                         let span = inner.as_span();
-//                         debug!("THE PIPELINE SPAN: {:?}", span);
-//                         span.as_str().to_string()
-//                     })
-//                     .collect(),
-//             };
-//             if inner.clone().next().is_some() {
-//                 {
-//                     panic!(
-//                         "when converting JobSpecification, found extraneous {0:?}",
-//                         inner
-//                     )
-//                 }
-//             }
-//             *pest = clone;
-//             Ok(this)
-//         } else {
-//             tracing::trace!("PipelineSpec NoMatch: {pair:?}");
-//             Err(::from_pest::ConversionError::NoMatch)
-//         }
-//     }
-// }
 
 #[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::pipeline_definition))]
@@ -461,3 +315,54 @@ impl ops::Add<Pipeline> for Pipeline {
 #[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::EOI))]
 struct EOI;
+
+#[cfg(test)]
+mod tests {
+    use expect_test::{expect, Expect};
+
+    use super::*;
+
+    fn check(list: &str, expect: Expect) {
+        let mut pest = BannerParser::parse(Rule::identifier_list, list).unwrap();
+        let pair = pest.next().unwrap();
+        let actual = identifier_list_span_into_vec_of_string(pair.as_span());
+        expect.assert_debug_eq(&actual);
+    }
+
+    #[test]
+    fn test_identifier_list_span_into_vec_of_string() {
+        check(
+            "foo,bar,",
+            expect![[r#"
+            [
+                "foo",
+                "bar",
+            ]
+        "#]],
+        );
+
+        check(
+            "this,is,a, much, longer,list\n",
+            expect![[r#"
+            [
+                "this",
+                "is",
+                "a",
+                "much",
+                "longer",
+                "list",
+            ]
+        "#]],
+        );
+
+        check(
+            "funky,                        whitespace,                        \n",
+            expect![[r#"
+            [
+                "funky",
+                "whitespace",
+            ]
+        "#]],
+        );
+    }
+}
