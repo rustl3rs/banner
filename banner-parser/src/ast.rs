@@ -1,12 +1,22 @@
-use std::{ops, println};
+use std::ops;
 
 use crate::grammar::Rule;
-use pest::Span;
+use pest::{iterators::Pairs, Span};
 use tracing::debug;
 
 fn span_into_str(span: Span) -> &str {
-    debug!("SPAN: {}", span.as_str());
     span.as_str()
+}
+
+fn inner_into_vec_of_string(span: Span) -> Vec<String> {
+    println!("span_into_vec_of_string: {:#?}", span);
+    let result = span
+        .as_str()
+        .split_whitespace()
+        .map(|s| s.trim_end_matches(",").to_string())
+        .collect();
+    println!("{result:?}");
+    result
 }
 
 #[derive(Debug, Clone)]
@@ -23,54 +33,67 @@ impl<'a> ::from_pest::FromPest<'a> for StringLiteral {
     ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
-        tracing::trace!("pair: {pair:?}");
         if pair.as_rule() == Rule::string_literal {
-            let this = Err(::from_pest::ConversionError::NoMatch)
-                .or_else(|_: ::from_pest::ConversionError<::from_pest::Void>| {
+            let mut literal = pair.clone().into_inner();
+            let pair = literal
+                .next()
+                .ok_or(::from_pest::ConversionError::NoMatch)?;
+            match pair.as_rule() {
+                Rule::raw_string => {
                     let mut inner = pair.clone().into_inner();
                     let inner = &mut inner;
-                    let this = StringLiteral::RawString(Result::unwrap(str::parse(span_into_str(
-                        inner
-                            .next()
-                            .ok_or(::from_pest::ConversionError::NoMatch)?
-                            .as_span(),
-                    ))));
-                    if inner.clone().next().is_some() {
-                        {
-                            panic!(
-                                "when converting StringLiteral::Raw, found extraneous {0:?}",
-                                inner
-                            )
-                        }
-                    }
-                    Ok(this)
-                })
-                .or_else(|_: ::from_pest::ConversionError<::from_pest::Void>| {
-                    let mut inner = pair.clone().into_inner();
-                    tracing::trace!("inner: {inner:?}");
-                    let mut inner_content = inner
-                        .next()
-                        .ok_or(::from_pest::ConversionError::NoMatch)?
-                        .into_inner();
-                    let inner_content = &mut inner_content;
-                    tracing::trace!("inner_content: {inner_content:?}");
-                    let this =
-                        StringLiteral::StringLiteral(Result::unwrap(str::parse(span_into_str(
-                            inner_content
+                    let this = StringLiteral::RawString(
+                        span_into_str(
+                            inner
                                 .next()
                                 .ok_or(::from_pest::ConversionError::NoMatch)?
                                 .as_span(),
-                        ))));
-                    if inner.clone().next().is_some() {
-                        {
-                            panic!(
-                                "when converting StringLiteral::String, found extraneous {0:?}",
-                                inner
-                            )
-                        }
-                    }
+                        )
+                        .to_string(),
+                    );
+                    tracing::trace!("raw_string = {this:?}");
+                    tracing::trace!("clone: {clone:?}");
+                    *pest = clone;
                     Ok(this)
-                })?;
+                }
+                Rule::standard_string => {
+                    let mut inner = pair.clone().into_inner();
+                    let inner = &mut inner;
+                    let this = StringLiteral::StringLiteral(
+                        span_into_str(
+                            inner
+                                .next()
+                                .ok_or(::from_pest::ConversionError::NoMatch)?
+                                .as_span(),
+                        )
+                        .to_string(),
+                    );
+                    tracing::trace!("string_literal = {this:?}");
+                    tracing::trace!("clone: {clone:?}");
+                    *pest = clone;
+                    Ok(this)
+                }
+                _ => {
+                    tracing::trace!("StringLiteral NoMatch");
+                    Err(::from_pest::ConversionError::NoMatch)
+                }
+            }
+        } else if pair.as_rule() == Rule::raw_string {
+            let mut clone = pest.clone();
+            let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
+            let mut inner = pair.clone().into_inner();
+            let inner = &mut inner;
+            let this = StringLiteral::RawString(
+                span_into_str(
+                    inner
+                        .next()
+                        .ok_or(::from_pest::ConversionError::NoMatch)?
+                        .as_span(),
+                )
+                .to_string(),
+            );
+            tracing::trace!("raw_string = {this:?}");
+            tracing::trace!("clone: {clone:?}");
             *pest = clone;
             Ok(this)
         } else {
@@ -89,7 +112,7 @@ impl StringLiteral {
     }
 }
 
-#[derive(Debug, FromPest, Clone)]
+#[derive(Debug, Clone, FromPest)]
 #[pest_ast(rule(Rule::task_definition))]
 pub struct Task {
     pub tags: Vec<Tag>,
@@ -98,9 +121,57 @@ pub struct Task {
     #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub image: String,
     pub command: StringLiteral,
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
-    pub script: String,
+    pub script: StringLiteral,
 }
+
+// impl<'a> ::from_pest::FromPest<'a> for Task {
+//     type Rule = Rule;
+//     type FatalError = ::from_pest::Void;
+//     fn from_pest(
+//         pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
+//     ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
+//         let mut clone = pest.clone();
+//         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
+//         println!("=====> TASK_SPEC: {pair:?}");
+//         if pair.as_rule() == Rule::task_definition {
+//             let mut inner = pair.into_inner();
+//             let inner = &mut inner;
+//             let this = Task { tags: ::from_pest::FromPest(), name: (), image: (), command: (), script: () } {
+//                 name: Result::unwrap(str::parse(span_into_str(
+//                     inner
+//                         .next()
+//                         .ok_or(::from_pest::ConversionError::NoMatch)?
+//                         .as_span(),
+//                 ))),
+//                 tasks: inner
+//                     .into_iter()
+//                     .map(|p| {
+//                         // we need to strip out the trailing ","
+//                         let inner = p.into_inner().into_iter().next().unwrap();
+//                         let span = inner.as_span();
+//                         debug!("THE JOB SPAN: {:?}", span);
+//                         span.as_str().to_string()
+//                     })
+//                     .collect(),
+//             };
+//             if inner.clone().next().is_some() {
+//                 {
+//                     panic!(
+//                         "when converting JobSpecification, found extraneous {0:?}",
+//                         inner
+//                     )
+//                 }
+//             }
+//             println!("=====> {clone:?}");
+//             // let clone = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?; // need to be rid of the NEWLINE
+//             *pest = clone; // need to be rid of the NEWLINE
+//             Ok(this)
+//         } else {
+//             tracing::trace!("JobSpec NoMatch: {pair:?}");
+//             Err(::from_pest::ConversionError::NoMatch)
+//         }
+//     }
+// }
 
 #[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::tag))]
@@ -211,109 +282,143 @@ pub struct Images {
     pub image: Image,
 }
 
-#[derive(Debug, Clone)]
-pub struct JobSpecification {
+#[derive(Debug, FromPest, Clone)]
+#[pest_ast(rule(Rule::identifier))]
+pub struct Identifier {
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub name: String,
+}
+
+impl Identifier {
+    pub fn as_str(&self) -> &str {
+        &self.name
+    }
+}
+
+impl From<String> for Identifier {
+    fn from(name: String) -> Self {
+        Self { name }
+    }
+}
+
+impl PartialEq for Identifier {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+#[derive(Debug, Clone, FromPest)]
+#[pest_ast(rule(Rule::job_specification))]
+pub struct JobSpecification {
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+    pub name: String,
+    #[pest_ast(inner(with(inner_into_vec_of_string)))]
     pub tasks: Vec<String>,
 }
 
-impl<'a> ::from_pest::FromPest<'a> for JobSpecification {
-    type Rule = Rule;
-    type FatalError = ::from_pest::Void;
-    fn from_pest(
-        pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
-    ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
-        let mut clone = pest.clone();
-        let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
-        if pair.as_rule() == Rule::job_specification {
-            let mut inner = pair.into_inner();
-            let inner = &mut inner;
-            let this = JobSpecification {
-                name: Result::unwrap(str::parse(span_into_str(
-                    inner
-                        .next()
-                        .ok_or(::from_pest::ConversionError::NoMatch)?
-                        .as_span(),
-                ))),
-                tasks: inner
-                    .into_iter()
-                    .map(|p| {
-                        // we need to strip out the trailing ","
-                        let inner = p.into_inner().into_iter().next().unwrap();
-                        let span = inner.as_span();
-                        debug!("THE JOB SPAN: {:?}", span);
-                        span.as_str().to_string()
-                    })
-                    .collect(),
-            };
-            if inner.clone().next().is_some() {
-                {
-                    panic!(
-                        "when converting JobSpecification, found extraneous {0:?}",
-                        inner
-                    )
-                }
-            }
-            *pest = clone;
-            Ok(this)
-        } else {
-            tracing::trace!("JobSpec NoMatch: {pair:?}");
-            Err(::from_pest::ConversionError::NoMatch)
-        }
-    }
-}
+// impl<'a> ::from_pest::FromPest<'a> for JobSpecification {
+//     type Rule = Rule;
+//     type FatalError = ::from_pest::Void;
+//     fn from_pest(
+//         pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
+//     ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
+//         let mut clone = pest.clone();
+//         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
+//         println!("=====> JOB_SPEC: {pair:?}");
+//         if pair.as_rule() == Rule::job_specification {
+//             let mut inner = pair.into_inner();
+//             let inner = &mut inner;
+//             let this = JobSpecification {
+//                 name: Result::unwrap(str::parse(span_into_str(
+//                     inner
+//                         .next()
+//                         .ok_or(::from_pest::ConversionError::NoMatch)?
+//                         .as_span(),
+//                 ))),
+//                 tasks: inner
+//                     .into_iter()
+//                     .map(|p| {
+//                         // we need to strip out the trailing ","
+//                         let inner = p.into_inner().into_iter().next().unwrap();
+//                         let span = inner.as_span();
+//                         debug!("THE JOB SPAN: {:?}", span);
+//                         span.as_str().to_string()
+//                     })
+//                     .collect(),
+//             };
+//             if inner.clone().next().is_some() {
+//                 {
+//                     panic!(
+//                         "when converting JobSpecification, found extraneous {0:?}",
+//                         inner
+//                     )
+//                 }
+//             }
+//             println!("=====> {clone:?}");
+//             // let clone = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?; // need to be rid of the NEWLINE
+//             *pest = clone; // need to be rid of the NEWLINE
+//             Ok(this)
+//         } else {
+//             tracing::trace!("JobSpec NoMatch: {pair:?}");
+//             Err(::from_pest::ConversionError::NoMatch)
+//         }
+//     }
+// }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromPest)]
+#[pest_ast(rule(Rule::pipeline_specification))]
 pub struct PipelineSpecification {
+    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub name: String,
+    #[pest_ast(inner(with(inner_into_vec_of_string)))]
     pub jobs: Vec<String>,
 }
 
-impl<'a> ::from_pest::FromPest<'a> for PipelineSpecification {
-    type Rule = Rule;
-    type FatalError = ::from_pest::Void;
-    fn from_pest(
-        pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
-    ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
-        let mut clone = pest.clone();
-        let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
-        if pair.as_rule() == Rule::pipeline_specification {
-            let mut inner = pair.into_inner();
-            let inner = &mut inner;
-            let this = PipelineSpecification {
-                name: Result::unwrap(str::parse(span_into_str(
-                    inner
-                        .next()
-                        .ok_or(::from_pest::ConversionError::NoMatch)?
-                        .as_span(),
-                ))),
-                jobs: inner
-                    .into_iter()
-                    .map(|p| {
-                        // we need to strip out the trailing ","
-                        let inner = p.into_inner().into_iter().next().unwrap();
-                        let span = inner.as_span();
-                        debug!("THE PIPELINE SPAN: {:?}", span);
-                        span.as_str().to_string()
-                    })
-                    .collect(),
-            };
-            if inner.clone().next().is_some() {
-                {
-                    panic!(
-                        "when converting JobSpecification, found extraneous {0:?}",
-                        inner
-                    )
-                }
-            }
-            *pest = clone;
-            Ok(this)
-        } else {
-            println!("PipelineSpec NoMatch: {pair:?}");
-            Err(::from_pest::ConversionError::NoMatch)
-        }
-    }
-}
+// impl<'a> ::from_pest::FromPest<'a> for PipelineSpecification {
+//     type Rule = Rule;
+//     type FatalError = ::from_pest::Void;
+//     fn from_pest(
+//         pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
+//     ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
+//         let mut clone = pest.clone();
+//         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
+//         if pair.as_rule() == Rule::pipeline_specification {
+//             let mut inner = pair.into_inner();
+//             let inner = &mut inner;
+//             let this = PipelineSpecification {
+//                 name: Result::unwrap(str::parse(span_into_str(
+//                     inner
+//                         .next()
+//                         .ok_or(::from_pest::ConversionError::NoMatch)?
+//                         .as_span(),
+//                 ))),
+//                 jobs: inner
+//                     .into_iter()
+//                     .map(|p| {
+//                         // we need to strip out the trailing ","
+//                         let inner = p.into_inner().into_iter().next().unwrap();
+//                         let span = inner.as_span();
+//                         debug!("THE PIPELINE SPAN: {:?}", span);
+//                         span.as_str().to_string()
+//                     })
+//                     .collect(),
+//             };
+//             if inner.clone().next().is_some() {
+//                 {
+//                     panic!(
+//                         "when converting JobSpecification, found extraneous {0:?}",
+//                         inner
+//                     )
+//                 }
+//             }
+//             *pest = clone;
+//             Ok(this)
+//         } else {
+//             tracing::trace!("PipelineSpec NoMatch: {pair:?}");
+//             Err(::from_pest::ConversionError::NoMatch)
+//         }
+//     }
+// }
 
 #[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::pipeline_definition))]

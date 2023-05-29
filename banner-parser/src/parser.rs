@@ -129,6 +129,44 @@ mod pipeline_from_ast_tests {
         }
     }
 
+    #[traced_test]
+    #[test]
+    fn test_double_forward_slash_in_string() {
+        let code = r#######"
+        task unit-test(image: rustl3rs/banner-rust-build, execute: "/bin/bash -c") {
+            r#"
+            // this is a comment
+            curl https://banner.io/api/v1/echo
+            "#
+        }
+        "#######;
+
+        check(
+            &code,
+            expect![[r#"
+            Pipeline {
+                imports: [],
+                images: [],
+                tasks: [
+                    Task {
+                        tags: [],
+                        name: "unit-test",
+                        image: "rustl3rs/banner-rust-build",
+                        command: StringLiteral(
+                            "/bin/bash -c",
+                        ),
+                        script: RawString(
+                            "\n            // this is a comment\n            curl https://banner.io/api/v1/echo\n            ",
+                        ),
+                    },
+                ],
+                jobs: [],
+                pipelines: [],
+                eoi: EOI,
+            }"#]],
+        )
+    }
+
     #[test]
     fn test_syntax() {
         let code = r#######"
@@ -144,33 +182,35 @@ mod pipeline_from_ast_tests {
         check(
             &code,
             expect![[r#"
-            Pipeline {
-                imports: [],
-                images: [],
-                tasks: [
-                    Task {
-                        tags: [
-                            Tag {
-                                key: "banner.io/owner",
-                                value: "me",
-                            },
-                            Tag {
-                                key: "banner.io/company",
-                                value: "rustl3rs",
-                            },
-                        ],
-                        name: "unit-test",
-                        image: "rustl3rs/banner-rust-build",
-                        command: RawString(
-                            "/bin/bash -c",
-                        ),
-                        script: "bash\n            echo testing, testing, 1, 2, 3!",
-                    },
-                ],
-                jobs: [],
-                pipelines: [],
-                eoi: EOI,
-            }"#]],
+                Pipeline {
+                    imports: [],
+                    images: [],
+                    tasks: [
+                        Task {
+                            tags: [
+                                Tag {
+                                    key: "banner.io/owner",
+                                    value: "me",
+                                },
+                                Tag {
+                                    key: "banner.io/company",
+                                    value: "rustl3rs",
+                                },
+                            ],
+                            name: "unit-test",
+                            image: "rustl3rs/banner-rust-build",
+                            command: RawString(
+                                "/bin/bash -c",
+                            ),
+                            script: RawString(
+                                "bash\n            echo testing, testing, 1, 2, 3!\n            ",
+                            ),
+                        },
+                    ],
+                    jobs: [],
+                    pipelines: [],
+                    eoi: EOI,
+                }"#]],
         )
     }
 
@@ -202,7 +242,9 @@ mod pipeline_from_ast_tests {
                             command: RawString(
                                 "",
                             ),
-                            script: "",
+                            script: RawString(
+                                "",
+                            ),
                         },
                     ],
                     jobs: [
@@ -224,6 +266,23 @@ mod pipeline_from_ast_tests {
                     eoi: EOI,
                 }"#]],
         )
+    }
+
+    #[traced_test]
+    #[test]
+    fn can_parse_pipeline_with_job_and_task_reversed() {
+        let code = r#######"
+            job build [
+                // this is a comment...
+                cowsay,
+                test,
+            ]
+            
+            task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
+            task test(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
+        "#######;
+
+        check(&code, expect![""])
     }
 
     #[traced_test]
@@ -265,6 +324,16 @@ mod pipeline_from_ast_tests {
 
     #[traced_test]
     #[test]
+    fn can_parse_job() {
+        let code = r#######"
+        job build []
+        "#######;
+
+        check(&code, expect![""])
+    }
+
+    #[traced_test]
+    #[test]
     fn can_parse_task_with_var() {
         let code = r#######"
         let _image = Image {
@@ -284,42 +353,143 @@ mod pipeline_from_ast_tests {
         check(
             &code,
             expect![[r#"
-            Pipeline {
-                imports: [],
-                images: [
-                    Images {
-                        name: "_image",
-                        image: Image {
-                            name: "rancher/alpine-git:latest",
-                            mounts: [
-                                Mount {
-                                    source: EngineSupplied(
-                                        "src",
-                                    ),
-                                    destination: RawString(
-                                        "/source",
-                                    ),
+                Pipeline {
+                    imports: [],
+                    images: [
+                        Images {
+                            name: "_image",
+                            image: Image {
+                                name: "rancher/alpine-git:latest",
+                                mounts: [
+                                    Mount {
+                                        source: EngineSupplied(
+                                            "src",
+                                        ),
+                                        destination: StringLiteral(
+                                            "/source",
+                                        ),
+                                    },
+                                ],
+                                envs: [],
+                            },
+                        },
+                    ],
+                    tasks: [
+                        Task {
+                            tags: [],
+                            name: "unit-test",
+                            image: "${build_image}",
+                            command: RawString(
+                                "/bin/bash -c",
+                            ),
+                            script: RawString(
+                                "bash\n            echo testing, testing, 1, 2, 3!\n            ",
+                            ),
+                        },
+                    ],
+                    jobs: [],
+                    pipelines: [],
+                    eoi: EOI,
+                }"#]],
+        )
+    }
+}
+
+#[cfg(test)]
+mod string_tests {
+    use expect_test::{expect, Expect};
+    use tracing_test::traced_test;
+
+    use super::*;
+
+    fn check(code: &str, expect: Expect) {
+        match BannerParser::parse(Rule::string_literal, &code) {
+            Ok(tree) => {
+                let actual = format!("{:#?}", tree);
+                expect.assert_eq(&actual);
+            }
+            Err(e) => {
+                trace!("ERROR = {:#?}", e);
+                panic!("{:?}", e);
+            }
+        }
+    }
+
+    #[traced_test]
+    #[test]
+    fn test_string_parsing() {
+        let code = r#######""this is a string""#######;
+        check(
+            &code,
+            expect![[r#"
+            [
+                Pair {
+                    rule: string_literal,
+                    span: Span {
+                        str: "\"this is a string\"",
+                        start: 0,
+                        end: 18,
+                    },
+                    inner: [
+                        Pair {
+                            rule: standard_string,
+                            span: Span {
+                                str: "\"this is a string\"",
+                                start: 0,
+                                end: 18,
+                            },
+                            inner: [
+                                Pair {
+                                    rule: string_content,
+                                    span: Span {
+                                        str: "this is a string",
+                                        start: 1,
+                                        end: 17,
+                                    },
+                                    inner: [],
                                 },
                             ],
-                            envs: [],
                         },
+                    ],
+                },
+            ]"#]],
+        );
+
+        let code = r#######"r#"this is a string"#"#######;
+        check(
+            &code,
+            expect![[r##"
+            [
+                Pair {
+                    rule: string_literal,
+                    span: Span {
+                        str: "r#\"this is a string\"#",
+                        start: 0,
+                        end: 21,
                     },
-                ],
-                tasks: [
-                    Task {
-                        tags: [],
-                        name: "unit-test",
-                        image: "${build_image}",
-                        command: RawString(
-                            "/bin/bash -c",
-                        ),
-                        script: "bash\n            echo testing, testing, 1, 2, 3!",
-                    },
-                ],
-                jobs: [],
-                pipelines: [],
-                eoi: EOI,
-            }"#]],
-        )
+                    inner: [
+                        Pair {
+                            rule: raw_string,
+                            span: Span {
+                                str: "r#\"this is a string\"#",
+                                start: 0,
+                                end: 21,
+                            },
+                            inner: [
+                                Pair {
+                                    rule: raw_string_interior,
+                                    span: Span {
+                                        str: "this is a string",
+                                        start: 3,
+                                        end: 19,
+                                    },
+                                    inner: [],
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ]"##]],
+        );
     }
 }

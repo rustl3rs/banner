@@ -234,8 +234,10 @@ mod string_tests {
         let input = r##""try something /\/ new""##;
         check(input);
 
-        // known to fail.  have raised issue with pest https://github.com/pest-parser/pest/issues/857
-        // let input = r##"r#"//""##;
-        // check(input);
+        let input = r##""//""##;
+        check(input);
+
+        let input = r##"r#"//"#"##;
+        check(input);
     }
 }

@@ -39,18 +39,19 @@ block = _{
 
 image_definition = _{ image_identifier | variable }
 
-variable = { "$" ~ "{" ~ identifier ~ "}" }
-identifier = { (ASCII_ALPHANUMERIC | "_" | "-")+ }
+variable = ${ "$" ~ "{" ~ identifier ~ "}" }
+identifier = @{ (ASCII_ALPHANUMERIC | "_" | "-")+ }
 //image_identifier = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ":")+ }
-image_identifier = { image_var | image_def }
+image_identifier = ${ image_var | image_def }
 image_def = @{ !"${" ~ (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ":")+ }
 image_var = @{ "${" ~ identifier ~ "}" }
-string_literal = { raw_string | "\"" ~ string_content ~ "\"" }
+string_literal = ${ raw_string | standard_string }
+standard_string = ${ "\"" ~ string_content ~ "\"" }
 string_content = { (!("\"") ~ ANY)* }
 
 // raw strings was taken directly from 
 // https://pest.rs/book/grammars/syntax.html#the-stack-wip
-raw_string = _{
+raw_string = ${
     "r" ~ PUSH("#"*) ~ "\""    // push the number signs onto the stack
     ~ raw_string_interior
     ~ "\"" ~ POP               // match a quotation mark and the number signs
@@ -82,8 +83,6 @@ URI = ${ scheme ~ ":" ~ "//" ~ heir_query_fragment }
 scheme = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "+" | "-" | ".")* }
 heir_query_fragment = @{ (ASCII_ALPHA | ASCII_DIGIT | "-" | "." | "_" | "~" | ":" | "/" | "?" | "#" | "[" | "]" | "@" | "!" | "$" | "&" | "'" | "(" | ")" | "*" | "+" | "," | ";" | "=")+ }
 
-job_specification = { "job" ~ identifier ~ "[" ~ task* ~ "]" }
-task = { identifier ~ "," }
-
-pipeline_specification = { "pipeline" ~ identifier ~ "[" ~ job* ~ "]" }
-job = { identifier ~ "," }
+job_specification = { "job" ~ identifier ~ "[" ~ identifier_list ~ "]" }
+pipeline_specification = { "pipeline" ~ identifier ~ "[" ~ identifier_list ~ "]" }
+identifier_list = { identifier ~ ("," ~ identifier)* ~ ","{0,1} }

@@ -1,0 +1,10 @@
+job build [
+    cowsay,
+    test
+]
+
+task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
+
+//pipeline test [
+//    build,
+//]
