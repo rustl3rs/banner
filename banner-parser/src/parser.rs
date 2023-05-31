@@ -99,7 +99,6 @@ mod banner_parser_tests {
 
     #[traced_test]
     #[test]
-    #[ignore] // known to fail.... need to fix... raised issue with pest https://github.com/pest-parser/pest/issues/857
     fn can_parse_banner_pipeline() {
         let code = fs::read_to_string("../pipeline-assets/banner-pipeline-get-only.ban")
             .expect("Should have been able to read the file");
@@ -111,6 +110,7 @@ mod banner_parser_tests {
 #[cfg(test)]
 mod pipeline_from_ast_tests {
     use expect_test::{expect, Expect};
+    use from_pest::FromPest;
     use tracing_test::traced_test;
 
     use super::*;
@@ -144,26 +144,27 @@ mod pipeline_from_ast_tests {
         check(
             &code,
             expect![[r#"
-            Pipeline {
-                imports: [],
-                images: [],
-                tasks: [
-                    Task {
-                        tags: [],
-                        name: "unit-test",
-                        image: "rustl3rs/banner-rust-build",
-                        command: StringLiteral(
-                            "/bin/bash -c",
-                        ),
-                        script: RawString(
-                            "\n            // this is a comment\n            curl https://banner.io/api/v1/echo\n            ",
-                        ),
-                    },
-                ],
-                jobs: [],
-                pipelines: [],
-                eoi: EOI,
-            }"#]],
+                Pipeline {
+                    imports: [],
+                    images: [],
+                    tasks: [
+                        Task {
+                            tags: [],
+                            name: "unit-test",
+                            image: "rustl3rs/banner-rust-build",
+                            command: StringLiteral(
+                                "/bin/bash -c",
+                            ),
+                            script: RawString(
+                                1,
+                                "\n            // this is a comment\n            curl https://banner.io/api/v1/echo\n            ",
+                            ),
+                        },
+                    ],
+                    jobs: [],
+                    pipelines: [],
+                    eoi: EOI,
+                }"#]],
         )
     }
 
@@ -200,9 +201,11 @@ mod pipeline_from_ast_tests {
                             name: "unit-test",
                             image: "rustl3rs/banner-rust-build",
                             command: RawString(
+                                1,
                                 "/bin/bash -c",
                             ),
                             script: RawString(
+                                5,
                                 "bash\n            echo testing, testing, 1, 2, 3!\n            ",
                             ),
                         },
@@ -217,6 +220,7 @@ mod pipeline_from_ast_tests {
     #[test]
     fn can_parse_pipeline_with_job_and_task() {
         let code = r#######"
+        
         task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
 
         job build [
@@ -240,9 +244,11 @@ mod pipeline_from_ast_tests {
                             name: "cowsay",
                             image: "kmcgivern/cowsay-alpine:latest",
                             command: RawString(
+                                1,
                                 "",
                             ),
                             script: RawString(
+                                1,
                                 "",
                             ),
                         },
@@ -272,30 +278,74 @@ mod pipeline_from_ast_tests {
     #[test]
     fn can_parse_pipeline_with_job_and_task_reversed() {
         let code = r#######"
+            pipeline my_pipeline [
+                build
+            ]
+            
+            import file://./single_task.ban
+            
             job build [
                 // this is a comment...
                 cowsay,
-                test
+                cowsay
             ]
+            
+            [tag: banner.io/owner=me]
+            [tag: banner.io/company=rustl3rs]
+            task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
         "#######;
 
         check(
             &code,
             expect![[r#"
             Pipeline {
-                imports: [],
+                imports: [
+                    Import {
+                        uri: "file://./single_task.ban",
+                    },
+                ],
                 images: [],
-                tasks: [],
+                tasks: [
+                    Task {
+                        tags: [
+                            Tag {
+                                key: "banner.io/owner",
+                                value: "me",
+                            },
+                            Tag {
+                                key: "banner.io/company",
+                                value: "rustl3rs",
+                            },
+                        ],
+                        name: "cowsay",
+                        image: "kmcgivern/cowsay-alpine:latest",
+                        command: RawString(
+                            1,
+                            "",
+                        ),
+                        script: RawString(
+                            1,
+                            "",
+                        ),
+                    },
+                ],
                 jobs: [
                     JobSpecification {
                         name: "build",
                         tasks: [
                             "cowsay",
-                            "test",
+                            "cowsay",
                         ],
                     },
                 ],
-                pipelines: [],
+                pipelines: [
+                    PipelineSpecification {
+                        name: "my_pipeline",
+                        jobs: [
+                            "build",
+                        ],
+                    },
+                ],
                 eoi: EOI,
             }"#]],
         )
@@ -373,7 +423,7 @@ mod pipeline_from_ast_tests {
     #[test]
     fn can_parse_task_with_var() {
         let code = r#######"
-        let _image = Image {
+        let build_image = Image {
             name=rancher/alpine-git:latest,
             mount=[
                 ${src} => "/source",
@@ -393,8 +443,8 @@ mod pipeline_from_ast_tests {
                 Pipeline {
                     imports: [],
                     images: [
-                        Images {
-                            name: "_image",
+                        ImageDefinition {
+                            name: "build_image",
                             image: Image {
                                 name: "rancher/alpine-git:latest",
                                 mounts: [
@@ -417,9 +467,11 @@ mod pipeline_from_ast_tests {
                             name: "unit-test",
                             image: "${build_image}",
                             command: RawString(
+                                1,
                                 "/bin/bash -c",
                             ),
                             script: RawString(
+                                5,
                                 "bash\n            echo testing, testing, 1, 2, 3!\n            ",
                             ),
                         },

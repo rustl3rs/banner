@@ -1,38 +1,19 @@
 use std::ops;
 
-use crate::grammar::{BannerParser, Rule};
-use from_pest::FromPest;
-use pest::{Parser, Span};
+use crate::{from_pest::FromPest, grammar::Rule};
 
-fn span_into_str(span: Span) -> &str {
-    println!("SPAN(span_into_str): {:?}", span.as_str());
-    span.as_str()
-}
-
-fn identifier_list_span_into_vec_of_string(span: Span) -> Vec<String> {
-    println!("span_into_vec_of_string: {:#?}", span);
-    let mut parse_tree = BannerParser::parse(Rule::identifier_list, &span.as_str()).unwrap();
-    // println!(
-    //     "span_into_vec_of_string => PARSED: {:#?}",
-    //     parse_tree.next().unwrap().into_inner()
-    // );
-    match IdentifierList::from_pest(&mut parse_tree) {
-        Ok(tree) => tree
-            .identifiers
-            .into_iter()
-            .map(|s| s.name)
-            .collect::<Vec<String>>(),
-        Err(e) => {
-            tracing::trace!("ERROR = {:#?}", e);
-            panic!("{:?}", e);
-        }
-    }
-}
+use pest::iterators::{Pair, Pairs};
 
 #[derive(Debug, Clone)]
 pub enum StringLiteral {
-    RawString(String),
+    RawString(u8, String),
     StringLiteral(String),
+}
+
+impl Default for StringLiteral {
+    fn default() -> Self {
+        Self::StringLiteral("".into())
+    }
 }
 
 impl<'a> ::from_pest::FromPest<'a> for StringLiteral {
@@ -43,72 +24,24 @@ impl<'a> ::from_pest::FromPest<'a> for StringLiteral {
     ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
-        if pair.as_rule() == Rule::string_literal {
-            let mut literal = pair.clone().into_inner();
-            let pair = literal
-                .next()
-                .ok_or(::from_pest::ConversionError::NoMatch)?;
-            match pair.as_rule() {
-                Rule::raw_string => {
-                    let mut inner = pair.clone().into_inner();
-                    let inner = &mut inner;
-                    let this = StringLiteral::RawString(
-                        span_into_str(
-                            inner
-                                .next()
-                                .ok_or(::from_pest::ConversionError::NoMatch)?
-                                .as_span(),
-                        )
-                        .to_string(),
-                    );
-                    tracing::trace!("raw_string = {this:?}");
-                    tracing::trace!("clone: {clone:?}");
-                    *pest = clone;
-                    Ok(this)
-                }
-                Rule::standard_string => {
-                    let mut inner = pair.clone().into_inner();
-                    let inner = &mut inner;
-                    let this = StringLiteral::StringLiteral(
-                        span_into_str(
-                            inner
-                                .next()
-                                .ok_or(::from_pest::ConversionError::NoMatch)?
-                                .as_span(),
-                        )
-                        .to_string(),
-                    );
-                    tracing::trace!("string_literal = {this:?}");
-                    tracing::trace!("clone: {clone:?}");
-                    *pest = clone;
-                    Ok(this)
-                }
-                _ => {
-                    tracing::trace!("StringLiteral NoMatch");
-                    Err(::from_pest::ConversionError::NoMatch)
-                }
+        tracing::trace!("STRING_LITERAL: pair: {pair:?}");
+        match pair.as_rule() {
+            Rule::raw_string => {
+                let this = StringLiteral::from_raw_string(pair);
+                tracing::trace!("raw_string = {this:?}");
+                *pest = clone;
+                Ok(this)
             }
-        } else if pair.as_rule() == Rule::raw_string {
-            let mut clone = pest.clone();
-            let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
-            let mut inner = pair.clone().into_inner();
-            let inner = &mut inner;
-            let this = StringLiteral::RawString(
-                span_into_str(
-                    inner
-                        .next()
-                        .ok_or(::from_pest::ConversionError::NoMatch)?
-                        .as_span(),
-                )
-                .to_string(),
-            );
-            tracing::trace!("raw_string = {this:?}");
-            tracing::trace!("clone: {clone:?}");
-            *pest = clone;
-            Ok(this)
-        } else {
-            tracing::trace!("StringLiteral NoMatch");
-            Err(::from_pest::ConversionError::NoMatch)
+            Rule::standard_string => {
+                let this = StringLiteral::StringLiteral(pair.into_inner().as_str().to_string());
+                tracing::trace!("string_literal = {this:?}");
+                *pest = clone;
+                Ok(this)
+            }
+            _ => {
+                tracing::trace!("StringLiteral NoMatch");
+                Err(::from_pest::ConversionError::NoMatch)
+            }
         }
     }
 }
@@ -116,38 +49,151 @@ impl<'a> ::from_pest::FromPest<'a> for StringLiteral {
 impl StringLiteral {
     pub fn as_str(&self) -> &str {
         match self {
-            StringLiteral::RawString(inner) => inner,
+            StringLiteral::RawString(_, inner) => inner,
             StringLiteral::StringLiteral(inner) => inner,
         }
     }
+
+    pub fn from_raw_string(raw: Pair<Rule>) -> StringLiteral {
+        if raw.as_rule() != Rule::raw_string {
+            panic!("Expected raw_string, got {:?}", raw);
+        };
+        // subtract 1 for the starting `r` char
+        // since we are zero based, we don't need to subtract an extra 1 for the ending `"`
+        let count = raw.as_str().find("\"").unwrap() as u8 - 1;
+        let raw = raw.into_inner().next().unwrap().as_str().to_string();
+        StringLiteral::RawString(count, raw)
+    }
 }
 
-#[derive(Debug, Clone, FromPest)]
-#[pest_ast(rule(Rule::task_definition))]
+#[derive(Debug, Clone, Default)]
 pub struct Task {
     pub tags: Vec<Tag>,
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub name: String,
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub image: String,
     pub command: StringLiteral,
     pub script: StringLiteral,
 }
 
-#[derive(Debug, FromPest, Clone)]
-#[pest_ast(rule(Rule::tag))]
+impl<'pest> FromPest<'pest> for Task {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+
+    fn from_pest(
+        pest: &mut Pairs<'pest, Self::Rule>,
+    ) -> Result<Self, from_pest::ConversionError<Self::FatalError>> {
+        tracing::trace!("TASK: pest = {:#?}", pest);
+        let mut clone = pest.clone();
+        let mut pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("TASK: pair = {:#?}", pair);
+
+        let mut task_def = Task {
+            ..Default::default()
+        };
+        tracing::trace!("TASK: default task_def = {:#?}", task_def);
+
+        while pair.as_rule() == Rule::tag {
+            tracing::trace!("TAG pair = {:#?}", pair);
+            let tag = Tag::from_pest(&mut pair.into_inner())?;
+            task_def.tags.push(tag);
+            pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        }
+        tracing::trace!("TASK: task_def with tags = {:#?}", task_def);
+
+        tracing::trace!("TASK: pair = {:#?}", pair);
+        if pair.as_rule() != Rule::identifier {
+            tracing::trace!("TASK: Task.Name NoMatch");
+            return Err(from_pest::ConversionError::NoMatch);
+        }
+        task_def.name = pair.as_str().to_string();
+        tracing::trace!("TASK: task_def with name = {:#?}", task_def);
+
+        pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("TASK: pair = {:#?}", pair);
+        if pair.as_rule() != Rule::image_identifier {
+            tracing::trace!("TASK: Task.Image NoMatch");
+            return Err(from_pest::ConversionError::NoMatch);
+        }
+        task_def.image = pair.as_str().to_string();
+        tracing::trace!("TASK: task_def with image = {:#?}", task_def);
+
+        pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("TASK: pair = {:#?}", pair);
+        if pair.as_rule() != Rule::string_literal {
+            tracing::trace!("TASK: Task.Command NoMatch");
+            return Err(from_pest::ConversionError::NoMatch);
+        }
+        task_def.command = StringLiteral::from_pest(&mut pair.into_inner())?;
+        tracing::trace!("TASK: task_def with command = {:#?}", task_def);
+
+        pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("TASK: pair = {:#?}", pair);
+        if pair.as_rule() != Rule::raw_string {
+            tracing::trace!("TTASK: ask.Script NoMatch");
+            return Err(from_pest::ConversionError::NoMatch);
+        }
+        task_def.script = StringLiteral::from_raw_string(pair);
+        tracing::trace!("TASK: task_def with script = {:#?}", task_def);
+
+        *pest = clone;
+        Ok(task_def)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct Tag {
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub key: String,
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub value: String,
 }
 
-#[derive(Debug, FromPest, Clone)]
-#[pest_ast(rule(Rule::import_declaration))]
+impl<'pest> FromPest<'pest> for Tag {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+
+    fn from_pest(
+        pest: &mut Pairs<'pest, Self::Rule>,
+    ) -> Result<Self, from_pest::ConversionError<Self::FatalError>> {
+        tracing::trace!("TAG: pest = {:#?}", pest);
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("TAG: pair = {:#?}", pair);
+
+        // because the parser has already returned a valid set of pairs, we can
+        // safely assume that the first pair is a key and the second pair is a value
+        // because to get here, we had to validate that we had a TAG rule
+        let key = pair.as_str().to_string();
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        let value = pair.as_str().to_string();
+
+        let tag = Tag { key, value };
+        *pest = clone;
+        Ok(tag)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct Import {
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub uri: String,
+}
+
+impl<'pest> FromPest<'pest> for Import {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+
+    fn from_pest(
+        pest: &mut Pairs<'pest, Self::Rule>,
+    ) -> Result<Self, from_pest::ConversionError<Self::FatalError>> {
+        tracing::trace!("IMPORT: pest = {:#?}", pest);
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("IMPORT: pair = {:#?}", pair);
+
+        let uri = pair.as_str().to_string();
+
+        let import = Import { uri };
+        *pest = clone;
+        Ok(import)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -156,50 +202,38 @@ pub enum MountSource {
     Identifier(String),
     StringLiteral(String),
 }
+
+impl Default for MountSource {
+    fn default() -> Self {
+        Self::StringLiteral("".into())
+    }
+}
+
 impl<'a> ::from_pest::FromPest<'a> for MountSource {
     type Rule = Rule;
     type FatalError = ::from_pest::Void;
     fn from_pest(
         pest: &mut ::from_pest::pest::iterators::Pairs<'a, Rule>,
     ) -> ::std::result::Result<Self, ::from_pest::ConversionError<::from_pest::Void>> {
+        tracing::trace!("MOUNTSOURCE: pest = {:#?}", pest);
         let mut clone = pest.clone();
         let pair = clone.next().ok_or(::from_pest::ConversionError::NoMatch)?;
         match pair.as_rule() {
             Rule::variable => {
-                let mut inner = pair.clone().into_inner();
-                let inner = &mut inner;
-                let this = MountSource::EngineSupplied(Result::unwrap(str::parse(span_into_str(
-                    inner
-                        .next()
-                        .ok_or(::from_pest::ConversionError::NoMatch)?
-                        .as_span(),
-                ))));
+                let this = MountSource::EngineSupplied(pair.into_inner().as_str().to_string());
                 tracing::trace!("variable = {this:?}");
                 *pest = clone;
                 Ok(this)
             }
             Rule::pipe_job_task_identifier => {
-                let this = MountSource::Identifier(pair.clone().as_span().as_str().to_string());
+                let this = MountSource::Identifier(pair.as_span().as_str().to_string());
                 *pest = clone;
                 Ok(this)
             }
             Rule::string_literal => {
                 let mut inner = pair.clone().into_inner();
                 let inner = &mut inner;
-                let this = MountSource::StringLiteral(Result::unwrap(str::parse(span_into_str(
-                    inner
-                        .next()
-                        .ok_or(::from_pest::ConversionError::NoMatch)?
-                        .as_span(),
-                ))));
-                if inner.clone().next().is_some() {
-                    {
-                        panic!(
-                            "when converting MountSource::StringLiteral, found extraneous {0:?}",
-                            inner
-                        )
-                    }
-                }
+                let this = MountSource::StringLiteral(inner.as_str().to_string());
                 *pest = clone;
                 Ok(this)
             }
@@ -211,78 +245,312 @@ impl<'a> ::from_pest::FromPest<'a> for MountSource {
     }
 }
 
-#[derive(Debug, FromPest, Clone)]
-#[pest_ast(rule(Rule::mount))]
+#[derive(Debug, Clone, Default)]
 pub struct Mount {
     pub source: MountSource,
     pub destination: StringLiteral,
 }
 
-#[derive(Debug, FromPest, Clone)]
-#[pest_ast(rule(Rule::env_var))]
+impl<'pest> FromPest<'pest> for Mount {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+
+    fn from_pest(
+        pest: &mut Pairs<'pest, Self::Rule>,
+    ) -> Result<Self, from_pest::ConversionError<Self::FatalError>> {
+        tracing::trace!("MOUNT: pest = {:#?}", pest);
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("MOUNT: pair = {:#?}", pair);
+
+        let source = match pair.as_rule() {
+            Rule::variable => MountSource::EngineSupplied(pair.into_inner().as_str().to_string()),
+            Rule::pipe_job_task_identifier => MountSource::Identifier(pair.as_str().to_string()),
+            Rule::string_literal => MountSource::StringLiteral(pair.as_str().to_string()),
+            _ => return Err(from_pest::ConversionError::NoMatch),
+        };
+        tracing::trace!("MOUNT: source = {:#?}", source);
+
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("MOUNT: pair = {:#?}", pair);
+        let destination = match pair.as_rule() {
+            Rule::string_literal => StringLiteral::from_pest(&mut pair.into_inner())?,
+            _ => return Err(from_pest::ConversionError::NoMatch),
+        };
+        tracing::trace!("MOUNT: destination = {:#?}", destination);
+
+        let mount = Mount {
+            source,
+            destination,
+        };
+        *pest = clone;
+        Ok(mount)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct EnvironmentVariable {
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub key: String,
     pub value: StringLiteral,
 }
 
-#[derive(Debug, FromPest, Clone)]
-#[pest_ast(rule(Rule::image_specification))]
+impl<'pest> FromPest<'pest> for EnvironmentVariable {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+
+    fn from_pest(
+        pest: &mut Pairs<'pest, Self::Rule>,
+    ) -> Result<Self, from_pest::ConversionError<Self::FatalError>> {
+        tracing::trace!("ENV_VAR: pest = {:#?}", pest);
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("ENV_VAR: pair = {:#?}", pair);
+
+        let key = pair.as_str().to_string();
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        let value = StringLiteral::from_pest(&mut pair.into_inner())?;
+
+        let env_var = EnvironmentVariable { key, value };
+        *pest = clone;
+        Ok(env_var)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct Image {
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub name: String,
     pub mounts: Vec<Mount>,
     pub envs: Vec<EnvironmentVariable>,
 }
 
-#[derive(Debug, FromPest, Clone)]
-#[pest_ast(rule(Rule::let_statement))]
-pub struct Images {
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
+impl<'pest> FromPest<'pest> for Image {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+
+    fn from_pest(
+        pest: &mut Pairs<'pest, Self::Rule>,
+    ) -> Result<Self, from_pest::ConversionError<Self::FatalError>> {
+        tracing::trace!("IMAGE: pest = {:#?}", pest);
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("IMAGE: pair = {:#?}", pair);
+
+        let mut image = Image {
+            name: pair.as_str().to_string(),
+            ..Default::default()
+        };
+
+        let mut pair = clone.next();
+        while pair.is_some() {
+            let possible_mount = pair.clone().unwrap();
+            if possible_mount.as_rule() != Rule::mount {
+                break;
+            }
+            let mount = Mount::from_pest(&mut possible_mount.into_inner())?;
+            image.mounts.push(mount);
+            tracing::trace!("IMAGE: move next");
+            pair = clone.next();
+            tracing::trace!("IMAGE: move next done!");
+        }
+
+        while pair.is_some() {
+            let possible_var = pair.clone().unwrap();
+            if possible_var.as_rule() != Rule::env_var {
+                break;
+            }
+            let env_var = EnvironmentVariable::from_pest(&mut possible_var.into_inner())?;
+            image.envs.push(env_var);
+            pair = clone.next();
+        }
+
+        if pair.is_some() {
+            panic!(
+                "when converting MountSource::StringLiteral, found extraneous {0:?}",
+                pair.unwrap().as_str()
+            )
+        }
+
+        *pest = clone;
+        Ok(image)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ImageDefinition {
     pub name: String,
     pub image: Image,
 }
 
-#[derive(Debug, Clone, FromPest)]
-#[pest_ast(rule(Rule::identifier_list))]
-pub struct IdentifierList {
-    pub identifiers: Vec<Identifier>,
+impl<'pest> FromPest<'pest> for ImageDefinition {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+
+    fn from_pest(
+        pest: &mut Pairs<'pest, Self::Rule>,
+    ) -> Result<Self, from_pest::ConversionError<Self::FatalError>> {
+        tracing::trace!("IMAGE_DEFINITION: pest = {:#?}", pest);
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("IMAGE_DEFINITION: pair = {:#?}", pair);
+
+        let name = pair.as_str().to_string();
+        tracing::trace!("IMAGE_DEFINITION: name = {:#?}", name);
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("IMAGE_DEFINITION: pair = {:#?}", pair);
+        let image = Image::from_pest(&mut pair.into_inner())?;
+
+        let image_def = ImageDefinition { name, image };
+        *pest = clone;
+        Ok(image_def)
+    }
 }
 
-#[derive(Debug, Clone, FromPest)]
-#[pest_ast(rule(Rule::identifier))]
-pub struct Identifier {
-    #[pest_ast(outer(with(span_into_str), with(str::parse), with(Result::unwrap)))]
-    pub name: String,
-}
-
-#[derive(Debug, Clone, FromPest)]
-#[pest_ast(rule(Rule::job_specification))]
+#[derive(Debug, Clone, Default)]
 pub struct JobSpecification {
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub name: String,
-    #[pest_ast(inner(with(identifier_list_span_into_vec_of_string)))]
     pub tasks: Vec<String>,
 }
 
-#[derive(Debug, Clone, FromPest)]
-#[pest_ast(rule(Rule::pipeline_specification))]
+impl<'pest> FromPest<'pest> for JobSpecification {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+
+    fn from_pest(
+        pest: &mut Pairs<'pest, Self::Rule>,
+    ) -> Result<Self, from_pest::ConversionError<Self::FatalError>> {
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        if pair.as_rule() != Rule::identifier {
+            return Err(from_pest::ConversionError::NoMatch);
+        }
+
+        let mut job_spec = JobSpecification {
+            name: pair.as_str().to_string(),
+            ..Default::default()
+        };
+
+        let mut ident_list = clone.next().unwrap().into_inner();
+        let mut ident = ident_list.next();
+        tracing::trace!("PIPELINE_SPEC: identList = {:#?}", ident_list);
+        while ident.is_some() {
+            let possible_ident = ident.clone().unwrap();
+            if possible_ident.as_rule() != Rule::identifier {
+                break;
+            }
+            let job_name = possible_ident.as_str().to_string();
+            job_spec.tasks.push(job_name);
+            ident = ident_list.next();
+        }
+
+        *pest = clone;
+        Ok(job_spec)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct PipelineSpecification {
-    #[pest_ast(inner(with(span_into_str), with(str::parse), with(Result::unwrap)))]
     pub name: String,
-    #[pest_ast(inner(with(identifier_list_span_into_vec_of_string)))]
     pub jobs: Vec<String>,
 }
 
-#[derive(Debug, FromPest, Clone)]
-#[pest_ast(rule(Rule::pipeline_definition))]
+impl<'pest> FromPest<'pest> for PipelineSpecification {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+
+    fn from_pest(
+        pest: &mut Pairs<'pest, Self::Rule>,
+    ) -> Result<Self, from_pest::ConversionError<Self::FatalError>> {
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        if pair.as_rule() != Rule::identifier {
+            return Err(from_pest::ConversionError::NoMatch);
+        }
+
+        let mut pipeline_spec = PipelineSpecification {
+            name: pair.as_str().to_string(),
+            jobs: vec![],
+        };
+
+        let mut ident_list = clone.next().unwrap().into_inner();
+        let mut ident = ident_list.next();
+        tracing::trace!("PIPELINE_SPEC: identList = {:#?}", ident_list);
+        while ident.is_some() {
+            let possible_ident = ident.clone().unwrap();
+            if possible_ident.as_rule() != Rule::identifier {
+                break;
+            }
+            let job_name = possible_ident.as_str().to_string();
+            pipeline_spec.jobs.push(job_name);
+            ident = ident_list.next();
+        }
+
+        *pest = clone;
+        Ok(pipeline_spec)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct Pipeline {
     pub imports: Vec<Import>,
-    pub images: Vec<Images>,
+    pub images: Vec<ImageDefinition>,
     pub tasks: Vec<Task>,
     pub jobs: Vec<JobSpecification>,
     pub pipelines: Vec<PipelineSpecification>,
     eoi: EOI,
+}
+
+impl<'pest> FromPest<'pest> for Pipeline {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+
+    fn from_pest(
+        pest: &mut Pairs<'pest, Self::Rule>,
+    ) -> Result<Self, from_pest::ConversionError<Self::FatalError>> {
+        let mut clone = pest.clone();
+        let pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        if pair.as_rule() != Rule::pipeline_definition {
+            return Err(from_pest::ConversionError::NoMatch);
+        }
+
+        let mut pipeline = Pipeline {
+            ..Default::default()
+        };
+        for pair in pair.into_inner().clone() {
+            tracing::trace!("pair = {pair:?}");
+            let mut inner = pair.clone().into_inner();
+            // let inner = &mut inner;
+            match pair.as_rule() {
+                Rule::pipeline_specification => {
+                    tracing::trace!("pipeline_specification");
+                    let this = PipelineSpecification::from_pest(&mut inner)?;
+                    pipeline.pipelines.push(this);
+                }
+                Rule::job_specification => {
+                    tracing::trace!("job_specification");
+                    let this = JobSpecification::from_pest(&mut inner)?;
+                    pipeline.jobs.push(this);
+                }
+                Rule::import_declaration => {
+                    tracing::trace!("import_declaration");
+                    let this = Import::from_pest(&mut inner)?;
+                    pipeline.imports.push(this);
+                }
+                Rule::let_statement => {
+                    tracing::trace!("let_statement");
+                    let this = ImageDefinition::from_pest(&mut inner)?;
+                    pipeline.images.push(this);
+                }
+                Rule::task_definition => {
+                    tracing::trace!("task_definition");
+                    let this = Task::from_pest(&mut inner)?;
+                    pipeline.tasks.push(this);
+                }
+                Rule::EOI => {}
+                _ => panic!("unexpected pair: {pair:?}"),
+            }
+        }
+        Ok(pipeline)
+    }
 }
 
 impl ops::Add<Pipeline> for Pipeline {
@@ -312,57 +580,6 @@ impl ops::Add<Pipeline> for Pipeline {
     }
 }
 
-#[derive(Debug, FromPest, Clone)]
+#[derive(Debug, Clone, FromPest, Default)]
 #[pest_ast(rule(Rule::EOI))]
 struct EOI;
-
-#[cfg(test)]
-mod tests {
-    use expect_test::{expect, Expect};
-
-    use super::*;
-
-    fn check(list: &str, expect: Expect) {
-        let mut pest = BannerParser::parse(Rule::identifier_list, list).unwrap();
-        let pair = pest.next().unwrap();
-        let actual = identifier_list_span_into_vec_of_string(pair.as_span());
-        expect.assert_debug_eq(&actual);
-    }
-
-    #[test]
-    fn test_identifier_list_span_into_vec_of_string() {
-        check(
-            "foo,bar,",
-            expect![[r#"
-            [
-                "foo",
-                "bar",
-            ]
-        "#]],
-        );
-
-        check(
-            "this,is,a, much, longer,list\n",
-            expect![[r#"
-            [
-                "this",
-                "is",
-                "a",
-                "much",
-                "longer",
-                "list",
-            ]
-        "#]],
-        );
-
-        check(
-            "funky,                        whitespace,                        \n",
-            expect![[r#"
-            [
-                "funky",
-                "whitespace",
-            ]
-        "#]],
-        );
-    }
-}

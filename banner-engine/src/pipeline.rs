@@ -1,7 +1,7 @@
 use std::{collections::HashSet, error::Error, fmt::Display, fs, path::PathBuf};
 
 use banner_parser::{
-    ast::{self, Identifier, Import, JobSpecification, PipelineSpecification},
+    ast::{self, Import, JobSpecification, PipelineSpecification},
     grammar::{BannerParser, Rule},
     image_ref::{self, ImageRefParser},
     FromPest, Iri, Parser,
@@ -410,6 +410,7 @@ fn get_eventhandlers_for_pipeline(pipeline: &ast::PipelineSpecification) -> Vec<
     //   * an EH to trigger the first job in the pipeline
     //   * an EH per other job in the pipeline that triggers that job on the completion of the job preceeding it.
     //   * an EH to deal with the successful completion of the last job in the pipeline
+    tracing::trace!("get_eventhandlers_for_pipeline: pipeline: {pipeline:?}");
     let mut event_handlers: Vec<EventHandler> = vec![];
     if pipeline.jobs.len() == 0 {
         let eh = create_start_empty_pipeline_event_handler(pipeline);
@@ -877,6 +878,7 @@ fn load_file(uri: &Iri) -> Result<ast::Pipeline, Box<dyn Error + Send + Sync>> {
 // The pipelines that get passed in should already have undergone transformation and validation
 fn code_to_ast(code: &str) -> ast::Pipeline {
     let parsed = BannerParser::parse(Rule::pipeline_definition, &code);
+    tracing::trace!("Code tree: {:#?}", parsed);
     match parsed {
         Ok(mut parse_tree) => match ast::Pipeline::from_pest(&mut parse_tree) {
             Ok(tree) => tree,
@@ -1413,7 +1415,9 @@ mod event_handler_creation_tests {
     }
 
     fn get_ast_for(code: &str) -> ast::Pipeline {
-        code_to_ast(code)
+        let ast = code_to_ast(code);
+        tracing::debug!("AST: {:#?}", ast);
+        ast
     }
 
     #[traced_test]

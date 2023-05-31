@@ -1,10 +1,11 @@
+pipeline my_pipeline [
+    build
+]
+
 job build [
+    // this is a comment...
     cowsay,
     test
 ]
 
 task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
-
-//pipeline test [
-//    build,
-//]
