@@ -1,11 +1,11 @@
 pipeline_definition = {
-    SOI ~ 
-        ( import_declaration 
-        | let_statement 
-        | task_definition 
-        | job_specification 
-        | pipeline_specification 
-        )* 
+    SOI ~
+        ( import_declaration
+        | let_statement
+        | task_definition
+        | job_specification
+        | pipeline_specification
+        )*
     ~ EOI
 }
 
@@ -14,8 +14,8 @@ let_statement = {
 }
 
 image_specification = {
-    "name" ~ "=" ~ image_identifier ~  
-    ( "," ~ "mount" ~ "=" ~ "[" ~ mount* ~ "]" )? ~ 
+    "name" ~ "=" ~ image_identifier ~
+    ( "," ~ "mount" ~ "=" ~ "[" ~ mount* ~ "]" )? ~
     ( "," ~ "env" ~ "=" ~ "[" ~ env_var* ~ "]" )?
 }
 
@@ -49,7 +49,7 @@ string_literal = ${ raw_string | standard_string }
 standard_string = ${ "\"" ~ string_content ~ "\"" }
 string_content = { (!("\"") ~ ANY)* }
 
-// raw strings was taken directly from 
+// raw strings was taken directly from
 // https://pest.rs/book/grammars/syntax.html#the-stack-wip
 raw_string = ${
     "r" ~ PUSH("#"*) ~ "\""    // push the number signs onto the stack
@@ -77,12 +77,18 @@ tag_value = { (ASCII_ALPHANUMERIC | "_" | "-" | "/" | ".")+ }
 import_declaration = ${ "import" ~ WHITESPACE ~ URI ~ NEWLINE }
 // URI parsing 😭🤕 https://www.rfc-editor.org/rfc/rfc3986#appendix-A
 // Accept basically anything as a URI on the way in, make any transformations
-// that are required because of the use of variables, and then parse it a touch 
+// that are required because of the use of variables, and then parse it a touch
 // later with the iref crate.
 URI = ${ scheme ~ ":" ~ "//" ~ heir_query_fragment }
 scheme = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "+" | "-" | ".")* }
 heir_query_fragment = @{ (ASCII_ALPHA | ASCII_DIGIT | "-" | "." | "_" | "~" | ":" | "/" | "?" | "#" | "[" | "]" | "@" | "!" | "$" | "&" | "'" | "(" | ")" | "*" | "+" | "," | ";" | "=")+ }
 
-job_specification = { "job" ~ identifier ~ "[" ~ identifier_list ~ "]" }
-pipeline_specification = { "pipeline" ~ identifier ~ "[" ~ identifier_list ~ "]" }
-identifier_list = { identifier ~ ("," ~ identifier)* ~ ","{0,1} }
+job_specification = { "job" ~ identifier ~ sequential_identifier_list }
+pipeline_specification = { "pipeline" ~ identifier ~ sequential_identifier_list }
+
+parallel_identifier_list = {
+    "{" ~ (identifier | sequential_identifier_list) ~ ("," ~ (identifier | sequential_identifier_list))* ~ ","? ~ "}"
+}
+sequential_identifier_list = {
+    "[" ~ (identifier | parallel_identifier_list) ~ ("," ~ (identifier | parallel_identifier_list))* ~ ","? ~ "]"
+}

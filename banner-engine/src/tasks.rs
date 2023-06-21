@@ -1,4 +1,4 @@
-use banner_parser::ast::Task;
+use banner_parser::ast::TaskSpecification;
 use log::debug;
 
 use crate::{Metadata, TASK_TAG};
@@ -147,8 +147,8 @@ pub enum ImageRepositoryCredentials {
     DockerConfig(String),
 }
 
-impl From<&Task> for TaskDefinition {
-    fn from(task: &Task) -> Self {
+impl From<&TaskSpecification> for TaskDefinition {
+    fn from(task: &TaskSpecification) -> Self {
         let tags = task
             .tags
             .iter()

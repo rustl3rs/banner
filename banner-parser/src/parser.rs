@@ -50,8 +50,26 @@ mod banner_parser_tests {
 
     #[traced_test]
     #[test]
+    fn can_parse_parallel_tasks_in_job() {
+        let code = r#######"
+            job test [
+                first_task,
+                {
+                    second_task,
+                    third_task
+                },
+                fourth_task
+            ]        
+        "#######;
+
+        check(&code, expect!["()"])
+    }
+
+    #[traced_test]
+    #[test]
     fn can_parse_comment() {
         let code = String::from("// a test");
+
         check(&code, expect!["()"])
     }
 
@@ -148,7 +166,7 @@ mod pipeline_from_ast_tests {
                     imports: [],
                     images: [],
                     tasks: [
-                        Task {
+                        TaskSpecification {
                             tags: [],
                             name: "unit-test",
                             image: "rustl3rs/banner-rust-build",
@@ -187,7 +205,7 @@ mod pipeline_from_ast_tests {
                     imports: [],
                     images: [],
                     tasks: [
-                        Task {
+                        TaskSpecification {
                             tags: [
                                 Tag {
                                     key: "banner.io/owner",
@@ -239,7 +257,7 @@ mod pipeline_from_ast_tests {
                     imports: [],
                     images: [],
                     tasks: [
-                        Task {
+                        TaskSpecification {
                             tags: [],
                             name: "cowsay",
                             image: "kmcgivern/cowsay-alpine:latest",
@@ -257,7 +275,9 @@ mod pipeline_from_ast_tests {
                         JobSpecification {
                             name: "build",
                             tasks: [
-                                "cowsay",
+                                Identifier(
+                                    "cowsay",
+                                ),
                             ],
                         },
                     ],
@@ -265,7 +285,9 @@ mod pipeline_from_ast_tests {
                         PipelineSpecification {
                             name: "test",
                             jobs: [
-                                "build",
+                                Identifier(
+                                    "build",
+                                ),
                             ],
                         },
                     ],
@@ -298,56 +320,62 @@ mod pipeline_from_ast_tests {
         check(
             &code,
             expect![[r#"
-            Pipeline {
-                imports: [
-                    Import {
-                        uri: "file://./single_task.ban",
-                    },
-                ],
-                images: [],
-                tasks: [
-                    Task {
-                        tags: [
-                            Tag {
-                                key: "banner.io/owner",
-                                value: "me",
-                            },
-                            Tag {
-                                key: "banner.io/company",
-                                value: "rustl3rs",
-                            },
-                        ],
-                        name: "cowsay",
-                        image: "kmcgivern/cowsay-alpine:latest",
-                        command: RawString(
-                            1,
-                            "",
-                        ),
-                        script: RawString(
-                            1,
-                            "",
-                        ),
-                    },
-                ],
-                jobs: [
-                    JobSpecification {
-                        name: "build",
-                        tasks: [
-                            "cowsay",
-                            "cowsay",
-                        ],
-                    },
-                ],
-                pipelines: [
-                    PipelineSpecification {
-                        name: "my_pipeline",
-                        jobs: [
-                            "build",
-                        ],
-                    },
-                ],
-                eoi: EOI,
-            }"#]],
+                Pipeline {
+                    imports: [
+                        Import {
+                            uri: "file://./single_task.ban",
+                        },
+                    ],
+                    images: [],
+                    tasks: [
+                        TaskSpecification {
+                            tags: [
+                                Tag {
+                                    key: "banner.io/owner",
+                                    value: "me",
+                                },
+                                Tag {
+                                    key: "banner.io/company",
+                                    value: "rustl3rs",
+                                },
+                            ],
+                            name: "cowsay",
+                            image: "kmcgivern/cowsay-alpine:latest",
+                            command: RawString(
+                                1,
+                                "",
+                            ),
+                            script: RawString(
+                                1,
+                                "",
+                            ),
+                        },
+                    ],
+                    jobs: [
+                        JobSpecification {
+                            name: "build",
+                            tasks: [
+                                Identifier(
+                                    "cowsay",
+                                ),
+                                Identifier(
+                                    "cowsay",
+                                ),
+                            ],
+                        },
+                    ],
+                    pipelines: [
+                        PipelineSpecification {
+                            name: "my_pipeline",
+                            jobs: [
+                                Identifier(
+                                    "build",
+                                ),
+                            ],
+                        },
+                    ],
+                    eoi: EOI,
+                }"#]],
         )
     }
 
@@ -373,7 +401,9 @@ mod pipeline_from_ast_tests {
                         JobSpecification {
                             name: "build",
                             tasks: [
-                                "build",
+                                Identifier(
+                                    "build",
+                                ),
                             ],
                         },
                     ],
@@ -381,7 +411,9 @@ mod pipeline_from_ast_tests {
                         PipelineSpecification {
                             name: "test",
                             jobs: [
-                                "build",
+                                Identifier(
+                                    "build",
+                                ),
                             ],
                         },
                     ],
@@ -400,22 +432,26 @@ mod pipeline_from_ast_tests {
         check(
             &code,
             expect![[r#"
-            Pipeline {
-                imports: [],
-                images: [],
-                tasks: [],
-                jobs: [
-                    JobSpecification {
-                        name: "build",
-                        tasks: [
-                            "build",
-                            "test",
-                        ],
-                    },
-                ],
-                pipelines: [],
-                eoi: EOI,
-            }"#]],
+                Pipeline {
+                    imports: [],
+                    images: [],
+                    tasks: [],
+                    jobs: [
+                        JobSpecification {
+                            name: "build",
+                            tasks: [
+                                Identifier(
+                                    "build",
+                                ),
+                                Identifier(
+                                    "test",
+                                ),
+                            ],
+                        },
+                    ],
+                    pipelines: [],
+                    eoi: EOI,
+                }"#]],
         )
     }
 
@@ -462,7 +498,7 @@ mod pipeline_from_ast_tests {
                         },
                     ],
                     tasks: [
-                        Task {
+                        TaskSpecification {
                             tags: [],
                             name: "unit-test",
                             image: "${build_image}",
@@ -481,6 +517,78 @@ mod pipeline_from_ast_tests {
                     eoi: EOI,
                 }"#]],
         )
+    }
+
+    #[traced_test]
+    #[test]
+    fn can_parse_parallel_tasks_in_job() {
+        let code = r#######"
+            job build [
+                task1,
+                {
+                    task2,
+                    task3,
+                    [
+                        task5,
+                        task6,
+                        {task7,task8}
+                    ]
+                },
+                task4,
+            ]
+        "#######;
+
+        check(&code, expect![[r#"
+            Pipeline {
+                imports: [],
+                images: [],
+                tasks: [],
+                jobs: [
+                    JobSpecification {
+                        name: "build",
+                        tasks: [
+                            Identifier(
+                                "task1",
+                            ),
+                            ParallelList(
+                                [
+                                    Identifier(
+                                        "task2",
+                                    ),
+                                    Identifier(
+                                        "task3",
+                                    ),
+                                    SequentialList(
+                                        [
+                                            Identifier(
+                                                "task5",
+                                            ),
+                                            Identifier(
+                                                "task6",
+                                            ),
+                                            ParallelList(
+                                                [
+                                                    Identifier(
+                                                        "task7",
+                                                    ),
+                                                    Identifier(
+                                                        "task8",
+                                                    ),
+                                                ],
+                                            ),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            Identifier(
+                                "task4",
+                            ),
+                        ],
+                    },
+                ],
+                pipelines: [],
+                eoi: EOI,
+            }"#]])
     }
 }
 
@@ -590,8 +698,21 @@ mod identifier_list_tests {
 
     use super::*;
 
-    fn check(code: &str, expect: Expect) {
-        match BannerParser::parse(Rule::identifier_list, &code) {
+    fn check_serial(code: &str, expect: Expect) {
+        match BannerParser::parse(Rule::sequential_identifier_list, &code) {
+            Ok(tree) => {
+                let actual = format!("{:#?}", tree);
+                expect.assert_eq(&actual);
+            }
+            Err(e) => {
+                trace!("ERROR = {:#?}", e);
+                panic!("{:?}", e);
+            }
+        }
+    }
+
+    fn check_parallel(code: &str, expect: Expect) {
+        match BannerParser::parse(Rule::parallel_identifier_list, &code) {
             Ok(tree) => {
                 let actual = format!("{:#?}", tree);
                 expect.assert_eq(&actual);
@@ -606,134 +727,134 @@ mod identifier_list_tests {
     #[traced_test]
     #[test]
     fn single_item_list() {
-        let code = r#######"cowsay"#######;
-        check(
+        let code = r#######"[cowsay]"#######;
+        check_serial(
             &code,
             expect![[r#"
-            [
-                Pair {
-                    rule: identifier_list,
-                    span: Span {
-                        str: "cowsay",
-                        start: 0,
-                        end: 6,
-                    },
-                    inner: [
-                        Pair {
-                            rule: identifier,
-                            span: Span {
-                                str: "cowsay",
-                                start: 0,
-                                end: 6,
-                            },
-                            inner: [],
+                [
+                    Pair {
+                        rule: sequential_identifier_list,
+                        span: Span {
+                            str: "[cowsay]",
+                            start: 0,
+                            end: 8,
                         },
-                    ],
-                },
-            ]"#]],
+                        inner: [
+                            Pair {
+                                rule: identifier,
+                                span: Span {
+                                    str: "cowsay",
+                                    start: 1,
+                                    end: 7,
+                                },
+                                inner: [],
+                            },
+                        ],
+                    },
+                ]"#]],
         );
 
-        let code = r#######"cowsay,"#######;
-        check(
+        let code = r#######"[cowsay,]"#######;
+        check_serial(
             &code,
             expect![[r#"
-            [
-                Pair {
-                    rule: identifier_list,
-                    span: Span {
-                        str: "cowsay,",
-                        start: 0,
-                        end: 7,
-                    },
-                    inner: [
-                        Pair {
-                            rule: identifier,
-                            span: Span {
-                                str: "cowsay",
-                                start: 0,
-                                end: 6,
-                            },
-                            inner: [],
+                [
+                    Pair {
+                        rule: sequential_identifier_list,
+                        span: Span {
+                            str: "[cowsay,]",
+                            start: 0,
+                            end: 9,
                         },
-                    ],
-                },
-            ]"#]],
+                        inner: [
+                            Pair {
+                                rule: identifier,
+                                span: Span {
+                                    str: "cowsay",
+                                    start: 1,
+                                    end: 7,
+                                },
+                                inner: [],
+                            },
+                        ],
+                    },
+                ]"#]],
         );
     }
 
     #[traced_test]
     #[test]
     fn multi_item_list() {
-        let code = r#######"cowsay,test"#######;
-        check(
+        let code = r#######"[cowsay,test]"#######;
+        check_serial(
             &code,
             expect![[r#"
-            [
-                Pair {
-                    rule: identifier_list,
-                    span: Span {
-                        str: "cowsay,test",
-                        start: 0,
-                        end: 11,
+                [
+                    Pair {
+                        rule: sequential_identifier_list,
+                        span: Span {
+                            str: "[cowsay,test]",
+                            start: 0,
+                            end: 13,
+                        },
+                        inner: [
+                            Pair {
+                                rule: identifier,
+                                span: Span {
+                                    str: "cowsay",
+                                    start: 1,
+                                    end: 7,
+                                },
+                                inner: [],
+                            },
+                            Pair {
+                                rule: identifier,
+                                span: Span {
+                                    str: "test",
+                                    start: 8,
+                                    end: 12,
+                                },
+                                inner: [],
+                            },
+                        ],
                     },
-                    inner: [
-                        Pair {
-                            rule: identifier,
-                            span: Span {
-                                str: "cowsay",
-                                start: 0,
-                                end: 6,
-                            },
-                            inner: [],
-                        },
-                        Pair {
-                            rule: identifier,
-                            span: Span {
-                                str: "test",
-                                start: 7,
-                                end: 11,
-                            },
-                            inner: [],
-                        },
-                    ],
-                },
-            ]"#]],
+                ]"#]],
         );
 
-        let code = r#######"cowsay,test,"#######;
-        check(
+        let code = r#######"[cowsay,test,]"#######;
+        check_serial(
             &code,
             expect![[r#"
-            [
-                Pair {
-                    rule: identifier_list,
-                    span: Span {
-                        str: "cowsay,test,",
-                        start: 0,
-                        end: 12,
+                [
+                    Pair {
+                        rule: sequential_identifier_list,
+                        span: Span {
+                            str: "[cowsay,test,]",
+                            start: 0,
+                            end: 14,
+                        },
+                        inner: [
+                            Pair {
+                                rule: identifier,
+                                span: Span {
+                                    str: "cowsay",
+                                    start: 1,
+                                    end: 7,
+                                },
+                                inner: [],
+                            },
+                            Pair {
+                                rule: identifier,
+                                span: Span {
+                                    str: "test",
+                                    start: 8,
+                                    end: 12,
+                                },
+                                inner: [],
+                            },
+                        ],
                     },
-                    inner: [
-                        Pair {
-                            rule: identifier,
-                            span: Span {
-                                str: "cowsay",
-                                start: 0,
-                                end: 6,
-                            },
-                            inner: [],
-                        },
-                        Pair {
-                            rule: identifier,
-                            span: Span {
-                                str: "test",
-                                start: 7,
-                                end: 11,
-                            },
-                            inner: [],
-                        },
-                    ],
-                },
-            ]"#]],
+                ]"#]],
         );
     }
 }

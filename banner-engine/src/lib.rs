@@ -1,5 +1,6 @@
 mod engine;
 mod event_handler;
+mod event_handlers;
 mod events;
 mod metadata;
 mod pipeline;

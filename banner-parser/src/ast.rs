@@ -1,4 +1,4 @@
-use std::ops;
+use std::{fmt::Display, ops};
 
 use crate::{from_pest::FromPest, grammar::Rule};
 
@@ -67,7 +67,7 @@ impl StringLiteral {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Task {
+pub struct TaskSpecification {
     pub tags: Vec<Tag>,
     pub name: String,
     pub image: String,
@@ -75,7 +75,7 @@ pub struct Task {
     pub script: StringLiteral,
 }
 
-impl<'pest> FromPest<'pest> for Task {
+impl<'pest> FromPest<'pest> for TaskSpecification {
     type Rule = Rule;
     type FatalError = ::from_pest::Void;
 
@@ -87,7 +87,7 @@ impl<'pest> FromPest<'pest> for Task {
         let mut pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
         tracing::trace!("TASK: pair = {:#?}", pair);
 
-        let mut task_def = Task {
+        let mut task_def = TaskSpecification {
             ..Default::default()
         };
         tracing::trace!("TASK: default task_def = {:#?}", task_def);
@@ -405,10 +405,85 @@ impl<'pest> FromPest<'pest> for ImageDefinition {
     }
 }
 
+// #[derive(Debug, Clone, Default)]
+// pub type IdentifierList = Vec<IdentifierListItem>;
+
+#[derive(Debug, Clone)]
+pub enum IdentifierListItem {
+    Identifier(String),
+    SequentialList(Vec<IdentifierListItem>),
+    ParallelList(Vec<IdentifierListItem>),
+}
+
+impl Default for IdentifierListItem {
+    fn default() -> Self {
+        Self::Identifier("".to_string())
+    }
+}
+
+fn from_ident_list(pest: &mut Pairs<Rule>) -> Vec<IdentifierListItem> {
+    let mut tasks = Vec::<IdentifierListItem>::new();
+    let clone = pest.clone();
+    if clone.peek().is_none() {
+        return tasks;
+    };
+
+    // let pair = clone.next().unwrap();
+
+    for pair in clone.into_iter() {
+        match pair.as_rule() {
+        Rule::identifier => {
+            let task = IdentifierListItem::Identifier(pair.as_str().to_string());
+            tasks.push(task);
+        }
+        Rule::sequential_identifier_list => {
+            let sequential_tasks = from_ident_list(&mut pair.into_inner());
+            tasks.push(IdentifierListItem::SequentialList(sequential_tasks));
+        }
+        Rule::parallel_identifier_list => {
+            let parallel_tasks = from_ident_list(&mut pair.into_inner());
+            tasks.push(IdentifierListItem::ParallelList(parallel_tasks));
+        }
+        _ => panic!(
+            "expected identifier, sequential_identifier_list or parallel_identifier_list, found {:#?}",
+            pair.as_rule()
+        ),
+    }
+    }
+
+    // *pest = clone;
+    tasks
+}
+
+impl Display for IdentifierListItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IdentifierListItem::SequentialList(tasks) => {
+                for task in tasks.into_iter() {
+                    write!(f, "{},", task)?
+                }
+            }
+            IdentifierListItem::ParallelList(tasks) => {
+                for task in tasks.into_iter() {
+                    write!(f, "{},", task)?
+                }
+            }
+            IdentifierListItem::Identifier(task_name) => write!(f, "{}", task_name)?,
+        }
+        Ok(())
+    }
+}
+
+impl PartialEq for IdentifierListItem {
+    fn eq(&self, other: &Self) -> bool {
+        todo!()
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct JobSpecification {
     pub name: String,
-    pub tasks: Vec<String>,
+    pub tasks: Vec<IdentifierListItem>,
 }
 
 impl<'pest> FromPest<'pest> for JobSpecification {
@@ -424,23 +499,12 @@ impl<'pest> FromPest<'pest> for JobSpecification {
             return Err(from_pest::ConversionError::NoMatch);
         }
 
-        let mut job_spec = JobSpecification {
-            name: pair.as_str().to_string(),
-            ..Default::default()
-        };
-
         let mut ident_list = clone.next().unwrap().into_inner();
-        let mut ident = ident_list.next();
-        tracing::trace!("PIPELINE_SPEC: identList = {:#?}", ident_list);
-        while ident.is_some() {
-            let possible_ident = ident.clone().unwrap();
-            if possible_ident.as_rule() != Rule::identifier {
-                break;
-            }
-            let job_name = possible_ident.as_str().to_string();
-            job_spec.tasks.push(job_name);
-            ident = ident_list.next();
-        }
+
+        let job_spec = JobSpecification {
+            name: pair.as_str().to_string(),
+            tasks: from_ident_list(&mut ident_list),
+        };
 
         *pest = clone;
         Ok(job_spec)
@@ -450,7 +514,7 @@ impl<'pest> FromPest<'pest> for JobSpecification {
 #[derive(Debug, Clone, Default)]
 pub struct PipelineSpecification {
     pub name: String,
-    pub jobs: Vec<String>,
+    pub jobs: Vec<IdentifierListItem>,
 }
 
 impl<'pest> FromPest<'pest> for PipelineSpecification {
@@ -466,23 +530,12 @@ impl<'pest> FromPest<'pest> for PipelineSpecification {
             return Err(from_pest::ConversionError::NoMatch);
         }
 
-        let mut pipeline_spec = PipelineSpecification {
-            name: pair.as_str().to_string(),
-            jobs: vec![],
-        };
-
         let mut ident_list = clone.next().unwrap().into_inner();
-        let mut ident = ident_list.next();
-        tracing::trace!("PIPELINE_SPEC: identList = {:#?}", ident_list);
-        while ident.is_some() {
-            let possible_ident = ident.clone().unwrap();
-            if possible_ident.as_rule() != Rule::identifier {
-                break;
-            }
-            let job_name = possible_ident.as_str().to_string();
-            pipeline_spec.jobs.push(job_name);
-            ident = ident_list.next();
-        }
+
+        let pipeline_spec = PipelineSpecification {
+            name: pair.as_str().to_string(),
+            jobs: from_ident_list(&mut ident_list),
+        };
 
         *pest = clone;
         Ok(pipeline_spec)
@@ -493,7 +546,7 @@ impl<'pest> FromPest<'pest> for PipelineSpecification {
 pub struct Pipeline {
     pub imports: Vec<Import>,
     pub images: Vec<ImageDefinition>,
-    pub tasks: Vec<Task>,
+    pub tasks: Vec<TaskSpecification>,
     pub jobs: Vec<JobSpecification>,
     pub pipelines: Vec<PipelineSpecification>,
     eoi: EOI,
@@ -542,7 +595,7 @@ impl<'pest> FromPest<'pest> for Pipeline {
                 }
                 Rule::task_definition => {
                     tracing::trace!("task_definition");
-                    let this = Task::from_pest(&mut inner)?;
+                    let this = TaskSpecification::from_pest(&mut inner)?;
                     pipeline.tasks.push(this);
                 }
                 Rule::EOI => {}

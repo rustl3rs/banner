@@ -19,14 +19,32 @@ let rust_build_image = Image {
     ]
 }
 
+task check-clippy(image: ${rust_build_image}, execute: "bash -exo pipefail -c") {
+    r#"
+    rustup component add clippy
+    cd /source-code
+
+    # would be good to run pedantic; but we aren't there yet.
+    cargo clippy
+
+    # check if there are any changes. there should not be.
+    if git diff --exit-code --quiet HEAD; then
+        echo "No changes detected."
+        exit 0
+    else
+        echo "Changes detected."
+        exit 1
+    fi
+    "#
+}
+
 task check-format(image: ${rust_build_image}, execute: "bash -exo pipefail -c") {
     r#"
     rustup component add rustfmt
     cd /source-code
-        
-    # would be good to capture code coverage stats here.
+
     cargo fmt
-    
+
     # check if there are any changes. there should not be.
     if git diff --exit-code --quiet HEAD; then
         echo "No changes detected."
@@ -50,7 +68,8 @@ task test(image: ${rust_build_image}, execute: "bash -exo pipefail -c") {
 
 job unit-test [
     get-source,
-    check-format,
+        check-format,
+        check-clippy,
     test,
 ]
 

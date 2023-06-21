@@ -111,6 +111,7 @@ dependencies = [
  "expect-test",
  "from-pest",
  "iref",
+ "log",
  "pest",
  "pest-ast",
  "pest_derive",
