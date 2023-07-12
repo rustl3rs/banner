@@ -15,8 +15,8 @@ use crate::{
     event_handlers::{
         get_eventhandlers_for_job, get_eventhandlers_for_pipeline, get_eventhandlers_for_task,
     },
-    matching_banner_metadata, Event, Metadata, MountPoint, Tag, TaskDefinition, TaskResource,
-    MATCHING_TAG,
+    listen_for_events::matching_banner_metadata,
+    Event, Metadata, MountPoint, Tag, TaskDefinition, TaskResource, MATCHING_TAG,
 };
 
 #[derive(Debug, Clone)]
@@ -599,23 +599,14 @@ mod build_pipeline_tests {
 
         check(
             code,
-            expect![[r#"
+            expect![[r####"
                 Pipeline {
                     tasks: [
                         TaskDefinition {
                             tags: [
-                                Metadata {
-                                    key: "banner.dev/task",
-                                    value: "unit-test",
-                                },
-                                Metadata {
-                                    key: "banner.dev/job",
-                                    value: "_",
-                                },
-                                Metadata {
-                                    key: "banner.dev/pipeline",
-                                    value: "_",
-                                },
+                                banner.dev/task: unit-test,
+                                banner.dev/job: _,
+                                banner.dev/pipeline: _,
                             ],
                             image: Image {
                                 source: "rustl3rs/banner-rust-build:latest",
@@ -631,72 +622,25 @@ mod build_pipeline_tests {
                         },
                     ],
                     event_handlers: [
-                        EventHandler {
-                            tags: [
-                                Metadata {
-                                    key: "banner.dev/pipeline",
-                                    value: "_",
-                                },
-                                Metadata {
-                                    key: "banner.dev/job",
-                                    value: "_",
-                                },
-                                Metadata {
-                                    key: "banner.dev/task",
-                                    value: "unit-test",
-                                },
-                                Metadata {
-                                    key: "banner.dev/description",
-                                    value: "Execute the task: unit-test",
-                                },
-                            ],
-                            listen_for_events: [
-                                Event {
-                                    type: System(
-                                        Trigger(
-                                            Task,
-                                        ),
-                                    ),
-                                    time_emitted: 0,
-                                    metadata: [
-                                        Metadata {
-                                            key: "banner.dev/task",
-                                            value: "unit-test",
-                                        },
-                                        Metadata {
-                                            key: "banner.dev/job",
-                                            value: "_",
-                                        },
-                                        Metadata {
-                                            key: "banner.dev/pipeline",
-                                            value: "_",
-                                        },
-                                    ],
-                                },
-                            ],
-                            script: "\n        pub async fn main (engine) {\n            engine.execute_task_name_in_scope(\"\", \"_\", \"_\", \"unit-test\").await;\n        }\n        ",
+                        {
+                            listen_for_events:
+                                ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/task: unit-test, banner.dev/job: _, banner.dev/pipeline: _] },
+                            tags:
+                                banner.dev/pipeline: _,
+                                banner.dev/job: _,
+                                banner.dev/task: unit-test,
+                                banner.dev/description: Execute the task: unit-test,
+                            script: ###"
+                                pub async fn main (engine, event) {
+                                    engine.execute_task_name_in_scope("", "_", "_", "unit-test").await;
+                                }
+                            "###
                         },
                     ],
-                }"#]],
+                }"####]],
         )
         .await
     }
-
-    // #[traced_test]
-    // #[test]
-    // fn can_parse_task_with_tag_attribute() {
-    //     let code = r#######"
-    //     [tag: banner.io/owner=me]
-    //     [tag: banner.io/company=rustl3rs]
-    //     task unit-test(image: rustl3rs/banner-rust-build, execute: r#"/bin/bash -c"#) {
-    //         r#####"bash
-    //         echo testing, testing, 1, 2, 3!
-    //         "#####
-    //     }
-    //     "#######;
-
-    //     check(code, expect![""])
-    // }
 
     #[traced_test]
     #[tokio::test]
@@ -706,23 +650,14 @@ mod build_pipeline_tests {
         import https://gist.githubusercontent.com/pms1969/464d6304014f9376be7e07b3ccf3a972/raw/a929e3feccd5384a00fe4e7ce6431f46dbb02951/cowsay.ban
         "#######;
 
-        check(code, expect![[r#"
+        check(code, expect![[r####"
             Pipeline {
                 tasks: [
                     TaskDefinition {
                         tags: [
-                            Metadata {
-                                key: "banner.dev/task",
-                                value: "unit-test",
-                            },
-                            Metadata {
-                                key: "banner.dev/job",
-                                value: "_",
-                            },
-                            Metadata {
-                                key: "banner.dev/pipeline",
-                                value: "_",
-                            },
+                            banner.dev/task: unit-test,
+                            banner.dev/job: _,
+                            banner.dev/pipeline: _,
                         ],
                         image: Image {
                             source: "alpine:latest",
@@ -738,18 +673,9 @@ mod build_pipeline_tests {
                     },
                     TaskDefinition {
                         tags: [
-                            Metadata {
-                                key: "banner.dev/task",
-                                value: "cowsay",
-                            },
-                            Metadata {
-                                key: "banner.dev/job",
-                                value: "_",
-                            },
-                            Metadata {
-                                key: "banner.dev/pipeline",
-                                value: "_",
-                            },
+                            banner.dev/task: cowsay,
+                            banner.dev/job: _,
+                            banner.dev/pipeline: _,
                         ],
                         image: Image {
                             source: "kmcgivern/cowsay-alpine:latest",
@@ -763,98 +689,36 @@ mod build_pipeline_tests {
                     },
                 ],
                 event_handlers: [
-                    EventHandler {
-                        tags: [
-                            Metadata {
-                                key: "banner.dev/pipeline",
-                                value: "_",
-                            },
-                            Metadata {
-                                key: "banner.dev/job",
-                                value: "_",
-                            },
-                            Metadata {
-                                key: "banner.dev/task",
-                                value: "unit-test",
-                            },
-                            Metadata {
-                                key: "banner.dev/description",
-                                value: "Execute the task: unit-test",
-                            },
-                        ],
-                        listen_for_events: [
-                            Event {
-                                type: System(
-                                    Trigger(
-                                        Task,
-                                    ),
-                                ),
-                                time_emitted: 0,
-                                metadata: [
-                                    Metadata {
-                                        key: "banner.dev/task",
-                                        value: "unit-test",
-                                    },
-                                    Metadata {
-                                        key: "banner.dev/job",
-                                        value: "_",
-                                    },
-                                    Metadata {
-                                        key: "banner.dev/pipeline",
-                                        value: "_",
-                                    },
-                                ],
-                            },
-                        ],
-                        script: "\n        pub async fn main (engine) {\n            engine.execute_task_name_in_scope(\"\", \"_\", \"_\", \"unit-test\").await;\n        }\n        ",
+                    {
+                        listen_for_events:
+                            ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/task: unit-test, banner.dev/job: _, banner.dev/pipeline: _] },
+                        tags:
+                            banner.dev/pipeline: _,
+                            banner.dev/job: _,
+                            banner.dev/task: unit-test,
+                            banner.dev/description: Execute the task: unit-test,
+                        script: ###"
+                            pub async fn main (engine, event) {
+                                engine.execute_task_name_in_scope("", "_", "_", "unit-test").await;
+                            }
+                        "###
                     },
-                    EventHandler {
-                        tags: [
-                            Metadata {
-                                key: "banner.dev/pipeline",
-                                value: "_",
-                            },
-                            Metadata {
-                                key: "banner.dev/job",
-                                value: "_",
-                            },
-                            Metadata {
-                                key: "banner.dev/task",
-                                value: "cowsay",
-                            },
-                            Metadata {
-                                key: "banner.dev/description",
-                                value: "Execute the task: cowsay",
-                            },
-                        ],
-                        listen_for_events: [
-                            Event {
-                                type: System(
-                                    Trigger(
-                                        Task,
-                                    ),
-                                ),
-                                time_emitted: 0,
-                                metadata: [
-                                    Metadata {
-                                        key: "banner.dev/task",
-                                        value: "cowsay",
-                                    },
-                                    Metadata {
-                                        key: "banner.dev/job",
-                                        value: "_",
-                                    },
-                                    Metadata {
-                                        key: "banner.dev/pipeline",
-                                        value: "_",
-                                    },
-                                ],
-                            },
-                        ],
-                        script: "\n        pub async fn main (engine) {\n            engine.execute_task_name_in_scope(\"\", \"_\", \"_\", \"cowsay\").await;\n        }\n        ",
+                    {
+                        listen_for_events:
+                            ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/task: cowsay, banner.dev/job: _, banner.dev/pipeline: _] },
+                        tags:
+                            banner.dev/pipeline: _,
+                            banner.dev/job: _,
+                            banner.dev/task: cowsay,
+                            banner.dev/description: Execute the task: cowsay,
+                        script: ###"
+                            pub async fn main (engine, event) {
+                                engine.execute_task_name_in_scope("", "_", "_", "cowsay").await;
+                            }
+                        "###
                     },
                 ],
-            }"#]]).await
+            }"####]]).await
     }
 
     #[traced_test]
@@ -865,23 +729,14 @@ mod build_pipeline_tests {
 
         check(
             &code,
-            expect![[r#"
+            expect![[r####"
                 Pipeline {
                     tasks: [
                         TaskDefinition {
                             tags: [
-                                Metadata {
-                                    key: "banner.dev/task",
-                                    value: "cowsay",
-                                },
-                                Metadata {
-                                    key: "banner.dev/job",
-                                    value: "_",
-                                },
-                                Metadata {
-                                    key: "banner.dev/pipeline",
-                                    value: "_",
-                                },
+                                banner.dev/task: cowsay,
+                                banner.dev/job: _,
+                                banner.dev/pipeline: _,
                             ],
                             image: Image {
                                 source: "kmcgivern/cowsay-alpine:latest",
@@ -895,53 +750,22 @@ mod build_pipeline_tests {
                         },
                     ],
                     event_handlers: [
-                        EventHandler {
-                            tags: [
-                                Metadata {
-                                    key: "banner.dev/pipeline",
-                                    value: "_",
-                                },
-                                Metadata {
-                                    key: "banner.dev/job",
-                                    value: "_",
-                                },
-                                Metadata {
-                                    key: "banner.dev/task",
-                                    value: "cowsay",
-                                },
-                                Metadata {
-                                    key: "banner.dev/description",
-                                    value: "Execute the task: cowsay",
-                                },
-                            ],
-                            listen_for_events: [
-                                Event {
-                                    type: System(
-                                        Trigger(
-                                            Task,
-                                        ),
-                                    ),
-                                    time_emitted: 0,
-                                    metadata: [
-                                        Metadata {
-                                            key: "banner.dev/task",
-                                            value: "cowsay",
-                                        },
-                                        Metadata {
-                                            key: "banner.dev/job",
-                                            value: "_",
-                                        },
-                                        Metadata {
-                                            key: "banner.dev/pipeline",
-                                            value: "_",
-                                        },
-                                    ],
-                                },
-                            ],
-                            script: "\n        pub async fn main (engine) {\n            engine.execute_task_name_in_scope(\"\", \"_\", \"_\", \"cowsay\").await;\n        }\n        ",
+                        {
+                            listen_for_events:
+                                ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/task: cowsay, banner.dev/job: _, banner.dev/pipeline: _] },
+                            tags:
+                                banner.dev/pipeline: _,
+                                banner.dev/job: _,
+                                banner.dev/task: cowsay,
+                                banner.dev/description: Execute the task: cowsay,
+                            script: ###"
+                                pub async fn main (engine, event) {
+                                    engine.execute_task_name_in_scope("", "_", "_", "cowsay").await;
+                                }
+                            "###
                         },
                     ],
-                }"#]],
+                }"####]],
         )
         .await
     }
@@ -992,7 +816,101 @@ mod event_handler_creation_tests {
             "#,
         );
 
-        check_pipeline(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the pipeline: test; Last job was: deploy-prod" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "deploy-prod" }] }], script: "\n        pub async fn main (engine) {\n            engine.pipeline_success(\"test\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the pipeline: test; Last job was: deploy-prod" }], listen_for_events: [Event { type: System(Done(Job, Failed)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "deploy-prod" }] }], script: "\n        pub async fn main (engine) {\n            engine.pipeline_fail(\"test\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "deploy-prod" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the job: test/deploy-prod" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "sit-test" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test\", \"deploy-prod\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "sit-test" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the job: test/sit-test" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "deploy-qa" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test\", \"sit-test\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "deploy-qa" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the job: test/deploy-qa" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "deploy-ci" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test\", \"deploy-qa\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "deploy-ci" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the job: test/deploy-ci" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "build-artefacts" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test\", \"deploy-ci\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "build-artefacts" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the job: test/build-artefacts" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "unit-test" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test\", \"build-artefacts\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the pipeline: test/unit-test" }], listen_for_events: [Event { type: System(Trigger(Pipeline)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test\", \"unit-test\").await;\n        }\n        " }]"#]]).await;
+        check_pipeline(ast, expect![[r####"
+            [{
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-prod] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: deploy-prod,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.pipeline_success("test").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Failed)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-prod] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: deploy-prod,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.pipeline_fail("test").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: sit-test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/job: deploy-prod,
+                    banner.dev/description: Trigger the start of the job: test/deploy-prod,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "deploy-prod").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-qa] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/job: sit-test,
+                    banner.dev/description: Trigger the start of the job: test/sit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "sit-test").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-ci] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/job: deploy-qa,
+                    banner.dev/description: Trigger the start of the job: test/deploy-qa,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "deploy-qa").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: build-artefacts] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/job: deploy-ci,
+                    banner.dev/description: Trigger the start of the job: test/deploy-ci,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "deploy-ci").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/job: build-artefacts,
+                    banner.dev/description: Trigger the start of the job: test/build-artefacts,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "build-artefacts").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Trigger the start of the pipeline: test/unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "unit-test").await;
+                    }
+                "###
+            }]"####]]).await;
     }
 
     #[traced_test]
@@ -1006,22 +924,42 @@ mod event_handler_creation_tests {
             "#,
         );
 
-        check_pipeline(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the pipeline: test; Last job was: unit-test" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "unit-test" }] }], script: "\n        pub async fn main (engine) {\n            engine.pipeline_success(\"test\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the pipeline: test; Last job was: unit-test" }], listen_for_events: [Event { type: System(Done(Job, Failed)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "unit-test" }] }], script: "\n        pub async fn main (engine) {\n            engine.pipeline_fail(\"test\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the pipeline: test/unit-test" }], listen_for_events: [Event { type: System(Trigger(Pipeline)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test\", \"unit-test\").await;\n        }\n        " }]"#]]).await;
+        check_pipeline(ast, expect![[r####"
+            [{
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.pipeline_success("test").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Failed)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.pipeline_fail("test").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Trigger the start of the pipeline: test/unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "unit-test").await;
+                    }
+                "###
+            }]"####]]).await;
     }
-
-    // not sure this should be a thing.  if you define a pipeline, it should have at least one job.
-    // #[traced_test]
-    // #[tokio::test]
-    // async fn test_empty_pipeline() {
-    //     let ast = get_ast_for(
-    //         r#"
-    //         pipeline test [
-    //         ]
-    //         "#,
-    //     );
-
-    //     check_pipeline(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the pipeline: test" }], listen_for_events: [Event { type: System(Trigger(Pipeline)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }] }], script: "\n        pub async fn main (engine) {\n            engine.log_message(\"Pipeline [test] has no jobs to trigger\").await;\n        }\n        " }]"#]]).await;
-    // }
 
     #[traced_test]
     #[tokio::test]
@@ -1035,22 +973,54 @@ mod event_handler_creation_tests {
             "#,
         );
 
-        check_pipeline(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the pipeline: test; Last job was: build-artefacts" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "build-artefacts" }] }], script: "\n        pub async fn main (engine) {\n            engine.pipeline_success(\"test\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the pipeline: test; Last job was: build-artefacts" }], listen_for_events: [Event { type: System(Done(Job, Failed)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "build-artefacts" }] }], script: "\n        pub async fn main (engine) {\n            engine.pipeline_fail(\"test\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "build-artefacts" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the job: test/build-artefacts" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/job", value: "unit-test" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test\", \"build-artefacts\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the pipeline: test/unit-test" }], listen_for_events: [Event { type: System(Trigger(Pipeline)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test\", \"unit-test\").await;\n        }\n        " }]"#]]).await;
+        check_pipeline(ast, expect![[r####"
+            [{
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: build-artefacts] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: build-artefacts,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.pipeline_success("test").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Failed)))), metadata: [banner.dev/pipeline: test, banner.dev/job: build-artefacts] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: build-artefacts,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.pipeline_fail("test").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/job: build-artefacts,
+                    banner.dev/description: Trigger the start of the job: test/build-artefacts,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "build-artefacts").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Trigger the start of the pipeline: test/unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "unit-test").await;
+                    }
+                "###
+            }]"####]]).await;
     }
-
-    // not sure this should be a thing. If you define a job, it should have some tasks in it to run
-    // #[traced_test]
-    // #[tokio::test]
-    // async fn test_empty_job() {
-    //     let ast = get_ast_for(
-    //         r#"
-    //         job build [
-    //         ]
-    //         "#,
-    //     );
-
-    //     check_job(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/description", value: "Trigger the start of empty job: _/build" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }] }], script: "\n        pub async fn main (engine) {\n            engine.log_message(\"Job [_/build] has no tasks to trigger\").await;\n        }\n        " }]"#]]).await;
-    // }
 
     #[traced_test]
     #[tokio::test]
@@ -1063,7 +1033,43 @@ mod event_handler_creation_tests {
             "#,
         );
 
-        check_job(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the job: _/build; Last task was: unit-test" }], listen_for_events: [Event { type: System(Done(Task, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/task", value: "unit-test" }] }], script: "\n        pub async fn main (engine) {\n            engine.job_success(\"_\", \"build\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the job: _/build; Last task was: unit-test" }], listen_for_events: [Event { type: System(Done(Task, Failed)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/task", value: "unit-test" }] }], script: "\n        pub async fn main (engine) {\n            engine.job_fail(\"_\", \"build\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the job: _/build/unit-test" }], listen_for_events: [Event { type: System(Trigger(Job)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_task(\"_\", \"build\", \"unit-test\").await;\n        }\n        " }]"#]]).await;
+        check_job(ast, expect![[r####"
+            [{
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: unit-test] },
+                tags:
+                    banner.dev/pipeline: _,
+                    banner.dev/job: build,
+                    banner.dev/description: Signal the completion of the job: _/build; Last task was: unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.job_success("_", "build").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Failed)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: unit-test] },
+                tags:
+                    banner.dev/pipeline: _,
+                    banner.dev/job: build,
+                    banner.dev/description: Signal the completion of the job: _/build; Last task was: unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.job_fail("_", "build").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build] },
+                tags:
+                    banner.dev/pipeline: _,
+                    banner.dev/description: Trigger the start of the job: _/build/unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_task("_", "build", "unit-test").await;
+                    }
+                "###
+            }]"####]]).await;
     }
 
     #[traced_test]
@@ -1079,7 +1085,69 @@ mod event_handler_creation_tests {
             "#,
         );
 
-        check_job(ast, expect![[r#"[EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the job: _/build; Last task was: publish-docker" }], listen_for_events: [Event { type: System(Done(Task, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/task", value: "publish-docker" }] }], script: "\n        pub async fn main (engine) {\n            engine.job_success(\"_\", \"build\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the job: _/build; Last task was: publish-docker" }], listen_for_events: [Event { type: System(Done(Task, Failed)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/task", value: "publish-docker" }] }], script: "\n        pub async fn main (engine) {\n            engine.job_fail(\"_\", \"build\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/task", value: "publish-docker" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the task: _/build/publish-docker" }], listen_for_events: [Event { type: System(Done(Task, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/task", value: "build-docker" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_task(\"_\", \"build\", \"publish-docker\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/task", value: "build-docker" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the task: _/build/build-docker" }], listen_for_events: [Event { type: System(Done(Task, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/task", value: "unit-test" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_task(\"_\", \"build\", \"build-docker\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the job: _/build/unit-test" }], listen_for_events: [Event { type: System(Trigger(Job)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "_" }, Metadata { key: "banner.dev/job", value: "build" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_task(\"_\", \"build\", \"unit-test\").await;\n        }\n        " }]"#]]).await;
+        check_job(ast, expect![[r####"
+            [{
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: publish-docker] },
+                tags:
+                    banner.dev/pipeline: _,
+                    banner.dev/job: build,
+                    banner.dev/description: Signal the completion of the job: _/build; Last task was: publish-docker,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.job_success("_", "build").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Failed)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: publish-docker] },
+                tags:
+                    banner.dev/pipeline: _,
+                    banner.dev/job: build,
+                    banner.dev/description: Signal the completion of the job: _/build; Last task was: publish-docker,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.job_fail("_", "build").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: build-docker] },
+                tags:
+                    banner.dev/pipeline: _,
+                    banner.dev/job: build,
+                    banner.dev/task: publish-docker,
+                    banner.dev/description: Trigger the start of the task: _/build/publish-docker,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_task("_", "build", "publish-docker").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: unit-test] },
+                tags:
+                    banner.dev/pipeline: _,
+                    banner.dev/job: build,
+                    banner.dev/task: build-docker,
+                    banner.dev/description: Trigger the start of the task: _/build/build-docker,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_task("_", "build", "build-docker").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build] },
+                tags:
+                    banner.dev/pipeline: _,
+                    banner.dev/description: Trigger the start of the job: _/build/unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_task("_", "build", "unit-test").await;
+                    }
+                "###
+            }]"####]]).await;
     }
 
     #[traced_test]
@@ -1106,6 +1174,88 @@ mod event_handler_creation_tests {
             "##,
         );
 
-        check_all(ast, expect![[r#"Pipeline { tasks: [TaskDefinition { tags: [], image: Image { source: "alpine:latest", credentials: None }, command: ["sh", "-c", "bash\n                # this is a bash comment\n                echo rustl3rs herd!\n                # basically a no-op.\n                # But a good start to our testing.\n                "], inputs: [], outputs: [] }], event_handlers: [EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the pipeline: test_simple_pipeline_with_job_and_task; Last job was: build" }], listen_for_events: [Event { type: System(Done(Job, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }, Metadata { key: "banner.dev/job", value: "build" }] }], script: "\n        pub async fn main (engine) {\n            engine.pipeline_success(\"test_simple_pipeline_with_job_and_task\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the pipeline: test_simple_pipeline_with_job_and_task; Last job was: build" }], listen_for_events: [Event { type: System(Done(Job, Failed)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }, Metadata { key: "banner.dev/job", value: "build" }] }], script: "\n        pub async fn main (engine) {\n            engine.pipeline_fail(\"test_simple_pipeline_with_job_and_task\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the pipeline: test_simple_pipeline_with_job_and_task/build" }], listen_for_events: [Event { type: System(Trigger(Pipeline)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_job(\"test_simple_pipeline_with_job_and_task\", \"build\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the job: test_simple_pipeline_with_job_and_task/build; Last task was: unit-test" }], listen_for_events: [Event { type: System(Done(Task, Success)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/task", value: "unit-test" }] }], script: "\n        pub async fn main (engine) {\n            engine.job_success(\"test_simple_pipeline_with_job_and_task\", \"build\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/description", value: "Signal the completion of the job: test_simple_pipeline_with_job_and_task/build; Last task was: unit-test" }], listen_for_events: [Event { type: System(Done(Task, Failed)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/task", value: "unit-test" }] }], script: "\n        pub async fn main (engine) {\n            engine.job_fail(\"test_simple_pipeline_with_job_and_task\", \"build\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }, Metadata { key: "banner.dev/description", value: "Trigger the start of the job: test_simple_pipeline_with_job_and_task/build/unit-test" }], listen_for_events: [Event { type: System(Trigger(Job)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }, Metadata { key: "banner.dev/job", value: "build" }] }], script: "\n        pub async fn main (engine) {\n            engine.trigger_task(\"test_simple_pipeline_with_job_and_task\", \"build\", \"unit-test\").await;\n        }\n        " }, EventHandler { tags: [Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/task", value: "unit-test" }, Metadata { key: "banner.dev/description", value: "Execute the task: unit-test" }], listen_for_events: [Event { type: System(Trigger(Task)), time_emitted: 0, metadata: [Metadata { key: "banner.dev/task", value: "unit-test" }, Metadata { key: "banner.dev/job", value: "build" }, Metadata { key: "banner.dev/pipeline", value: "test_simple_pipeline_with_job_and_task" }] }], script: "\n        pub async fn main (engine) {\n            engine.execute_task_name_in_scope(\"\", \"test_simple_pipeline_with_job_and_task\", \"build\", \"unit-test\").await;\n        }\n        " }] }"#]]).await;
+        check_all(ast, expect![[r####"
+            Pipeline { tasks: [TaskDefinition { tags: [], image: Image { source: "alpine:latest", credentials: None }, command: ["sh", "-c", "bash\n                # this is a bash comment\n                echo rustl3rs herd!\n                # basically a no-op.\n                # But a good start to our testing.\n                "], inputs: [], outputs: [] }], event_handlers: [{
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build] },
+                tags:
+                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
+                    banner.dev/description: Signal the completion of the pipeline: test_simple_pipeline_with_job_and_task; Last job was: build,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.pipeline_success("test_simple_pipeline_with_job_and_task").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Failed)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build] },
+                tags:
+                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
+                    banner.dev/description: Signal the completion of the pipeline: test_simple_pipeline_with_job_and_task; Last job was: build,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.pipeline_fail("test_simple_pipeline_with_job_and_task").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task] },
+                tags:
+                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
+                    banner.dev/description: Trigger the start of the pipeline: test_simple_pipeline_with_job_and_task/build,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test_simple_pipeline_with_job_and_task", "build").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build, banner.dev/task: unit-test] },
+                tags:
+                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
+                    banner.dev/job: build,
+                    banner.dev/description: Signal the completion of the job: test_simple_pipeline_with_job_and_task/build; Last task was: unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.job_success("test_simple_pipeline_with_job_and_task", "build").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Failed)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build, banner.dev/task: unit-test] },
+                tags:
+                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
+                    banner.dev/job: build,
+                    banner.dev/description: Signal the completion of the job: test_simple_pipeline_with_job_and_task/build; Last task was: unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.job_fail("test_simple_pipeline_with_job_and_task", "build").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build] },
+                tags:
+                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
+                    banner.dev/description: Trigger the start of the job: test_simple_pipeline_with_job_and_task/build/unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_task("test_simple_pipeline_with_job_and_task", "build", "unit-test").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/task: unit-test, banner.dev/job: build, banner.dev/pipeline: test_simple_pipeline_with_job_and_task] },
+                tags:
+                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
+                    banner.dev/job: build,
+                    banner.dev/task: unit-test,
+                    banner.dev/description: Execute the task: unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.execute_task_name_in_scope("", "test_simple_pipeline_with_job_and_task", "build", "unit-test").await;
+                    }
+                "###
+            }] }"####]]).await;
     }
 }

@@ -44,6 +44,16 @@ pub trait Engine {
     ) -> Result<ExecutionResult, Box<dyn Error + Send + Sync>>;
 
     fn get_pipelines(&self) -> Vec<&Pipeline>;
+
+    /// Returns a value from state based on the key.
+    fn get_state_for_id(&self, key: &str) -> Option<String>;
+
+    /// Sets a value in state based on the key.
+    fn set_state_for_id(
+        &self,
+        key: &str,
+        value: String,
+    ) -> Result<(), Box<dyn Error + Send + Sync>>;
 }
 
 #[derive(Debug)]

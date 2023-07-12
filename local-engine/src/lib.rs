@@ -41,6 +41,7 @@ pub struct LocalEngine {
     pipelines: Vec<Pipeline>,
     directories: Arc<RwLock<HashMap<String, String>>>,
     state_dir: PathBuf,
+    state: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl LocalEngine {
@@ -55,6 +56,7 @@ impl LocalEngine {
                 std::fs::create_dir_all(path.as_path()).unwrap();
                 path
             },
+            state: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -280,6 +282,27 @@ impl Engine for LocalEngine {
     fn get_pipelines(&self) -> Vec<&banner_engine::Pipeline> {
         self.pipelines.iter().collect()
     }
+
+    /// Returns a map of key/value pairs that represent the state of the engine for a specific pipeline run.
+    fn get_state_for_id(&self, key: &str) -> Option<String> {
+        let hm = self.state.read().unwrap();
+        let result = hm.get(key);
+        match result {
+            Some(val) => Some(val.to_string()),
+            None => None,
+        }
+    }
+
+    /// Returns a value from state based on the key.
+    fn set_state_for_id(
+        &self,
+        key: &str,
+        value: String,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let mut hm = self.state.write().unwrap();
+        hm.insert(key.to_string(), value);
+        Ok(())
+    }
 }
 
 fn get_task_definition<'a>(pipelines: &'a Vec<Pipeline>, task_name: &'a str) -> &'a TaskDefinition {
@@ -290,13 +313,7 @@ fn get_task_definition<'a>(pipelines: &'a Vec<Pipeline>, task_name: &'a str) -> 
                 pipeline
                     .tasks
                     .iter()
-                    .find(|task| {
-                        if (*task).get_name() == task_name {
-                            true
-                        } else {
-                            false
-                        }
-                    })
+                    .find(|task| (*task).get_name() == task_name)
                     .unwrap(),
             )
         })

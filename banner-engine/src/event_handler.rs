@@ -1,22 +1,24 @@
 use std::sync::Arc;
 
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
+use rune::runtime::Protocol;
 use rune::{
     termcolor::{BufferWriter, ColorChoice},
-    ContextError, Diagnostics, Module, Source, Sources, Vm,
+    Any, ContextError, Diagnostics, Module, Source, Sources, ToValue, Vm,
 };
 use tokio::sync::mpsc::Sender;
 
+use crate::ListenForEvents;
 use crate::{
-    rune_engine::RuneEngineWrapper, Engine, Event, EventType, Events, Metadata, SystemEventResult,
-    SystemEventScope, SystemEventType, Tag, JOB_TAG, PIPELINE_TAG, TASK_TAG,
+    rune_engine::RuneEngineWrapper, Engine, Event, EventType, Metadata, SystemEventResult,
+    SystemEventScope, SystemEventType, Tag,
 };
 
 #[derive(Clone)]
 pub struct EventHandler {
     tags: Vec<Tag>,
-    listen_for_events: Events,
+    listen_for_events: ListenForEvents,
     script: String,
 }
 
@@ -44,7 +46,7 @@ impl Debug for EventHandler {
 }
 
 impl EventHandler {
-    pub fn new(tags: Vec<Tag>, listen_for_events: Events, script: String) -> Self {
+    pub fn new(tags: Vec<Tag>, listen_for_events: ListenForEvents, script: String) -> Self {
         Self {
             tags,
             listen_for_events,
@@ -56,10 +58,10 @@ impl EventHandler {
         &self,
         engine: Arc<dyn Engine + Sync + Send>,
         tx: Sender<Event>,
-        _trigger: Event,
+        trigger: Event,
     ) {
         let script: &str = &self.script;
-        let result = execute_event_script(engine, tx.clone(), script).await;
+        let result = execute_event_script(engine, trigger, tx.clone(), script).await;
 
         // as long as everything is good, exit, otherwise raise an error event.
         match result {
@@ -81,9 +83,9 @@ impl EventHandler {
     pub fn is_listening_for(&self, event: &Event) -> bool {
         self.listen_for_events
             .iter()
-            .filter(|e| {
-                let is_listening = *e == event;
-                tracing::debug!(is_listening, "is listening for event: {:?}", e);
+            .filter(|lfe| {
+                let is_listening = lfe.matches_event(event);
+                tracing::debug!(is_listening, "is listening for event: {:?}", lfe);
                 is_listening
             })
             .count()
@@ -95,33 +97,36 @@ impl EventHandler {
     }
 }
 
-fn get_target_pipeline_and_task(tags: &[Metadata]) -> (&str, &str, &str) {
-    let pipeline_name = tags.iter().find(|tag| tag.key() == PIPELINE_TAG);
-    let job_name = tags.iter().find(|tag| tag.key() == JOB_TAG);
-    let task_name = tags.iter().find(|tag| tag.key() == TASK_TAG);
-    let pipeline_name = match pipeline_name {
-        Some(pt) => pt.value(),
-        None => "_",
-    };
-    let job_name = match job_name {
-        Some(jt) => jt.value(),
-        None => "_",
-    };
-    let task_name = match task_name {
-        Some(tt) => tt.value(),
-        None => "_",
-    };
-    (pipeline_name, job_name, task_name)
-}
+// fn get_target_pipeline_and_task(tags: &[Metadata]) -> (&str, &str, &str) {
+//     let pipeline_name = tags.iter().find(|tag| tag.key() == PIPELINE_TAG);
+//     let job_name = tags.iter().find(|tag| tag.key() == JOB_TAG);
+//     let task_name = tags.iter().find(|tag| tag.key() == TASK_TAG);
+//     let pipeline_name = match pipeline_name {
+//         Some(pt) => pt.value(),
+//         None => "_",
+//     };
+//     let job_name = match job_name {
+//         Some(jt) => jt.value(),
+//         None => "_",
+//     };
+//     let task_name = match task_name {
+//         Some(tt) => tt.value(),
+//         None => "_",
+//     };
+//     (pipeline_name, job_name, task_name)
+// }
 
 async fn execute_event_script(
     engine: Arc<dyn Engine + Sync + Send>,
+    event: Event,
     tx: Sender<Event>,
     script: &str,
 ) -> rune::Result<()> {
     let m = module()?;
 
+    // let mut context = rune_modules::with_config(true)?;
     let mut context = rune_modules::default_context()?;
+    // let mut context = Context::with_default_modules()?;
     context.install(&m)?;
 
     let runtime = Arc::new(context.runtime());
@@ -131,10 +136,28 @@ async fn execute_event_script(
 
     let mut diagnostics = Diagnostics::new();
 
-    let unit = rune::prepare(&mut sources)
+    let unit = match rune::prepare(&mut sources)
         .with_context(&context)
         .with_diagnostics(&mut diagnostics)
-        .build();
+        .build()
+    {
+        Ok(result) => result,
+        Err(e) => {
+            if !diagnostics.is_empty() {
+                let writer = BufferWriter::stderr(ColorChoice::Never);
+                let mut buffer = writer.buffer();
+                diagnostics.emit(&mut buffer, &sources)?;
+                let bufvec = buffer.into_inner();
+                let message = std::str::from_utf8(&bufvec);
+                log::error!(target: "task_log", "{}", message.unwrap());
+                Event::new(EventType::Log)
+                    .with_log_message(&message.unwrap())
+                    .send_from(&tx)
+                    .await;
+            }
+            return Err(e.into());
+        }
+    };
 
     if !diagnostics.is_empty() {
         let writer = BufferWriter::stderr(ColorChoice::Never);
@@ -142,24 +165,53 @@ async fn execute_event_script(
         diagnostics.emit(&mut buffer, &sources)?;
         let bufvec = buffer.into_inner();
         let message = std::str::from_utf8(&bufvec);
+        log::error!(target: "task_log", "{}", message.unwrap());
         Event::new(EventType::Log)
             .with_log_message(&message.unwrap())
             .send_from(&tx)
             .await;
     }
 
-    let wrapper = RuneEngineWrapper { engine, tx };
-    let vm = Vm::new(runtime, Arc::new(unit.unwrap())).send_execute(&["main"], (wrapper,))?;
+    let wrapper = RuneEngineWrapper {
+        engine,
+        tx: tx.clone(),
+    };
+
+    let vm = match Vm::new(runtime, Arc::new(unit)).send_execute(&["main"], (wrapper, event)) {
+        Ok(vm) => vm,
+        Err(e) => {
+            if !diagnostics.is_empty() {
+                let writer = BufferWriter::stderr(ColorChoice::Never);
+                let mut buffer = writer.buffer();
+                diagnostics.emit(&mut buffer, &sources)?;
+                let bufvec = buffer.into_inner();
+                let message = std::str::from_utf8(&bufvec);
+                log::error!(target: "task_log", "{}", message.unwrap());
+                Event::new(EventType::Log)
+                    .with_log_message(&message.unwrap())
+                    .send_from(&tx)
+                    .await;
+            }
+            return Err(e.into());
+        }
+    };
 
     // spawn this off into it's own thread so we can continue to process events. This is only required because
     // we give users the capability to define their own event handlers. User defined event handlers could potentially
     // be long running and we don't want to block the event loop.
-    let scr = script.to_owned();
     tokio::spawn(async move {
         match vm.async_complete().await {
-            Ok(_) => {}
+            Ok(out) => {
+                log::trace!("Rune script completed successfully: {:?}", out);
+            }
             Err(e) => {
-                log::error!(target: "task_log", "There was an error running rune script: {e}\nfor: {scr}")
+                println!("ERROR: {:?}", e);
+                let writer = BufferWriter::stderr(ColorChoice::Never);
+                let mut buffer = writer.buffer();
+                e.emit(&mut buffer, &sources).unwrap();
+                let bufvec = buffer.into_inner();
+                let message = std::str::from_utf8(&bufvec);
+                log::error!(target: "task_log", "{}", message.unwrap());
             }
         }
     });
@@ -185,12 +237,26 @@ fn module() -> Result<Module, ContextError> {
         "execute_task_name_in_scope",
         RuneEngineWrapper::execute_task_name_in_scope,
     )?;
+    module.async_inst_fn("get_from_state", RuneEngineWrapper::get_from_state)?;
+    module.async_inst_fn("set_state_for_task", RuneEngineWrapper::set_state_for_task)?;
+    module.async_inst_fn(
+        "get_pipeline_metadata_from_event",
+        RuneEngineWrapper::get_pipeline_metadata_from_event,
+    )?;
+    module.ty::<Event>()?;
+    module.inst_fn("get_type", Event::get_type)?;
+    // module.inst_fn("type", Event::r#type)?;
+    module.ty::<EventType>()?;
+    module.ty::<SystemEventType>()?;
+    module.ty::<SystemEventScope>()?;
+    module.ty::<SystemEventResult>()?;
+    module.ty::<Metadata>()?;
     Ok(module)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
+    use std::{collections::HashMap, error::Error};
 
     use async_trait::async_trait;
     use tokio::sync::mpsc;
@@ -236,6 +302,18 @@ mod tests {
         fn get_pipelines(&self) -> Vec<&Pipeline> {
             todo!()
         }
+
+        fn get_state_for_id(&self, _key: &str) -> Option<String> {
+            todo!()
+        }
+
+        fn set_state_for_id(
+            &self,
+            _key: &str,
+            _value: String,
+        ) -> Result<(), Box<dyn Error + Send + Sync>> {
+            todo!()
+        }
     }
 
     // #[tokio::test]
@@ -247,9 +325,13 @@ mod tests {
     // }
 
     #[tokio::test]
+    #[tracing_test::traced_test]
     async fn rune_script_setup() {
+        let mut hm = HashMap::new();
+        hm.insert("", "");
+
         let script = r###"
-        pub async fn main (engine) {{
+        pub async fn main (engine, event) {{
             engine.trigger_pipeline("pipeline_1").await;
             engine.trigger_job("pipeline_1", "job_1").await;
             engine.trigger_task("pipeline_1", "job_1", "task_1").await;
@@ -259,9 +341,12 @@ mod tests {
         let (tx, mut rx) = mpsc::channel::<Event>(100);
         let eng = Arc::new(MockEngine {});
 
-        let result = execute_event_script(eng, tx, script).await;
+        let result =
+            execute_event_script(eng, Event::new(EventType::UserDefined).build(), tx, script).await;
         assert!(result.is_ok());
+        log::debug!("{result:?}");
         let message = rx.recv().await;
+        log::debug!("{message:?}");
         assert_eq!(
             message.unwrap(),
             Event::new(EventType::System(SystemEventType::Trigger(
@@ -296,15 +381,24 @@ mod tests {
 
 #[cfg(test)]
 mod event_handler_tests {
+    use crate::ListenForEvent;
+    use crate::ListenForEventType;
+    use crate::ListenForSystemEventResult;
+    use crate::ListenForSystemEventScope;
+    use crate::ListenForSystemEventType;
+    use crate::Select::*;
+
     use super::*;
 
     #[tracing_test::traced_test]
     #[tokio::test]
     async fn test_is_listening_for() {
         let tags = vec![];
-        let listen_for_events = vec![Event::new(EventType::System(SystemEventType::Done(
-            SystemEventScope::Task,
-            SystemEventResult::Success,
+        let listen_for_events = vec![ListenForEvent::new(ListenForEventType::System(Only(
+            ListenForSystemEventType::Done(
+                Only(ListenForSystemEventScope::Task),
+                Only(ListenForSystemEventResult::Success),
+            ),
         )))
         .build()];
         let script = String::from("");

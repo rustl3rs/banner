@@ -59,7 +59,7 @@ mod banner_parser_tests {
                     third_task
                 },
                 fourth_task
-            ]        
+            ]
         "#######;
 
         check(&code, expect!["()"])
@@ -238,7 +238,7 @@ mod pipeline_from_ast_tests {
     #[test]
     fn can_parse_pipeline_with_job_and_task() {
         let code = r#######"
-        
+
         task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
 
         job build [
@@ -303,15 +303,15 @@ mod pipeline_from_ast_tests {
             pipeline my_pipeline [
                 build
             ]
-            
+
             import file://./single_task.ban
-            
+
             job build [
                 // this is a comment...
                 cowsay,
                 cowsay
             ]
-            
+
             [tag: banner.io/owner=me]
             [tag: banner.io/company=rustl3rs]
             task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
@@ -465,7 +465,7 @@ mod pipeline_from_ast_tests {
                 ${src} => "/source",
             ]
         }
-        
+
         task unit-test(image: ${build_image}, execute: r#"/bin/bash -c"#) {
             r#####"bash
             echo testing, testing, 1, 2, 3!
@@ -538,7 +538,9 @@ mod pipeline_from_ast_tests {
             ]
         "#######;
 
-        check(&code, expect![[r#"
+        check(
+            &code,
+            expect![[r#"
             Pipeline {
                 imports: [],
                 images: [],
@@ -588,7 +590,8 @@ mod pipeline_from_ast_tests {
                 ],
                 pipelines: [],
                 eoi: EOI,
-            }"#]])
+            }"#]],
+        )
     }
 }
 
@@ -711,18 +714,18 @@ mod identifier_list_tests {
         }
     }
 
-    fn check_parallel(code: &str, expect: Expect) {
-        match BannerParser::parse(Rule::parallel_identifier_list, &code) {
-            Ok(tree) => {
-                let actual = format!("{:#?}", tree);
-                expect.assert_eq(&actual);
-            }
-            Err(e) => {
-                trace!("ERROR = {:#?}", e);
-                panic!("{:?}", e);
-            }
-        }
-    }
+    // fn check_parallel(code: &str, expect: Expect) {
+    //     match BannerParser::parse(Rule::parallel_identifier_list, &code) {
+    //         Ok(tree) => {
+    //             let actual = format!("{:#?}", tree);
+    //             expect.assert_eq(&actual);
+    //         }
+    //         Err(e) => {
+    //             trace!("ERROR = {:#?}", e);
+    //             panic!("{:?}", e);
+    //         }
+    //     }
+    // }
 
     #[traced_test]
     #[test]

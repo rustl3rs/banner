@@ -90,7 +90,7 @@ async fn execute_command(
         }
         Commands::ValidatePipeline { file } => {
             let pipeline =
-                fs::read_to_string(&file).expect("Should have been able to read the file");
+                fs::read_to_string(file).expect("Should have been able to read the file");
             match parse_file(pipeline) {
                 Ok(()) => {
                     println!("Pipeline validated successfully! 👍🏽 🎉 ✅");

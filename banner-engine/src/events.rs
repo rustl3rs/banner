@@ -2,14 +2,14 @@ use std::fmt::Display;
 use std::fmt::{Debug, Formatter, Result};
 
 use chrono::{DateTime, TimeZone, Utc};
-use rune::Any;
+use strum_macros::{EnumIter, EnumString};
 use tokio::sync::mpsc::Sender;
 
 use crate::metadata::Metadata;
 
 pub type Events = Vec<Event>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, rune::Any)]
 pub struct Event {
     r#type: EventType,
     time_emitted: i64,
@@ -29,6 +29,10 @@ impl Event {
 
     pub fn r#type(&self) -> &EventType {
         &self.r#type
+    }
+
+    pub fn get_type(&self) -> EventType {
+        self.r#type.clone()
     }
 
     pub fn time_emitted(&self) -> DateTime<Utc> {
@@ -58,6 +62,7 @@ impl Display for Event {
 
 impl PartialEq for Event {
     fn eq(&self, other: &Self) -> bool {
+        tracing::info!("Checking equality of {self:?} and {other:?}");
         match (self.r#type, other.r#type) {
             (EventType::System(sel), EventType::System(ser)) => match (sel, ser) {
                 (SystemEventType::Trigger(sesl), SystemEventType::Trigger(sesr)) => {
@@ -65,6 +70,7 @@ impl PartialEq for Event {
                         (SystemEventScope::Pipeline, SystemEventScope::Pipeline)
                         | (SystemEventScope::Job, SystemEventScope::Job)
                         | (SystemEventScope::Task, SystemEventScope::Task) => {
+                            tracing::info!("=====> Triggering.");
                             matching_banner_metadata(&self.metadata, &other.metadata)
                         }
                         (_, _) => false,
@@ -76,6 +82,7 @@ impl PartialEq for Event {
                         | (SystemEventScope::Job, SystemEventScope::Job)
                         | (SystemEventScope::Task, SystemEventScope::Task)
                         | (SystemEventScope::EventHandler, SystemEventScope::EventHandler) => {
+                            tracing::info!("=====> Starting something");
                             matching_banner_metadata(&self.metadata, &other.metadata)
                         }
                         (_, _) => false,
@@ -87,11 +94,13 @@ impl PartialEq for Event {
                         | (SystemEventScope::Job, SystemEventScope::Job)
                         | (SystemEventScope::Task, SystemEventScope::Task)
                         | (SystemEventScope::EventHandler, SystemEventScope::EventHandler) => {
+                            tracing::info!("=====> Done -> Pipeline/Job/Task/EventHandler");
                             match (serl, serr) {
                                 (SystemEventResult::Success, SystemEventResult::Success)
                                 | (SystemEventResult::Failed, SystemEventResult::Failed)
                                 | (SystemEventResult::Aborted, SystemEventResult::Aborted)
                                 | (SystemEventResult::Errored, SystemEventResult::Errored) => {
+                                    tracing::info!("=====> Done -> ANY");
                                     matching_banner_metadata(&self.metadata, &other.metadata)
                                 }
                                 (_, _) => false,
@@ -106,9 +115,11 @@ impl PartialEq for Event {
             | (EventType::Metric, EventType::Metric)
             | (EventType::Log, EventType::Log)
             | (EventType::Notification, EventType::Notification) => {
+                tracing::info!("=====> External/Metric/Log/Notification");
                 matching_banner_metadata(&self.metadata, &other.metadata)
             }
             (EventType::UserDefined, EventType::UserDefined) => {
+                tracing::info!("=====> UserDefined");
                 matching_banner_metadata(&self.metadata, &other.metadata)
             }
             (_, _) => false,
@@ -118,6 +129,8 @@ impl PartialEq for Event {
 
 // metadata from the left is checked for existence in the right. If all are present; TRUE; otherwise; FALSE
 pub(crate) fn matching_banner_metadata(lhs: &[Metadata], rhs: &[Metadata]) -> bool {
+    println!("LHS = {lhs:?}");
+    println!("RHS = {rhs:?}");
     lhs.iter().all(|tag| rhs.iter().any(|t| t == tag))
 }
 
@@ -199,10 +212,10 @@ impl EventBuilder {
 // Log: informational event with data.
 // Notification: informational event that should result in a notification being sent to system users/operational systems.
 // UserDefined: just what it says.
-#[derive(Clone, Copy, PartialEq, Any)]
+#[derive(Clone, Copy, PartialEq, rune::Any)]
 pub enum EventType {
     External,
-    System(SystemEventType),
+    System(#[rune(get)] SystemEventType),
     Metric,
     Log,
     Notification,
@@ -224,14 +237,17 @@ impl Debug for EventType {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Any)]
+#[derive(Debug, Clone, Copy, PartialEq, rune::Any)]
 pub enum SystemEventType {
-    Trigger(SystemEventScope),
-    Starting(SystemEventScope),
-    Done(SystemEventScope, SystemEventResult),
+    Trigger(#[rune(get)] SystemEventScope),
+    Starting(#[rune(get)] SystemEventScope),
+    Done(
+        #[rune(get)] SystemEventScope,
+        #[rune(get)] SystemEventResult,
+    ),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, rune::Any)]
 pub enum SystemEventScope {
     Pipeline,
     Job,
@@ -244,12 +260,25 @@ pub enum SystemEventScope {
 // Aborted: means the step was cut short by some kind of intervention via Banner
 // Errored: means the step was cut short by some external means; might be best to merge Errored and Aborted with a descriminator.
 // TODO: Executions are either successful or not.  if not, then they have a result of execution-failed, aborted or system-errored. Maybe, think it thru more.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, rune::Any, EnumString, EnumIter)]
 pub enum SystemEventResult {
     Success,
     Failed,
     Aborted,
     Errored,
+    // Incomplete,
+}
+
+impl Display for SystemEventResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SystemEventResult::Success => write!(f, "Success"),
+            SystemEventResult::Failed => write!(f, "Failed"),
+            SystemEventResult::Aborted => write!(f, "Aborted"),
+            SystemEventResult::Errored => write!(f, "Errored"),
+            // SystemEventResult::Incomplete => write!(f, "incomplete"),
+        }
+    }
 }
 
 #[cfg(test)]

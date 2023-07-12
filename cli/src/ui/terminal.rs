@@ -112,7 +112,7 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
     let logs_events = Layout::default()
         .direction(Direction::Horizontal)
         .margin(0)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
         .split(chunks[1]);
 
     {

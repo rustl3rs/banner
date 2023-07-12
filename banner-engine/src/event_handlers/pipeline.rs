@@ -1,8 +1,9 @@
 use banner_parser::ast::{self, IdentifierListItem, PipelineSpecification};
 
 use crate::{
-    event_handler::EventHandler, event_handlers::create_start_pipeline_job_event_handler, Event,
-    EventType, Metadata, SystemEventResult, SystemEventScope, SystemEventType,
+    event_handler::EventHandler, event_handlers::create_start_pipeline_job_event_handler,
+    ListenForEvent, ListenForEventType, ListenForSystemEventResult, ListenForSystemEventScope,
+    ListenForSystemEventType, Metadata, Select::*,
 };
 
 pub fn create_finished_pipeline_event_handler(
@@ -32,27 +33,31 @@ pub fn create_finished_pipeline_event_handler(
             let eh = EventHandler::new(vec![pipeline_tag, description_tag], vec![event], script);
             event_handlers.push(eh);
         }
-        IdentifierListItem::SequentialList(jobs) => todo!(),
-        IdentifierListItem::ParallelList(jobs) => todo!(),
+        IdentifierListItem::SequentialList(_jobs) => todo!(),
+        IdentifierListItem::ParallelList(_jobs) => todo!(),
     };
 
     event_handlers
 }
 
-fn create_success_event_listener(pipeline: &str, job: &str) -> Event {
-    Event::new(EventType::System(SystemEventType::Done(
-        SystemEventScope::Job,
-        SystemEventResult::Success,
+fn create_success_event_listener(pipeline: &str, job: &str) -> ListenForEvent {
+    ListenForEvent::new(ListenForEventType::System(Only(
+        ListenForSystemEventType::Done(
+            Only(ListenForSystemEventScope::Job),
+            Only(ListenForSystemEventResult::Success),
+        ),
     )))
     .with_pipeline_name(pipeline)
     .with_job_name(job)
     .build()
 }
 
-fn create_fail_event_listener(pipeline: &str, job: &str) -> Event {
-    Event::new(EventType::System(SystemEventType::Done(
-        SystemEventScope::Job,
-        SystemEventResult::Failed,
+fn create_fail_event_listener(pipeline: &str, job: &str) -> ListenForEvent {
+    ListenForEvent::new(ListenForEventType::System(Only(
+        ListenForSystemEventType::Done(
+            Only(ListenForSystemEventScope::Job),
+            Only(ListenForSystemEventResult::Failed),
+        ),
     )))
     .with_pipeline_name(pipeline)
     .with_job_name(job)
@@ -65,8 +70,8 @@ pub fn create_start_empty_pipeline_event_handler(pipeline: &PipelineSpecificatio
         "Trigger the start of the pipeline: {}",
         &pipeline.name
     ));
-    let listen_for_event = Event::new(EventType::System(SystemEventType::Trigger(
-        SystemEventScope::Pipeline,
+    let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+        ListenForSystemEventType::Trigger(Only(ListenForSystemEventScope::Pipeline)),
     )))
     .with_pipeline_name(&pipeline.name)
     .build();
@@ -88,15 +93,15 @@ pub fn create_start_pipeline_event_handler(
         "Trigger the start of the pipeline: {}/{}",
         &pipeline.name, &job
     ));
-    let listen_for_event = Event::new(EventType::System(SystemEventType::Trigger(
-        SystemEventScope::Pipeline,
+    let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+        ListenForSystemEventType::Trigger(Only(ListenForSystemEventScope::Pipeline)),
     )))
     .with_pipeline_name(&pipeline.name)
     .build();
     let script = match job {
         IdentifierListItem::Identifier(job) => generate_start_pipeline_script_single_job(&pipeline.name, job),
-        IdentifierListItem::SequentialList(jobs) => panic!("Sequential lists in this context are not supported. This should really never happen, since the parser should have caught this."),
-        IdentifierListItem::ParallelList(jobs) => todo!(),
+        IdentifierListItem::SequentialList(_jobs) => panic!("Sequential lists in this context are not supported. This should really never happen, since the parser should have caught this."),
+        IdentifierListItem::ParallelList(_jobs) => todo!(),
     };
     let eh = EventHandler::new(
         vec![pipeline_tag, description_tag],
@@ -150,40 +155,32 @@ pub fn get_eventhandlers_for_pipeline(pipeline: &ast::PipelineSpecification) -> 
 
 fn generate_finish_pipeline_on_success_script(pipeline: &str) -> String {
     format!(
-        r###"
-        pub async fn main (engine) {{
+        r###"pub async fn main (engine, event) {{
             engine.pipeline_success("{pipeline}").await;
-        }}
-        "###
+        }}"###
     )
 }
 
 fn generate_finish_pipeline_on_fail_script(pipeline: &str) -> String {
     format!(
-        r###"
-        pub async fn main (engine) {{
+        r###"pub async fn main (engine, event) {{
             engine.pipeline_fail("{pipeline}").await;
-        }}
-        "###
+        }}"###
     )
 }
 
 fn generate_start_pipeline_script_single_job(pipeline: &str, job_name: &str) -> String {
     format!(
-        r###"
-        pub async fn main (engine) {{
+        r###"pub async fn main (engine, event) {{
             engine.trigger_job("{pipeline}", "{job_name}").await;
-        }}
-        "###
+        }}"###
     )
 }
 
 fn generate_pipeline_with_no_jobs_script(pipeline: &str) -> String {
     format!(
-        r###"
-        pub async fn main (engine) {{
+        r###"pub async fn main (engine, event) {{
             engine.log_message("Pipeline [{pipeline}] has no jobs to trigger").await;
-        }}
-        "###
+        }}"###
     )
 }

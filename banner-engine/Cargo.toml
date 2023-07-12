@@ -26,6 +26,8 @@ hyper-tls = "*"
 const_format = "0.2.30"
 serde = "*"
 itertools = "*"
+strum = "*"
+strum_macros = "*"
 
 [dev-dependencies]
 expect-test = "1.4.0"
