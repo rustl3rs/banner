@@ -1,6 +1,8 @@
 use std::fmt::Display;
+use std::fmt::{Debug, Formatter, Result};
 
 use chrono::{DateTime, TimeZone, Utc};
+use rune::Any;
 use tokio::sync::mpsc::Sender;
 
 use crate::metadata::Metadata;
@@ -197,7 +199,7 @@ impl EventBuilder {
 // Log: informational event with data.
 // Notification: informational event that should result in a notification being sent to system users/operational systems.
 // UserDefined: just what it says.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Any)]
 pub enum EventType {
     External,
     System(SystemEventType),
@@ -208,7 +210,21 @@ pub enum EventType {
     Error,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+impl Debug for EventType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            EventType::External => write!(f, "External"),
+            EventType::System(et) => write!(f, "System({et:?})"),
+            EventType::Metric => write!(f, "Metric"),
+            EventType::Log => write!(f, "Log"),
+            EventType::Notification => write!(f, "Notification"),
+            EventType::UserDefined => write!(f, "UserDefined"),
+            EventType::Error => write!(f, "Error"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Any)]
 pub enum SystemEventType {
     Trigger(SystemEventScope),
     Starting(SystemEventScope),

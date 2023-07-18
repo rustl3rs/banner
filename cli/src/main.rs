@@ -25,14 +25,19 @@ struct Args {
 #[derive(Subcommand, Clone, Debug)]
 enum Commands {
     /// Runs the pipeline locally
-    Local {
-        file: PathBuf,
-    },
+    Local { file: PathBuf },
+    /// Not yet implemented
     Remote {},
     /// Validates the pipeline so it can be checked without trying to load it.
-    ValidatePipeline {
-        file: PathBuf,
-    },
+    #[command(verbatim_doc_comment, visible_alias = "vp")]
+    ValidatePipeline { file: PathBuf },
+    /// Loads a pipeline into the local engine and the prints the internal respresentation of it.
+    /// This is useful for debugging pipelines.
+    /// The output consists of
+    ///  * Tasks; and their tags, inputs, outputs, and dependencies
+    ///  * EventHandlers; identifying the events they listen for.
+    #[command(verbatim_doc_comment, visible_aliases = ["pp", "print-pipeline"])]
+    PipelineRepresentation { file: PathBuf },
 }
 
 #[tokio::main]
@@ -96,6 +101,13 @@ async fn execute_command(
                     Err(e)
                 }
             }
+        }
+        Commands::PipelineRepresentation { file } => {
+            let mut engine = LocalEngine::new();
+            engine.with_pipeline_from_file(file).await?;
+            let pipeline = engine.get_pipelines()[0];
+            println!("{:#?}", pipeline);
+            Ok(())
         }
     }
 }

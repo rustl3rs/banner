@@ -1,3 +1,5 @@
+use std::fmt::{Debug, Formatter, Result};
+
 use const_format::concatcp;
 
 use crate::Event;
@@ -6,10 +8,16 @@ use crate::Event;
 // too much about blowing up the implementations between versions.
 // It might work.. It might not... Truth of the matter is, I don't know
 // all the stuff I might want to pass around about an event yet.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Metadata {
     key: String,
     value: String,
+}
+
+impl Debug for Metadata {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{}: {}", self.key, self.value)
+    }
 }
 
 impl Metadata {

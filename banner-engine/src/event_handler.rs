@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use std::fmt::{Debug, Formatter};
+
 use rune::{
     termcolor::{BufferWriter, ColorChoice},
     ContextError, Diagnostics, Module, Source, Sources, Vm,
@@ -11,11 +13,34 @@ use crate::{
     SystemEventScope, SystemEventType, Tag, JOB_TAG, PIPELINE_TAG, TASK_TAG,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct EventHandler {
     tags: Vec<Tag>,
     listen_for_events: Events,
     script: String,
+}
+
+impl Debug for EventHandler {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, r#"{{"#)?;
+
+        writeln!(f, "    listen_for_events:")?;
+        for event in &self.listen_for_events {
+            writeln!(f, "        {:?},", event)?;
+        }
+
+        writeln!(f, r#"    tags:"#)?;
+        for tag in &self.tags {
+            writeln!(f, "        {:?},", tag)?;
+        }
+
+        writeln!(f, r#####"    script: ###""#####)?;
+        writeln!(f, "        {}", self.script)?;
+        writeln!(f, r#####"    "###"#####)?;
+
+        write!(f, r#"}}"#)?;
+        Ok(())
+    }
 }
 
 impl EventHandler {
