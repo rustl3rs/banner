@@ -129,8 +129,8 @@ impl PartialEq for Event {
 
 // metadata from the left is checked for existence in the right. If all are present; TRUE; otherwise; FALSE
 pub(crate) fn matching_banner_metadata(lhs: &[Metadata], rhs: &[Metadata]) -> bool {
-    println!("LHS = {lhs:?}");
-    println!("RHS = {rhs:?}");
+    tracing::debug!("LHS = {lhs:?}");
+    tracing::debug!("RHS = {rhs:?}");
     lhs.iter().all(|tag| rhs.iter().any(|t| t == tag))
 }
 
