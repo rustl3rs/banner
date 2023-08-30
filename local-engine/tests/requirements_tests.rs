@@ -34,6 +34,7 @@ async fn starts_task_with_required_tags() {
         assert!(result.is_ok());
     }
 
+    #[allow(dead_code)]
     async fn check_fails(expected_error: &str, tags: Vec<Tag>) {
         let result = execute(tags).await;
         assert!(result.is_err());

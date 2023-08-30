@@ -1,8 +1,8 @@
-use std::{error::Error, io, time::Duration};
+use std::{error::Error, io, sync::Arc, time::Duration};
 
-use banner_engine::{EventType, SystemEventScope, SystemEventType};
+use banner_engine::{Engine, EventType, SystemEventScope, SystemEventType};
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode},
+    event::{DisableMouseCapture, Event, EventStream, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -12,25 +12,23 @@ use futures_util::stream::StreamExt;
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
+    prelude::Alignment,
     style::{Color, Style},
     widgets::{Block, Borders},
     Frame, Terminal,
 };
-use tokio::{
-    select,
-    sync::{mpsc::Sender, oneshot::Receiver},
-};
+use tokio::{select, sync::mpsc::Sender};
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
 
-use super::state::{UiLayout, UiState};
+use super::{
+    pipeline::pipeline::PipelineWidget,
+    state::{UiLayout, UiState},
+};
 
 pub async fn create_terminal_ui(
+    engine: &Arc<dyn Engine + Send + Sync>,
     tx: Sender<banner_engine::Event>,
-    osrx: Receiver<bool>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    // wait for the signal to start doing this stuff.
-    let _ = osrx.await;
-
     // setup terminal
     let backend = {
         enable_raw_mode()?;
@@ -56,7 +54,7 @@ pub async fn create_terminal_ui(
         select! {
             _ = delay => {
                 terminal.draw(|f| {
-                    ui(f, &ui_layout);
+                    ui(f, &ui_layout, engine);
                 })?;
             },
             maybe_event = event => {
@@ -116,7 +114,7 @@ pub async fn create_terminal_ui(
                     None => break,
                 };
                 terminal.draw(|f| {
-                    ui(f, &ui_layout);
+                    ui(f, &ui_layout, engine);
                 })?;
             }
         }
@@ -136,35 +134,28 @@ pub async fn create_terminal_ui(
     Ok(())
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, ui_layout: &UiLayout) {
+fn ui<B: Backend>(f: &mut Frame<B>, ui_layout: &UiLayout, engine: &Arc<dyn Engine + Send + Sync>) {
     match ui_layout {
         UiLayout::FullScreenLogs => full_screen_logs(f),
         UiLayout::FullScreenEvents => full_screen_events(f),
-        UiLayout::FullScreenPipelines => full_screen_pipeline(f),
-        UiLayout::MultiPanelLayout(ui_state) => multi_panel_layout(f, ui_state),
+        UiLayout::FullScreenPipelines => full_screen_pipeline(f, engine),
+        UiLayout::MultiPanelLayout(ui_state) => multi_panel_layout(f, ui_state, engine),
     }
 }
 
-fn full_screen_pipeline<B: Backend>(f: &mut Frame<B>) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([Constraint::Percentage(100)].as_ref())
-        .split(f.size());
+fn full_screen_pipeline<B: Backend>(f: &mut Frame<B>, engine: &Arc<dyn Engine + Send + Sync>) {
+    let pipe = PipelineWidget::default().block(
+        Block::default()
+            .title(" Pipeline (test) - ('q' to quit; 's' to start pipeline) - Pipeline ('m' to return to multi panel view) ")
+            .title_alignment(Alignment::Center)
+            .borders(Borders::TOP),
+    )
+    .pipeline(&engine.get_pipeline_specification()[0]);
 
-    let block = Block::default()
-        .title(" Pipeline (test) - ('q' to quit; 's' to start pipeline) - Pipeline ('m' to return to multi panel view) ")
-        .borders(Borders::ALL);
-    f.render_widget(block, chunks[0]);
+    f.render_widget(pipe, f.size());
 }
 
 fn full_screen_events<B: Backend>(f: &mut Frame<B>) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([Constraint::Percentage(100)].as_ref())
-        .split(f.size());
-
     let ews = TuiWidgetState::new()
         .set_level_for_target("event_log", log::LevelFilter::Debug)
         .set_default_display_level(log::LevelFilter::Off);
@@ -172,8 +163,8 @@ fn full_screen_events<B: Backend>(f: &mut Frame<B>) {
         .block(
             Block::default()
                 .title(" Pipeline (test) - Events ('m' to return to multi panel view) ")
-                .border_style(Style::default().fg(Color::White).bg(Color::Black))
-                .borders(Borders::ALL),
+                .title_alignment(Alignment::Center)
+                .borders(Borders::TOP | Borders::BOTTOM),
         )
         .style_error(Style::default().fg(Color::Red))
         .style_debug(Style::default().fg(Color::Green))
@@ -188,16 +179,10 @@ fn full_screen_events<B: Backend>(f: &mut Frame<B>) {
         .style(Style::default().fg(Color::White).bg(Color::Black))
         .state(&ews);
 
-    f.render_widget(ewidget, chunks[0]);
+    f.render_widget(ewidget, f.size());
 }
 
 fn full_screen_logs<B: Backend>(f: &mut Frame<B>) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([Constraint::Percentage(100)].as_ref())
-        .split(f.size());
-
     let lws = TuiWidgetState::new()
         .set_level_for_target("task_log", log::LevelFilter::Debug)
         .set_default_display_level(log::LevelFilter::Off);
@@ -205,8 +190,8 @@ fn full_screen_logs<B: Backend>(f: &mut Frame<B>) {
         .block(
             Block::default()
                 .title(" Pipeline (test) - Logs ('m' to return to multi panel view) ")
-                .border_style(Style::default().fg(Color::White).bg(Color::Black))
-                .borders(Borders::ALL),
+                .title_alignment(Alignment::Center)
+                .borders(Borders::TOP | Borders::BOTTOM),
         )
         .style_error(Style::default().fg(Color::Red))
         .style_debug(Style::default().fg(Color::Green))
@@ -221,20 +206,27 @@ fn full_screen_logs<B: Backend>(f: &mut Frame<B>) {
         .style(Style::default().fg(Color::White).bg(Color::Black))
         .state(&lws);
 
-    f.render_widget(lwidget, chunks[0]);
+    f.render_widget(lwidget, f.size());
 }
 
-fn multi_panel_layout<B: Backend>(f: &mut Frame<B>, ui_layout: &UiState) {
+fn multi_panel_layout<B: Backend>(
+    f: &mut Frame<B>,
+    ui_layout: &UiState,
+    engine: &Arc<dyn Engine + Send + Sync>,
+) {
     let constraints = split_frame(ui_layout.pipeline_frame);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
         .constraints(constraints)
         .split(f.size());
-    let block = Block::default()
-        .title(" Pipeline (test) - ('q' to quit; 's' to start pipeline) ")
-        .borders(Borders::ALL);
-    f.render_widget(block, chunks[0]);
+    let pipe = PipelineWidget::default().block(
+        Block::default()
+            .title(" Pipeline (test) - ('q' to quit; 's' to start pipeline) - Pipeline ('m' to return to multi panel view) ")
+            .borders(Borders::ALL),
+    )
+    .pipeline(&engine.get_pipeline_specification()[0]);
+    f.render_widget(pipe, chunks[0]);
 
     let constraints = split_frame(ui_layout.log_and_event_frame);
     let logs_events = Layout::default()

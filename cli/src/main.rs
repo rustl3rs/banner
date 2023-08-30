@@ -1,13 +1,10 @@
-use std::{error::Error, fs, path::PathBuf, sync::Arc};
+use std::{error::Error, fs, path::PathBuf, process, sync::Arc};
 
-use banner_engine::{parse_file, start_engine, Engine, Event};
+use banner_engine::{parse_file, start_engine, Engine};
 use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
 use log::{self, LevelFilter};
-use tokio::sync::{
-    mpsc::{self, Receiver, Sender},
-    oneshot,
-};
+use tokio::sync::mpsc::{self};
 use tui_logger::{self, init_logger, set_default_level, set_level_for_target};
 use ui::terminal::create_terminal_ui;
 
@@ -57,28 +54,41 @@ async fn main() -> Result<(), Box<dyn Error>> {
     set_level_for_target("task_log", log_level);
     set_level_for_target("event_log", log_level);
 
-    log::info!(target: "task_log", "Log level set to: {log_level}");
-    log::debug!(target: "task_log", "Creating channels");
-    let (tx, rx) = mpsc::channel(100);
-    let (ostx, osrx) = oneshot::channel::<bool>();
+    match execute_command().await {
+        Ok(result) => match result {
+            Some(engine) => {
+                log::info!(target: "task_log", "Starting orchestrator");
+                println!("Starting orchestrator...");
 
-    tokio::select! {
-        _ = execute_command(rx, tx.clone(), ostx) => {},
-        _ = create_terminal_ui(tx.clone(), osrx) => {}
-    };
+                log::info!(target: "task_log", "Log level set to: {log_level}");
+                log::debug!(target: "task_log", "Creating channels");
+                let (tx, rx) = mpsc::channel(100);
 
-    Ok(())
+                let engine: Arc<dyn Engine + Send + Sync> = Arc::new(engine);
+                let se = engine.clone();
+
+                tokio::select! {
+                    _ = start_engine(&se, rx, tx.clone()) => {},
+                    _ = create_terminal_ui(&engine, tx.clone()) => {}
+                };
+
+                log::info!(target: "task_log", "Exiting orchestrator");
+                Ok(())
+            }
+            None => Ok(()),
+        },
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
+    }
 }
 
-async fn execute_command(
-    rx: Receiver<Event>,
-    tx: Sender<Event>,
-    ostx: oneshot::Sender<bool>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+async fn execute_command() -> Result<Option<LocalEngine>, Box<dyn Error + Send + Sync>> {
     let args = Args::parse();
     match args.command {
-        Commands::Local { file } => match execute_pipeline(file, rx, tx, ostx).await {
-            Ok(_) => Ok(()),
+        Commands::Local { file } => match execute_pipeline(file).await {
+            Ok(engine) => Ok(engine),
             Err(e) => {
                 eprintln!("{}", e);
                 Err(e)
@@ -86,7 +96,7 @@ async fn execute_command(
         },
         Commands::Remote {} => {
             log::info!("Hello World!");
-            Ok(())
+            Ok(None)
         }
         Commands::ValidatePipeline { file } => {
             let pipeline =
@@ -94,7 +104,7 @@ async fn execute_command(
             match parse_file(pipeline) {
                 Ok(()) => {
                     println!("Pipeline validated successfully! 👍🏽 🎉 ✅");
-                    Ok(())
+                    Ok(None)
                 }
                 Err(e) => {
                     eprintln!("Error occurred validating pipeline: 😞\n{e}");
@@ -107,34 +117,22 @@ async fn execute_command(
             engine.with_pipeline_from_file(file).await?;
             let pipeline = engine.get_pipelines()[0];
             println!("{:#?}", pipeline);
-            Ok(())
+            Ok(None)
         }
     }
 }
 
 async fn execute_pipeline(
     filepath: PathBuf,
-    rx: Receiver<Event>,
-    tx: Sender<Event>,
-    ostx: oneshot::Sender<bool>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<Option<LocalEngine>, Box<dyn Error + Send + Sync>> {
     println!("Loading pipeline from file: {:?}", filepath);
     log::info!(target: "task_log", "Starting pipeline");
     let mut engine = LocalEngine::new();
     engine.with_pipeline_from_file(filepath).await?;
-    let engine = Arc::new(engine);
 
     log::info!(target: "task_log", "Confirming requirements");
     println!("Confirming requirements...");
     engine.confirm_requirements().await?;
 
-    // now we are ready to start messing with the terminal window.
-    let _ = ostx.send(true);
-
-    log::info!(target: "task_log", "Starting orchestrator");
-    println!("Starting orchestrator...");
-    start_engine(engine, rx, tx).await?;
-    log::info!(target: "task_log", "Exiting orchestrator");
-
-    Ok(())
+    Ok(Some(engine))
 }

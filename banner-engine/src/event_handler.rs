@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Formatter};
 
-use rune::runtime::Protocol;
 use rune::{
     termcolor::{BufferWriter, ColorChoice},
-    Any, ContextError, Diagnostics, Module, Source, Sources, ToValue, Vm,
+    ContextError, Diagnostics, Module, Source, Sources, Vm,
 };
 use tokio::sync::mpsc::Sender;
 
@@ -259,6 +258,7 @@ mod tests {
     use std::{collections::HashMap, error::Error};
 
     use async_trait::async_trait;
+    use banner_parser::ast::PipelineSpecification;
     use tokio::sync::mpsc;
 
     use crate::{ExecutionResult, Pipeline, TaskDefinition};
@@ -300,6 +300,10 @@ mod tests {
         }
 
         fn get_pipelines(&self) -> Vec<&Pipeline> {
+            todo!()
+        }
+
+        fn get_pipeline_specification(&self) -> &Vec<PipelineSpecification> {
             todo!()
         }
 

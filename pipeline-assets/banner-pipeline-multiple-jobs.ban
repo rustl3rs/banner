@@ -15,6 +15,10 @@ job unit-test [
     test,
 ]
 
+job coverage [
+    cowsay,
+]
+
 job pre-load [
     cowsay,
 ]
@@ -25,7 +29,7 @@ job finish [
 
 pipeline banner [
     pre-load,
-    unit-test,
+    unit-test, coverage, sonarqube,
     finish,
 ]
 

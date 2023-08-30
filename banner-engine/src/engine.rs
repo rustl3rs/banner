@@ -1,7 +1,7 @@
 use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
-
+use banner_parser::ast::PipelineSpecification;
 use log::debug;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -45,6 +45,8 @@ pub trait Engine {
 
     fn get_pipelines(&self) -> Vec<&Pipeline>;
 
+    fn get_pipeline_specification(&self) -> &Vec<PipelineSpecification>;
+
     /// Returns a value from state based on the key.
     fn get_state_for_id(&self, key: &str) -> Option<String>;
 
@@ -63,7 +65,7 @@ pub enum ExecutionResult {
 }
 
 pub async fn start_engine(
-    engine: Arc<dyn Engine + Send + Sync>,
+    engine: &Arc<dyn Engine + Send + Sync>,
     mut rx: Receiver<Event>,
     tx: Sender<Event>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {

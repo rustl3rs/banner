@@ -18,9 +18,9 @@ clap = { version = "4", features = ["derive"] }
 local-engine = { path = "../local-engine" }
 tracing = {workspace = true}
 tokio = {version = "1.25", features = ["test-util", "macros"]}
-ratatui = "0.20.1"
-crossterm = {version = "0.25", features = ["event-stream"]}
-tui-logger = {version = "0.9.1", default-features = false, features = ["ratatui-support", "tracing-support"]}
+ratatui = "0.22"
+crossterm = {version = "0.27", features = ["event-stream"]}
+tui-logger = {version = "0.9", default-features = false, features = ["ratatui-support", "tracing-support"]}
 log = "0.4"
 futures-timer = "3.0"
 futures-core = "0.3"

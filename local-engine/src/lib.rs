@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use backon::ConstantBuilder;
 use backon::Retryable;
 use banner_engine::HostPath;
+use banner_engine::PipelineSpecification;
 use banner_engine::{
     build_and_validate_pipeline, Engine, ExecutionResult, Pipeline, TaskDefinition, JOB_TAG,
     PIPELINE_TAG, TASK_TAG,
@@ -39,6 +40,7 @@ use tag_missing_error::TagMissingError;
 #[derive(Debug)]
 pub struct LocalEngine {
     pipelines: Vec<Pipeline>,
+    specifications: Vec<PipelineSpecification>,
     directories: Arc<RwLock<HashMap<String, String>>>,
     state_dir: PathBuf,
     state: Arc<RwLock<HashMap<String, String>>>,
@@ -48,6 +50,7 @@ impl LocalEngine {
     pub fn new() -> Self {
         Self {
             pipelines: vec![],
+            specifications: vec![],
             directories: Arc::new(RwLock::new(HashMap::new())),
             state_dir: {
                 let dir = Alphanumeric.sample_string(&mut rand::thread_rng(), 8);
@@ -67,8 +70,9 @@ impl LocalEngine {
         let pipeline =
             fs::read_to_string(&filepath).expect("Should have been able to read the file");
         match build_and_validate_pipeline(&pipeline).await {
-            Ok(pipeline) => {
+            Ok((pipeline, mut specifications)) => {
                 self.pipelines.push(pipeline);
+                self.specifications.append(&mut specifications);
                 ()
             }
             Err(e) => {
@@ -281,6 +285,10 @@ impl Engine for LocalEngine {
 
     fn get_pipelines(&self) -> Vec<&banner_engine::Pipeline> {
         self.pipelines.iter().collect()
+    }
+
+    fn get_pipeline_specification(&self) -> &Vec<PipelineSpecification> {
+        &self.specifications
     }
 
     /// Returns a map of key/value pairs that represent the state of the engine for a specific pipeline run.

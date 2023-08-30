@@ -53,7 +53,7 @@ impl Pipeline {
 
 pub async fn build_and_validate_pipeline(
     code: &str,
-) -> Result<Pipeline, Box<dyn Error + Send + Sync>> {
+) -> Result<(Pipeline, Vec<PipelineSpecification>), Box<dyn Error + Send + Sync>> {
     let mut main_segment = code_to_ast(code);
     // try and gather all the errors in one place before returning them all.
     let mut errors: Vec<Box<dyn Error + Send + Sync>> = vec![];
@@ -104,8 +104,9 @@ pub async fn build_and_validate_pipeline(
     }
 
     post_process(&mut main_segment)?;
+    let specifications = main_segment.pipelines.clone();
     let pipeline = ast_to_repr(main_segment);
-    Ok(pipeline)
+    Ok((pipeline, specifications))
 }
 
 fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sync>> {

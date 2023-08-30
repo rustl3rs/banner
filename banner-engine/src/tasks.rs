@@ -46,6 +46,7 @@ impl TaskDefinition {
         self.inputs.push(input);
     }
 
+    #[allow(dead_code)]
     pub(crate) fn append_outputs(&mut self, output: TaskResource) {
         self.outputs.push(output);
     }
