@@ -108,6 +108,7 @@ mod Connector {
     pub(crate) const VERTICAL: &str = "│";
     pub(crate) const HORIZONTAL: &str = "─";
     pub(crate) const LEFT: &str = "├";
+    pub(crate) const RIGHT: &str = "┤";
     pub(crate) const TOP: &str = "┬";
     pub(crate) const BOTTOM: &str = "┴";
     pub(crate) const CROSS: &str = "┼";
@@ -159,7 +160,6 @@ impl Job {
                 format!("{}    {}", Box::VERTICAL, Box::VERTICAL),
                 border_style,
             );
-            buf.set_string(x + 1, y + i, format!("    "), inner_style);
         }
         buf.set_string(
             x,
@@ -197,8 +197,9 @@ impl Job {
                 }
                 buf.set_string(rx - 1, ry, Connector::ARROW_RIGHT, connector_style);
             }
+            // Where the left job is higher than the right job.
             (left, right) if left.top_left.1 < right.top_left.1 => {
-                let midpoint = (lx + rx) / 2;
+                let midpoint = rx - 3;
                 for i in midpoint..rx {
                     buf.set_string(i, ry, Connector::HORIZONTAL, connector_style);
                 }
@@ -214,8 +215,11 @@ impl Job {
                     }
                 }
             }
+            // Where the left job is lower than the right job.
             (left, right) if left.top_left.1 > right.top_left.1 => {
-                let midpoint = (lx + rx) / 2;
+                let midpoint = rx - 3;
+
+                // renders the horizontal line + arrow closest to the right side job.
                 for i in midpoint..rx {
                     let symbol = buf.get(i, ry).symbol.clone();
                     match symbol.as_str() {
@@ -225,29 +229,35 @@ impl Job {
                 }
                 buf.set_string(rx - 1, ry, Connector::ARROW_RIGHT, connector_style);
 
+                // renders the bottom right hand joint.
                 let symbol = buf.get(midpoint, ly).symbol.clone();
                 match symbol.as_str() {
-                    " " => buf.set_string(midpoint, ly, Connector::RIGHT_BOTTOM, connector_style),
                     Connector::LEFT_BOTTOM => {
                         buf.set_string(midpoint, ly, Connector::BOTTOM, connector_style);
                     }
+                    " " => buf.set_string(midpoint, ly, Connector::RIGHT_BOTTOM, connector_style),
                     _ => (),
                 }
 
+                // renders the horizontal line from the left box to the midpoint.
                 for i in (lx + 1)..midpoint {
-                    let symbol = buf.get(midpoint, i).symbol.clone();
+                    let symbol = buf.get(i, ly).symbol.clone();
                     match symbol.as_str() {
                         " " => buf.set_string(i, ly, Connector::HORIZONTAL, connector_style),
-                        _ => (),
+                        _ => buf.set_string(i, ly, symbol, connector_style),
                     }
                 }
 
-                for i in (ry)..(ly) {
+                // renders the vertical line from the midpoint to the line attaching to the right box.
+                for i in ry..ly {
                     let symbol = buf.get(midpoint, i).symbol.clone();
                     match symbol.as_str() {
                         " " => buf.set_string(midpoint, i, Connector::VERTICAL, connector_style),
                         Connector::LEFT_BOTTOM => {
                             buf.set_string(midpoint, i, Connector::LEFT, connector_style);
+                        }
+                        Connector::RIGHT_BOTTOM => {
+                            buf.set_string(midpoint, i, Connector::RIGHT, connector_style);
                         }
                         Connector::BOTTOM => {
                             buf.set_string(midpoint, i, Connector::CROSS, connector_style);

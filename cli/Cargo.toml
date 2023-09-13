@@ -13,7 +13,6 @@ description = "The Banner CLI. Used to ship pipelines to Banner servers and to r
 
 [dependencies]
 banner-engine = { path = "../banner-engine" }
-banner-parser = { path = "../banner-parser" }
 clap = { version = "4", features = ["derive"] }
 local-engine = { path = "../local-engine" }
 tracing = {workspace = true}

@@ -20,8 +20,10 @@ use ratatui::{
 use tokio::{select, sync::mpsc::Sender};
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
 
+use crate::ui::pipeline::pipeline_metadata::PipelineSpecification;
+
 use super::{
-    pipeline::pipeline::PipelineWidget,
+    pipeline::{job::Status, pipeline::PipelineWidget, pipeline_metadata::IdentifierListItem},
     state::{UiLayout, UiState},
 };
 
@@ -134,6 +136,56 @@ pub async fn create_terminal_ui(
     Ok(())
 }
 
+fn set_statuses_on_jobs(
+    pipeline_with_metadata: &mut PipelineSpecification,
+    engine: &Arc<dyn Engine + Send + Sync>,
+) {
+    for job in pipeline_with_metadata.jobs.iter_mut() {
+        set_status_on_job(&pipeline_with_metadata.name, job, engine);
+    }
+}
+
+fn set_status_on_job(
+    pipeline_name: &str,
+    job: &mut IdentifierListItem,
+    engine: &Arc<dyn Engine + Send + Sync>,
+) {
+    match job {
+        super::pipeline::pipeline_metadata::IdentifierListItem::Identifier(j) => {
+            let job_status =
+                engine.get_state_for_id(&format!("{}/{}/{}", "", pipeline_name, j.name));
+            // log::debug!(target: "task_log",
+            //     "Job status: {}/{}/{} - {:?}",
+            //     "",
+            //     pipeline_name,
+            //     j.name,
+            //     job_status
+            // );
+            let js = match job_status {
+                Some(s) => match s.as_str() {
+                    "success" => Status::Success,
+                    "failure" => Status::Failed,
+                    "running" => Status::Running,
+                    _ => Status::Pending,
+                },
+                None => Status::Pending,
+            };
+
+            j.set_status(js);
+        }
+        super::pipeline::pipeline_metadata::IdentifierListItem::SequentialList(list) => {
+            for job in list.iter_mut() {
+                set_status_on_job(pipeline_name, job, engine);
+            }
+        }
+        super::pipeline::pipeline_metadata::IdentifierListItem::ParallelList(list) => {
+            for job in list.iter_mut() {
+                set_status_on_job(pipeline_name, job, engine);
+            }
+        }
+    }
+}
+
 fn ui<B: Backend>(f: &mut Frame<B>, ui_layout: &UiLayout, engine: &Arc<dyn Engine + Send + Sync>) {
     match ui_layout {
         UiLayout::FullScreenLogs => full_screen_logs(f),
@@ -144,13 +196,15 @@ fn ui<B: Backend>(f: &mut Frame<B>, ui_layout: &UiLayout, engine: &Arc<dyn Engin
 }
 
 fn full_screen_pipeline<B: Backend>(f: &mut Frame<B>, engine: &Arc<dyn Engine + Send + Sync>) {
+    let mut spec = PipelineSpecification::from(&engine.get_pipeline_specification()[0]);
+    set_statuses_on_jobs(&mut spec, engine);
     let pipe = PipelineWidget::default().block(
         Block::default()
             .title(" Pipeline (test) - ('q' to quit; 's' to start pipeline) - Pipeline ('m' to return to multi panel view) ")
             .title_alignment(Alignment::Center)
             .borders(Borders::TOP),
     )
-    .pipeline(&engine.get_pipeline_specification()[0]);
+    .pipeline(&spec);
 
     f.render_widget(pipe, f.size());
 }
@@ -220,12 +274,15 @@ fn multi_panel_layout<B: Backend>(
         .margin(1)
         .constraints(constraints)
         .split(f.size());
+
+    let mut spec = PipelineSpecification::from(&engine.get_pipeline_specification()[0]);
+    set_statuses_on_jobs(&mut spec, engine);
     let pipe = PipelineWidget::default().block(
         Block::default()
             .title(" Pipeline (test) - ('q' to quit; 's' to start pipeline) - Pipeline ('m' to return to multi panel view) ")
             .borders(Borders::ALL),
     )
-    .pipeline(&engine.get_pipeline_specification()[0]);
+    .pipeline(&spec);
     f.render_widget(pipe, chunks[0]);
 
     let constraints = split_frame(ui_layout.log_and_event_frame);

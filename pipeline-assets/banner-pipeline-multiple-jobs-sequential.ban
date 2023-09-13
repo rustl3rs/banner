@@ -19,10 +19,6 @@ job coverage [
     cowsay,
 ]
 
-job another-job [
-    cowsay,
-]
-
 job pre-load [
     cowsay,
 ]
@@ -31,17 +27,11 @@ job finish [
     cowsay,
 ]
 
-job test_j1 [
-    cowsay,
-]
-
-job test_j2 [
-    cowsay,
-]
-
 pipeline banner [
     pre-load,
-    { unit-test, [coverage, sonarqube, {test_j1, [test_j2, test_j1]}], [another-job, test_j1] },
+    unit-test, 
+    coverage, 
+    sonarqube,
     finish,
 ]
 

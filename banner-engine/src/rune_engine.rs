@@ -33,6 +33,9 @@ impl<'a> RuneEngineWrapper {
         .with_job_name(job)
         .send_from(&self.tx)
         .await;
+
+        self.engine
+            .set_state_for_id(&format!("{}/{}/{}", "", pipeline, job), "running".into());
     }
 
     pub async fn trigger_task(&self, pipeline: &str, job: &str, task: &str) {
@@ -63,6 +66,9 @@ impl<'a> RuneEngineWrapper {
         .with_job_name(job)
         .send_from(&self.tx)
         .await;
+
+        self.engine
+            .set_state_for_id(&format!("{}/{}/{}", "", pipeline, job), "success".into());
     }
 
     pub async fn job_fail(&self, pipeline: &str, job: &str) {
@@ -74,6 +80,9 @@ impl<'a> RuneEngineWrapper {
         .with_job_name(job)
         .send_from(&self.tx)
         .await;
+
+        self.engine
+            .set_state_for_id(&format!("{}/{}/{}", "", pipeline, job), "failure".into());
     }
 
     pub async fn task_success(&self, pipeline: &str, job: &str, task: &str) {

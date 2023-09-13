@@ -307,6 +307,7 @@ impl Engine for LocalEngine {
         key: &str,
         value: String,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        log::debug!(target: "task_log", "set_state_for_id: {key} {value}");
         let mut hm = self.state.write().unwrap();
         hm.insert(key.to_string(), value);
         Ok(())

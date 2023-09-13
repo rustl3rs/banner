@@ -101,7 +101,14 @@ pub fn create_start_pipeline_event_handler(
     let script = match job {
         IdentifierListItem::Identifier(job) => generate_start_pipeline_script_single_job(&pipeline.name, job),
         IdentifierListItem::SequentialList(_jobs) => panic!("Sequential lists in this context are not supported. This should really never happen, since the parser should have caught this."),
-        IdentifierListItem::ParallelList(_jobs) => todo!(),
+        IdentifierListItem::ParallelList(jobs) => {
+            let start_jobs:Vec<&str> = jobs.iter().map(|j| match j {
+                IdentifierListItem::Identifier(id) => vec![id.as_str()],
+                IdentifierListItem::SequentialList(list) => get_first_jobs_sequential(list),
+                IdentifierListItem::ParallelList(list) => get_all_jobs_parallel(list),
+            }).flatten().collect();
+            generate_start_pipeline_script_multi_job(&pipeline.name, start_jobs)
+        },
     };
     let eh = EventHandler::new(
         vec![pipeline_tag, description_tag],
@@ -109,6 +116,26 @@ pub fn create_start_pipeline_event_handler(
         script,
     );
     eh
+}
+
+fn get_all_jobs_parallel(list: &[IdentifierListItem]) -> Vec<&str> {
+    list.iter()
+        .map(|j| match j {
+            IdentifierListItem::Identifier(id) => vec![id.as_str()],
+            IdentifierListItem::SequentialList(list) => get_first_jobs_sequential(list),
+            IdentifierListItem::ParallelList(list) => get_all_jobs_parallel(list),
+        })
+        .flatten()
+        .collect()
+}
+
+fn get_first_jobs_sequential(list: &[IdentifierListItem]) -> Vec<&str> {
+    let first = list.first().unwrap();
+    match first {
+        IdentifierListItem::Identifier(id) => vec![id.as_str()],
+        IdentifierListItem::SequentialList(list) => get_first_jobs_sequential(&list),
+        IdentifierListItem::ParallelList(list) => get_all_jobs_parallel(&list),
+    }
 }
 
 pub fn get_eventhandlers_for_pipeline(pipeline: &ast::PipelineSpecification) -> Vec<EventHandler> {
@@ -139,7 +166,7 @@ pub fn get_eventhandlers_for_pipeline(pipeline: &ast::PipelineSpecification) -> 
         let next = iterator.clone().next();
         tracing::trace!("get_eventhandlers_for_pipeline: job: {job:?}, next: {next:?}");
         if next.is_some() {
-            let mut eh = create_start_pipeline_job_event_handler(pipeline, job, next);
+            let mut eh = create_start_pipeline_job_event_handler(pipeline, job, next.unwrap());
             event_handlers.append(&mut eh);
         } else {
             // Create event handler to accept pipeline triggers.  This event will only ever
@@ -183,4 +210,17 @@ fn generate_pipeline_with_no_jobs_script(pipeline: &str) -> String {
             engine.log_message("Pipeline [{pipeline}] has no jobs to trigger").await;
         }}"###
     )
+}
+
+fn generate_start_pipeline_script_multi_job(pipeline: &str, jobs: Vec<&str>) -> String {
+    let mut script = String::from(r###"pub async fn main (engine, event) {{"###);
+    for job in jobs {
+        script.push_str(&format!(
+            r###"
+            engine.trigger_job("{pipeline}", "{job}").await;
+            "###
+        ));
+    }
+    script.push_str("        }}");
+    script
 }

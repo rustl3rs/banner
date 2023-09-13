@@ -49,7 +49,7 @@ pub fn create_start_task_event_handler(
     let job_tag = Metadata::new_banner_job(&job.name);
     let pipeline_tag = Metadata::new_banner_pipeline(pipeline);
 
-    let mut event_handers: Vec<EventHandler> = vec![];
+    let mut event_handlers: Vec<EventHandler> = vec![];
     match (task, next) {
         (IdentifierListItem::Identifier(task), IdentifierListItem::Identifier(next)) => {
             let description_tag = Metadata::new_banner_description(&format!(
@@ -75,7 +75,7 @@ pub fn create_start_task_event_handler(
                 generate_start_task_script(pipeline, &job.name, task),
             );
 
-            event_handers.push(eh);
+            event_handlers.push(eh);
         }
         (IdentifierListItem::Identifier(task), IdentifierListItem::SequentialList(_))
         | (IdentifierListItem::Identifier(task), IdentifierListItem::ParallelList(_)) => {
@@ -115,7 +115,7 @@ pub fn create_start_task_event_handler(
                 script,
             );
 
-            event_handers.push(eh);
+            event_handlers.push(eh);
         }
         (IdentifierListItem::SequentialList(_), IdentifierListItem::Identifier(_)) => todo!(),
         (IdentifierListItem::SequentialList(_), IdentifierListItem::SequentialList(_)) => todo!(),
@@ -151,14 +151,14 @@ pub fn create_start_task_event_handler(
                     vec![listen_for_event.clone()],
                     script,
                 );
-                event_handers.push(eh);
+                event_handlers.push(eh);
             }
         }
         (IdentifierListItem::ParallelList(_), IdentifierListItem::SequentialList(_)) => todo!(),
         (IdentifierListItem::ParallelList(_), IdentifierListItem::ParallelList(_)) => todo!(),
     }
 
-    event_handers
+    event_handlers
 }
 
 fn flatten_task_for_start(task: &IdentifierListItem) -> Vec<&str> {
