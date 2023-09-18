@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
 use log::{self, LevelFilter};
 use tokio::sync::mpsc::{self};
-use tui_logger::{self, init_logger, set_default_level, set_level_for_target};
+use tui_logger::{self, init_logger, set_default_level, set_level_for_target, set_log_file};
 use ui::terminal::create_terminal_ui;
 
 mod ui;
@@ -61,6 +61,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 println!("Starting orchestrator...");
 
                 log::info!(target: "task_log", "Log level set to: {log_level}");
+                let log_file = format!("{}/banner.log", engine.get_state_dir().to_str().unwrap());
+                let _ = set_log_file(&log_file); // should probably handle the error that this could produce.
                 log::debug!(target: "task_log", "Creating channels");
                 let (tx, rx) = mpsc::channel(100);
 

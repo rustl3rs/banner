@@ -1,7 +1,10 @@
 use std::{collections::HashSet, error::Error, fmt::Display, fs, path::PathBuf};
 
 use banner_parser::{
-    ast::{self, IdentifierListItem, Import, JobSpecification, PipelineSpecification},
+    ast::{
+        self, IdentifierListItem, Import, JobSpecification, PipelineSpecification,
+        TaskSpecification,
+    },
     grammar::{BannerParser, Rule},
     image_ref::{self, ImageRefParser},
     FromPest, Iri, Parser,
@@ -14,6 +17,7 @@ use crate::{
     event_handler::EventHandler,
     event_handlers::{
         get_eventhandlers_for_job, get_eventhandlers_for_pipeline, get_eventhandlers_for_task,
+        get_eventhandlers_for_task_definition,
     },
     listen_for_events::matching_banner_metadata,
     Event, Metadata, MountPoint, Tag, TaskDefinition, TaskResource, MATCHING_TAG,
@@ -155,50 +159,66 @@ fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sy
     }
 
     // 3. annotate all tasks with their task, job and pipeline names
-    for task in ast.tasks.iter_mut() {
-        // first the task tag
-        let task_tag = Tag::new_banner_task(&task.name);
-        task.tags.push(ast::Tag {
-            key: task_tag.key().to_string(),
-            value: task_tag.value().to_string(),
-        });
+    // A task can be reused in multiple jobs, so we need to create a new task definition for each
+    // task described in the job descriptions and annotate them with the job and pipeline names.
+    // While this is particularly wasteful on memory, it makes it easier to reason about the
+    // tasks and their relationships to jobs and pipelines. It also allows for diversions in the
+    // future where we might want to add additional information to the task definitions, or allow for
+    // "inheritance" of tasks from other tasks. I can imagine a scenario where multiple tasks are
+    // essentially the same, but with minor differences. Rather than copy and paste the task, we
+    // can simply create a new task that inherits from the original task and then override the
+    // differences.
+    // This is a tradeoff between memory and flexibility.
+    let bare_tasks = ast.tasks.clone();
+    let mut unused_tasks = ast.tasks.clone();
+    let mut annotated_tasks: Vec<TaskSpecification> = vec![];
+    for job in ast.jobs.iter() {
+        // println!("--------> ANNOTATE job = {:#?}", job.name);
+        for task in job.all_tasks().into_iter() {
+            let bare_task = bare_tasks
+                .iter()
+                .find(|t| t.name == task)
+                .expect("Failed to find task");
+            let mut annotated_task = bare_task.clone();
+            unused_tasks.retain(|t| t != bare_task);
 
-        // job tag
-        let job_name = ast.jobs.iter().find_map(|job| {
-            match ident_list_contains_item(&job.tasks, &task.name) {
-                true => Some(&job.name),
-                false => None,
-            }
-        });
-        let job_name = match job_name {
-            Some(job) => job,
-            None => "_",
-        };
+            // add the task tag
+            let task_tag = Tag::new_banner_task(&task);
+            annotated_task.tags.push(ast::Tag {
+                key: task_tag.key().to_string(),
+                value: task_tag.value().to_string(),
+            });
 
-        let job_tag = Tag::new_banner_job(job_name);
-        task.tags.push(ast::Tag {
-            key: job_tag.key().to_string(),
-            value: job_tag.value().to_string(),
-        });
+            // add the job tag
+            let job_tag = Tag::new_banner_job(&job.name);
+            annotated_task.tags.push(ast::Tag {
+                key: job_tag.key().to_string(),
+                value: job_tag.value().to_string(),
+            });
 
-        // and now the pipeline tag.
-        let pipeline_name =
-            ast.pipelines.iter().find_map(|pipeline| {
-                match ident_list_contains_item(&pipeline.jobs, &job_name) {
+            let pipeline_name = ast.pipelines.iter().find_map(|pipeline| {
+                match ident_list_contains_item(&pipeline.jobs, &job.name) {
                     true => Some(&pipeline.name),
                     false => None,
                 }
             });
-        let pipeline_name = match pipeline_name {
-            Some(pipeline) => pipeline,
-            None => "_",
-        };
-        let pipeline_tag = Tag::new_banner_pipeline(pipeline_name);
-        task.tags.push(ast::Tag {
-            key: pipeline_tag.key().to_string(),
-            value: pipeline_tag.value().to_string(),
-        });
+
+            // add the pipeline tag
+            let pipeline_name = match pipeline_name {
+                Some(pipeline) => pipeline,
+                None => "_",
+            };
+            let pipeline_tag = Tag::new_banner_pipeline(pipeline_name);
+            annotated_task.tags.push(ast::Tag {
+                key: pipeline_tag.key().to_string(),
+                value: pipeline_tag.value().to_string(),
+            });
+
+            annotated_tasks.push(annotated_task);
+        }
     }
+    ast.tasks = annotated_tasks;
+    ast.tasks.extend(unused_tasks);
 
     Ok(())
 }
@@ -227,12 +247,12 @@ fn ident_list_contains_item(list: &Vec<IdentifierListItem>, item: &str) -> bool 
 }
 
 fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
-    let tasks = ast
+    let tasks: Vec<TaskDefinition> = ast
         .tasks
         .iter()
         .map(|task| {
             let mut task_def = TaskDefinition::from(task);
-            tracing::trace!("task.image = {}", task.image);
+            tracing::trace!("task = {:?}", task);
             if task.image.contains("${") {
                 // do variable substitution on images
                 let replacement = ast
@@ -279,50 +299,56 @@ fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
 
     // Must convert tasks, jobs and pipelines for now.
     // In future must also support free floating `on_event`
-    let task_events: Vec<EventHandler> = ast
-        .tasks
+    // let task_events: Vec<EventHandler> = ast
+    //     .tasks
+    //     .iter()
+    //     .map(|task| {
+    //         log::trace!(target: "task_log", "Getting event handlers for task: {}", task.name);
+    //         let jobs: Vec<&JobSpecification> = ast
+    //             .jobs
+    //             .iter()
+    //             .filter(|job| ident_list_contains_item(&job.tasks, &task.name))
+    //             .collect();
+    //         if jobs.len() > 0 {
+    //             jobs.iter()
+    //                 .map(|job| {
+    //                     let pipelines: Vec<&PipelineSpecification> = ast
+    //                         .pipelines
+    //                         .iter()
+    //                         .filter(|pipeline| ident_list_contains_item(&pipeline.jobs, &job.name))
+    //                         .collect();
+    //                     if pipelines.len() > 0 {
+    //                         pipelines
+    //                             .iter()
+    //                             .map(|pipeline| {
+    //                                 let veh: Vec<EventHandler> = get_eventhandlers_for_task(
+    //                                     Some(*pipeline),
+    //                                     Some(*job),
+    //                                     &task,
+    //                                 );
+    //                                 veh
+    //                             })
+    //                             .flatten()
+    //                             .collect()
+    //                     } else {
+    //                         let veh: Vec<EventHandler> =
+    //                             get_eventhandlers_for_task(None, Some(*job), &task);
+    //                         veh
+    //                     }
+    //                 })
+    //                 .flatten()
+    //                 .collect()
+    //         } else {
+    //             let veh: Vec<EventHandler> = get_eventhandlers_for_task(None, None, &task);
+    //             veh
+    //         }
+    //     })
+    //     .flatten()
+    //     .collect();
+
+    let task_events: Vec<EventHandler> = tasks
         .iter()
-        .map(|task| {
-            log::trace!(target: "task_log", "Getting event handlers for task: {}", task.name);
-            let jobs: Vec<&JobSpecification> = ast
-                .jobs
-                .iter()
-                .filter(|job| ident_list_contains_item(&job.tasks, &task.name))
-                .collect();
-            if jobs.len() > 0 {
-                jobs.iter()
-                    .map(|job| {
-                        let pipelines: Vec<&PipelineSpecification> = ast
-                            .pipelines
-                            .iter()
-                            .filter(|pipeline| ident_list_contains_item(&pipeline.jobs, &job.name))
-                            .collect();
-                        if pipelines.len() > 0 {
-                            pipelines
-                                .iter()
-                                .map(|pipeline| {
-                                    let veh: Vec<EventHandler> = get_eventhandlers_for_task(
-                                        Some(*pipeline),
-                                        Some(*job),
-                                        &task,
-                                    );
-                                    veh
-                                })
-                                .flatten()
-                                .collect()
-                        } else {
-                            let veh: Vec<EventHandler> =
-                                get_eventhandlers_for_task(None, Some(*job), &task);
-                            veh
-                        }
-                    })
-                    .flatten()
-                    .collect()
-            } else {
-                let veh: Vec<EventHandler> = get_eventhandlers_for_task(None, None, &task);
-                veh
-            }
-        })
+        .map(|task| get_eventhandlers_for_task_definition(task))
         .flatten()
         .collect();
 

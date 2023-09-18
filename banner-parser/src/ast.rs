@@ -4,7 +4,7 @@ use crate::{from_pest::FromPest, grammar::Rule};
 
 use pest::iterators::{Pair, Pairs};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum StringLiteral {
     RawString(u8, String),
     StringLiteral(String),
@@ -66,7 +66,7 @@ impl StringLiteral {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct TaskSpecification {
     pub tags: Vec<Tag>,
     pub name: String,
@@ -140,7 +140,7 @@ impl<'pest> FromPest<'pest> for TaskSpecification {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Tag {
     pub key: String,
     pub value: String,
@@ -408,7 +408,7 @@ impl<'pest> FromPest<'pest> for ImageDefinition {
 // #[derive(Debug, Clone, Default)]
 // pub type IdentifierList = Vec<IdentifierListItem>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IdentifierListItem {
     Identifier(String),
     SequentialList(Vec<IdentifierListItem>),
@@ -474,16 +474,50 @@ impl Display for IdentifierListItem {
     }
 }
 
-impl PartialEq for IdentifierListItem {
-    fn eq(&self, _other: &Self) -> bool {
-        todo!()
-    }
-}
+// impl PartialEq for IdentifierListItem {
+//     fn eq(&self, _other: &Self) -> bool {
+//         todo!()
+//     }
+// }
 
 #[derive(Debug, Clone, Default)]
 pub struct JobSpecification {
     pub name: String,
     pub tasks: Vec<IdentifierListItem>,
+}
+
+impl JobSpecification {
+    pub fn all_tasks(&self) -> Vec<String> {
+        let mut tasks = Vec::<String>::new();
+        for task in self.tasks.iter() {
+            match task {
+                IdentifierListItem::Identifier(task_name) => {
+                    tasks.push(task_name.to_string());
+                }
+                IdentifierListItem::SequentialList(task_list) => {
+                    for task in task_list.iter() {
+                        match task {
+                            IdentifierListItem::Identifier(task_name) => {
+                                tasks.push(task_name.to_string());
+                            }
+                            _ => panic!("expected IdentifierListItem::Identifier"),
+                        }
+                    }
+                }
+                IdentifierListItem::ParallelList(task_list) => {
+                    for task in task_list.iter() {
+                        match task {
+                            IdentifierListItem::Identifier(task_name) => {
+                                tasks.push(task_name.to_string());
+                            }
+                            _ => panic!("expected IdentifierListItem::Identifier"),
+                        }
+                    }
+                }
+            }
+        }
+        tasks
+    }
 }
 
 impl<'pest> FromPest<'pest> for JobSpecification {

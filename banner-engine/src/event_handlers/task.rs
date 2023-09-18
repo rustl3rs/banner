@@ -1,8 +1,10 @@
 use banner_parser::ast::{self, IdentifierListItem, JobSpecification, PipelineSpecification};
+use itertools::Itertools;
 
 use crate::{
     event_handler::EventHandler, ListenForEvent, ListenForEventType, ListenForSystemEventResult,
-    ListenForSystemEventScope, ListenForSystemEventType, Metadata, Select::*,
+    ListenForSystemEventScope, ListenForSystemEventType, Metadata, Select::*, TaskDefinition,
+    JOB_TAG, PIPELINE_TAG, TASK_TAG,
 };
 
 pub fn get_eventhandlers_for_task(
@@ -26,9 +28,9 @@ pub fn get_eventhandlers_for_task(
     let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
         ListenForSystemEventType::Trigger(Only(ListenForSystemEventScope::Task)),
     )))
-    .with_task_name(&task.name)
-    .with_job_name(job_name)
     .with_pipeline_name(pipeline_name)
+    .with_job_name(job_name)
+    .with_task_name(&task.name)
     .build();
     let script = generate_execute_task_script("", pipeline_name, job_name, &task.name); // TODO: fix scope
     let eh = EventHandler::new(
@@ -36,6 +38,45 @@ pub fn get_eventhandlers_for_task(
         vec![listen_for_event],
         script,
     );
+    vec![eh]
+}
+
+pub fn get_eventhandlers_for_task_definition(task_def: &TaskDefinition) -> Vec<EventHandler> {
+    let mut tags: Vec<Metadata> = task_def.tags().iter().map(|tag| tag.clone()).collect_vec();
+    let task_name = task_def
+        .tags()
+        .iter()
+        .find(|tag| tag.key() == TASK_TAG)
+        .unwrap()
+        .value()
+        .clone();
+    let job_name = task_def
+        .tags()
+        .iter()
+        .find(|tag| tag.key() == JOB_TAG)
+        .unwrap()
+        .value()
+        .clone();
+    let pipeline_name = task_def
+        .tags()
+        .iter()
+        .find(|tag| tag.key() == PIPELINE_TAG)
+        .unwrap()
+        .value()
+        .clone();
+    let description_tag =
+        Metadata::new_banner_description(&format!("Execute the task: {}", task_name));
+    tags.extend(vec![description_tag]);
+
+    let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+        ListenForSystemEventType::Trigger(Only(ListenForSystemEventScope::Task)),
+    )))
+    .with_pipeline_name(pipeline_name)
+    .with_job_name(job_name)
+    .with_task_name(task_name)
+    .build();
+    let script = generate_execute_task_script("", pipeline_name, job_name, task_name); // TODO: fix scope
+    let eh = EventHandler::new(tags, vec![listen_for_event], script);
     vec![eh]
 }
 

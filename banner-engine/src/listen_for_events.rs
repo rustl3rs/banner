@@ -227,11 +227,11 @@ pub enum ListenForSystemEventResult {
 impl Display for ListenForSystemEventResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ListenForSystemEventResult::Success => write!(f, "success"),
-            ListenForSystemEventResult::Failed => write!(f, "failed"),
-            ListenForSystemEventResult::Aborted => write!(f, "aborted"),
-            ListenForSystemEventResult::Errored => write!(f, "errored"),
-            // ListenForSystemEventResult::Incomplete => write!(f, "incomplete"),
+            ListenForSystemEventResult::Success => write!(f, "Success"),
+            ListenForSystemEventResult::Failed => write!(f, "Failed"),
+            ListenForSystemEventResult::Aborted => write!(f, "Aborted"),
+            ListenForSystemEventResult::Errored => write!(f, "Errored"),
+            // ListenForSystemEventResult::Incomplete => write!(f, "Incomplete"),
         }
     }
 }

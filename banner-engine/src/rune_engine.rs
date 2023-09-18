@@ -4,8 +4,8 @@ use rune::Any;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    Engine, Event, EventType, SystemEventResult, SystemEventScope, SystemEventType, JOB_TAG,
-    PIPELINE_TAG, TASK_TAG,
+    Engine, Event, EventType, Metadata, SystemEventResult, SystemEventScope, SystemEventType,
+    JOB_TAG, PIPELINE_TAG, TASK_TAG,
 };
 
 #[derive(Any)]
@@ -35,7 +35,7 @@ impl<'a> RuneEngineWrapper {
         .await;
 
         self.engine
-            .set_state_for_id(&format!("{}/{}/{}", "", pipeline, job), "running".into());
+            .set_state_for_id(&format!("{}/{}/{}", "", pipeline, job), "Running".into());
     }
 
     pub async fn trigger_task(&self, pipeline: &str, job: &str, task: &str) {
@@ -67,8 +67,10 @@ impl<'a> RuneEngineWrapper {
         .send_from(&self.tx)
         .await;
 
-        self.engine
-            .set_state_for_id(&format!("{}/{}/{}", "", pipeline, job), "success".into());
+        let _ = self.engine.set_state_for_id(
+            &format!("{}/{}/{}", "", pipeline, job),
+            SystemEventResult::Success.to_string(),
+        );
     }
 
     pub async fn job_fail(&self, pipeline: &str, job: &str) {
@@ -81,8 +83,10 @@ impl<'a> RuneEngineWrapper {
         .send_from(&self.tx)
         .await;
 
-        self.engine
-            .set_state_for_id(&format!("{}/{}/{}", "", pipeline, job), "failure".into());
+        let _ = self.engine.set_state_for_id(
+            &format!("{}/{}/{}", "", pipeline, job),
+            SystemEventResult::Failed.to_string(),
+        );
     }
 
     pub async fn task_success(&self, pipeline: &str, job: &str, task: &str) {
@@ -212,12 +216,9 @@ impl<'a> RuneEngineWrapper {
             .find(|md| md.key() == JOB_TAG)
             .unwrap()
             .value();
-        let task = event
-            .metadata()
-            .iter()
-            .find(|md| md.key() == TASK_TAG)
-            .unwrap()
-            .value();
-        (pipeline, job, task)
+        match event.metadata().iter().find(|md| md.key() == TASK_TAG) {
+            Some(task) => (pipeline, job, task.value()),
+            None => (pipeline, job, ""),
+        }
     }
 }

@@ -1,47 +1,52 @@
-import https://gist.githubusercontent.com/pms1969/464d6304014f9376be7e07b3ccf3a972/raw/a929e3feccd5384a00fe4e7ce6431f46dbb02951/cowsay.ban
-
 [tag: rustl3rs.com/owner=pms1969]
 task test(image: rust:latest, execute: "bash -exo pipefail -c") {
     r#"
-    cd /source-code
-
-    # would be good to capture code coverage stats here.
-    cargo test
+    sleep $(( ( RANDOM % 10 )  + 1 ))
+    echo "hello $BANNER_PIPELINE/$BANNER_JOB/$BANNER_TASK"
     "#
 }
 
-job unit-test [
-    cowsay,
+job coverage [
     test,
 ]
 
-job coverage [
-    cowsay,
+job unit-test [
+    test,
 ]
 
 job another-job [
-    cowsay,
+    test,
 ]
 
 job pre-load [
-    cowsay,
+    test,
 ]
 
 job finish [
-    cowsay,
+    test,
+]
+
+job sonarqube [
+    test,
 ]
 
 job test_j1 [
-    cowsay,
+    test,
 ]
 
 job test_j2 [
-    cowsay,
+    test,
+]
+job test_j3 [
+    test,
+]
+job test_j4 [
+    test,
 ]
 
 pipeline banner [
     pre-load,
-    { unit-test, [coverage, sonarqube, {test_j1, [test_j2, test_j1]}], [another-job, test_j1] },
+    { unit-test, [coverage, sonarqube, {test_j1, [test_j2, test_j3]}], [another-job, test_j4] },
     finish,
 ]
 

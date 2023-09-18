@@ -150,6 +150,7 @@ pub enum ImageRepositoryCredentials {
 
 impl From<&TaskSpecification> for TaskDefinition {
     fn from(task: &TaskSpecification) -> Self {
+        tracing::trace!("TaskSpec: {:?}", task);
         let tags = task
             .tags
             .iter()

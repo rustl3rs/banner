@@ -5,6 +5,7 @@ use backon::ConstantBuilder;
 use backon::Retryable;
 use banner_engine::HostPath;
 use banner_engine::PipelineSpecification;
+use banner_engine::Tag;
 use banner_engine::{
     build_and_validate_pipeline, Engine, ExecutionResult, Pipeline, TaskDefinition, JOB_TAG,
     PIPELINE_TAG, TASK_TAG,
@@ -61,6 +62,10 @@ impl LocalEngine {
             },
             state: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    pub fn get_state_dir(&self) -> &PathBuf {
+        &self.state_dir
     }
 
     pub async fn with_pipeline_from_file(
@@ -274,12 +279,17 @@ impl Engine for LocalEngine {
     async fn execute_task_name_in_scope(
         &self,
         _scope_name: &str,
-        _pipeline_name: &str,
-        _job_name: &str,
+        pipeline_name: &str,
+        job_name: &str,
         task_name: &str,
     ) -> Result<ExecutionResult, Box<dyn Error + Send + Sync>> {
-        let pipelines = self.pipelines.clone();
-        let task_definition: &TaskDefinition = get_task_definition(&pipelines, task_name);
+        let tags = vec![
+            Tag::new(PIPELINE_TAG, pipeline_name),
+            Tag::new(JOB_TAG, job_name),
+            Tag::new(TASK_TAG, task_name),
+        ];
+
+        let task_definition: &TaskDefinition = get_task_definition_for_tags(&self.pipelines, &tags);
         self.execute(task_definition).await
     }
 
@@ -327,6 +337,25 @@ fn get_task_definition<'a>(pipelines: &'a Vec<Pipeline>, task_name: &'a str) -> 
             )
         })
         .unwrap()
+}
+
+// return a TaskDefinition for a set of Tags from a given pipeline.
+fn get_task_definition_for_tags<'a>(
+    pipelines: &'a Vec<Pipeline>,
+    tags: &'a Vec<Tag>,
+) -> &'a TaskDefinition {
+    let tasks: Vec<&TaskDefinition> = pipelines
+        .iter()
+        .map(|pipeline| pipeline.tasks.iter())
+        .flatten()
+        .filter(|task| tags.iter().all(|tag| task.tags().contains(tag)))
+        .collect();
+
+    if tasks.len() > 1 {
+        panic!("more than one task found for tags: {tags:?}");
+    }
+
+    tasks.first().unwrap()
 }
 
 async fn stream_logs_from_container_to_stdout(

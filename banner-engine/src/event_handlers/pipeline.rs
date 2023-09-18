@@ -151,31 +151,107 @@ pub fn get_eventhandlers_for_pipeline(pipeline: &ast::PipelineSpecification) -> 
         return event_handlers;
     }
 
-    let mut iterator = pipeline.jobs.iter().rev();
-    let mut some_job = iterator.next();
-
-    // Create event handler to emit an event when the last job finishes.
-    if let Some(job) = some_job {
-        let mut veh = create_finished_pipeline_event_handler(pipeline, job);
-        event_handlers.append(&mut veh);
-    }
-
-    while let Some(job) = some_job {
-        // For every job we need to create:
-        //   * an event handler to trigger on successful completion of the previous job.
-        let next = iterator.clone().next();
-        tracing::trace!("get_eventhandlers_for_pipeline: job: {job:?}, next: {next:?}");
-        if next.is_some() {
-            let mut eh = create_start_pipeline_job_event_handler(pipeline, job, next.unwrap());
-            event_handlers.append(&mut eh);
-        } else {
-            // Create event handler to accept pipeline triggers.  This event will only ever
-            // emit another event which is a trigger to the first job(s) defined.
+    let first_job = match pipeline.jobs.first() {
+        Some(job) => {
             let eh = create_start_pipeline_event_handler(pipeline, job);
             event_handlers.push(eh);
+            job
         }
-        some_job = iterator.next();
+        None => return event_handlers,
+    };
+
+    // if there was a last, there is most certainly a first.
+    let last_job = pipeline.jobs.last().unwrap();
+    let mut eh = create_finished_pipeline_event_handler(pipeline, last_job);
+    event_handlers.append(&mut eh);
+
+    // no point continuing if there is only one job.
+    if last_job == first_job {
+        return event_handlers;
     }
+
+    let mut iterator = pipeline.jobs.iter();
+    let _ = iterator.next();
+
+    let eh = get_event_handlers_for_job_type(pipeline, first_job, &mut iterator);
+    event_handlers.extend(eh);
+
+    event_handlers
+}
+
+fn get_event_handlers_for_job_type(
+    pipeline: &PipelineSpecification,
+    current_job: &IdentifierListItem,
+    iterator: &mut std::slice::Iter<'_, IdentifierListItem>,
+) -> Vec<EventHandler> {
+    let mut event_handlers: Vec<EventHandler> = vec![];
+    let next_job = iterator.next();
+
+    log::debug!(
+        target: "task_log",
+        "get_event_handlers_for_job_type: Current Job is {current_job:?}"
+    );
+
+    if next_job.is_none() {
+        log::debug!(
+            target: "task_log",
+            "get_event_handlers_for_job_type: Next Job is NONE"
+        );
+        return event_handlers;
+    }
+
+    let next_job = next_job.unwrap();
+    match next_job {
+        IdentifierListItem::Identifier(_) => {
+            log::debug!(
+                target: "task_log",
+                "get_event_handlers_for_job_type: NEXT JOB: {next_job:?}"
+            );
+            let eh = create_start_pipeline_job_event_handler(&pipeline.name, current_job, next_job);
+            event_handlers.extend(eh);
+        }
+        IdentifierListItem::ParallelList(list) => {
+            log::debug!(
+                target: "task_log",
+                "get_event_handlers_for_job_type: parallel list: {list:?}"
+            );
+            let eh = create_start_pipeline_job_event_handler(&pipeline.name, current_job, next_job);
+            event_handlers.extend(eh);
+
+            for job in list.iter() {
+                match job {
+                    IdentifierListItem::Identifier(_) => (),
+                    IdentifierListItem::SequentialList(list) => {
+                        let mut iter = list.iter();
+                        let _ = iter.next();
+                        let eh = get_event_handlers_for_job_type(
+                            pipeline,
+                            list.first().unwrap(),
+                            &mut iter,
+                        );
+                        event_handlers.extend(eh);
+                    }
+                    IdentifierListItem::ParallelList(_) => todo!(),
+                }
+            }
+        }
+        IdentifierListItem::SequentialList(list) => {
+            log::debug!(
+                target: "task_log",
+                "get_event_handlers_for_job_type: seq list: {list:?}"
+            );
+            let eh = create_start_pipeline_job_event_handler(&pipeline.name, current_job, next_job);
+            event_handlers.extend(eh);
+
+            let mut iter = list.iter();
+            let _ = iter.next();
+            let eh = get_event_handlers_for_job_type(pipeline, list.first().unwrap(), &mut iter);
+            event_handlers.extend(eh);
+        }
+    }
+
+    let eh = get_event_handlers_for_job_type(pipeline, next_job, iterator);
+    event_handlers.extend(eh);
 
     event_handlers
 }

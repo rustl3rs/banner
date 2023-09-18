@@ -11,6 +11,7 @@ pub fn get_eventhandlers_for_job(
     pipeline: Option<&ast::PipelineSpecification>,
     job: &ast::JobSpecification,
 ) -> Vec<EventHandler> {
+    let mut event_handlers: Vec<EventHandler> = vec![];
     let pipeline = if let Some(pipeline) = pipeline {
         &pipeline.name
     } else {
@@ -20,7 +21,6 @@ pub fn get_eventhandlers_for_job(
     //   * an EH to trigger the first task in the job
     //   * an EH per other task in the job that triggers that task on the completion of the task preceeding it.
     //   * an EH to deal with the successful completion of the last task in the pipeline
-    let mut event_handlers: Vec<EventHandler> = vec![];
     if job.tasks.len() == 0 {
         let eh = create_start_empty_job_event_handler(pipeline, job);
         event_handlers.push(eh);
@@ -63,20 +63,22 @@ pub fn get_eventhandlers_for_job(
 ///
 /// Should not panic.
 pub fn create_start_pipeline_job_event_handler(
-    pipeline: &ast::PipelineSpecification,
-    job: &IdentifierListItem,
+    pipeline_name: &str,
+    current: &IdentifierListItem,
     next: &IdentifierListItem,
 ) -> Vec<EventHandler> {
-    // TODO: next, is actually a previous job list. The naming here really needs to be sorted out to prevent confusion.
-    //       right now is not that time, but it will be soon.
     let mut event_handlers: Vec<EventHandler> = vec![];
-    match (job, next) {
-        (IdentifierListItem::Identifier(job), IdentifierListItem::Identifier(next)) => {
-            let pipeline_tag = Metadata::new_banner_pipeline(&pipeline.name);
-            let job_tag = Metadata::new_banner_job(job);
+    match (current, next) {
+        (IdentifierListItem::Identifier(job_name), IdentifierListItem::Identifier(nj_name)) => {
+            // nj = next job
+            // The next_job should be triggered when the current job completes.
+            // This is a sequential part of the pipeline, so it's a straight forward one job finishes
+            // and the next job starts.
+            let pipeline_tag = Metadata::new_banner_pipeline(pipeline_name);
+            let job_tag = Metadata::new_banner_job(nj_name);
             let description_tag = Metadata::new_banner_description(&format!(
-                "Trigger the start of the job: {}/{}",
-                &pipeline.name, &job
+                "Trigger the start of the single job: {}/{}",
+                pipeline_name, &nj_name
             ));
             let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
                 ListenForSystemEventType::Done(
@@ -84,71 +86,87 @@ pub fn create_start_pipeline_job_event_handler(
                     Only(ListenForSystemEventResult::Success),
                 ),
             )))
-            .with_pipeline_name(&pipeline.name)
-            .with_job_name(next)
+            .with_pipeline_name(pipeline_name)
+            .with_job_name(job_name)
             .build();
             let eh = EventHandler::new(
                 vec![pipeline_tag, job_tag, description_tag],
                 vec![listen_for_event],
-                generate_start_job_script(job, &pipeline.name),
+                generate_start_job_script(pipeline_name, nj_name),
             );
             event_handlers.push(eh);
         }
-        (IdentifierListItem::Identifier(_job), IdentifierListItem::SequentialList(_)) => todo!(),
-        (IdentifierListItem::Identifier(job), IdentifierListItem::ParallelList(_)) => {
-            let pipeline_tag = Metadata::new_banner_pipeline(&pipeline.name);
-            let job_tag = Metadata::new_banner_job(job);
-            let description_tag = Metadata::new_banner_description(&format!(
-                "Trigger the start of the job: {}/{}",
-                &pipeline.name, &job
-            ));
-            let previous_jobs = flatten_jobs_for_finish(next);
-            // TODO: pretty sure "execute" is inconsistent with other functions that have start.
-            //       settle on one and make it consistent to avoid confusion.
-            let script = generate_execute_job_after_job_complete("", pipeline, job, &previous_jobs);
+        (IdentifierListItem::Identifier(job_name), IdentifierListItem::SequentialList(_))
+        | (IdentifierListItem::Identifier(job_name), IdentifierListItem::ParallelList(_)) => {
+            // if we have a straight forward job followed by a list of jobs; either parallel
+            // or sequential; then we need to trigger the first job in the list when the current
+            // job finishes.
+            let pipeline_tag = Metadata::new_banner_pipeline(pipeline_name);
 
-            let events = previous_jobs
-                .iter()
-                .map(|_task| {
-                    ListenForEvent::new(ListenForEventType::System(Only(
-                        ListenForSystemEventType::Done(Only(ListenForSystemEventScope::Task), Any),
-                    )))
-                    .with_pipeline_name(&pipeline.name)
-                    .with_job_name(job)
-                    .build()
-                })
-                .collect::<Vec<ListenForEvent>>();
-
-            let eh =
-                EventHandler::new(vec![pipeline_tag, job_tag, description_tag], events, script);
-
-            event_handlers.push(eh);
-        }
-        (IdentifierListItem::SequentialList(_), IdentifierListItem::Identifier(_)) => todo!(),
-        (IdentifierListItem::SequentialList(_), IdentifierListItem::SequentialList(_)) => todo!(),
-        (IdentifierListItem::SequentialList(_), IdentifierListItem::ParallelList(_)) => todo!(),
-        (IdentifierListItem::ParallelList(_), IdentifierListItem::Identifier(next)) => {
-            let pipeline_tag = Metadata::new_banner_pipeline(&pipeline.name);
-            let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+            let lfe = ListenForEvent::new(ListenForEventType::System(Only(
                 ListenForSystemEventType::Done(
                     Only(ListenForSystemEventScope::Job),
                     Only(ListenForSystemEventResult::Success),
                 ),
             )))
-            .with_pipeline_name(&pipeline.name)
-            .with_job_name(next)
+            .with_pipeline_name(pipeline_name)
+            .with_job_name(job_name)
             .build();
 
-            for job in flatten_jobs_for_start(job).iter() {
-                let job_tag = Metadata::new_banner_job(job);
+            let next_jobs = flatten_jobs_for_start(next);
+            for nj in next_jobs {
+                let job_tag = Metadata::new_banner_job(nj);
                 let description_tag = Metadata::new_banner_description(&format!(
-                    "Trigger the start of the task: {}/{}",
-                    &pipeline.name, job
+                    "Trigger the start of the list-job: {}/{}",
+                    pipeline_name, nj
                 ));
-                let script = generate_start_job_script(&pipeline.name, job);
                 let eh = EventHandler::new(
                     vec![pipeline_tag.clone(), job_tag, description_tag],
-                    vec![listen_for_event.clone()],
+                    vec![lfe.clone()],
+                    generate_start_job_script(pipeline_name, nj),
+                );
+                event_handlers.push(eh);
+            }
+        }
+        (IdentifierListItem::SequentialList(_), IdentifierListItem::SequentialList(_)) => todo!(),
+        (IdentifierListItem::SequentialList(_), IdentifierListItem::ParallelList(_)) => todo!(),
+        (IdentifierListItem::SequentialList(_), IdentifierListItem::Identifier(nj_name))
+        | (IdentifierListItem::ParallelList(_), IdentifierListItem::Identifier(nj_name)) => {
+            // if we have any list type before a straight forward job, then we need to trigger
+            // the next job after all the last jobs in the previous list have finished.
+            let pipeline_tag = Metadata::new_banner_pipeline(pipeline_name);
+            let job_tag = Metadata::new_banner_job(nj_name);
+            let description_tag = Metadata::new_banner_description(&format!(
+                "Trigger the start of the job: {}/{}",
+                pipeline_name, nj_name
+            ));
+
+            let previous_jobs = flatten_jobs_for_finish(current);
+
+            for job in previous_jobs.iter() {
+                let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+                    ListenForSystemEventType::Done(
+                        Only(ListenForSystemEventScope::Job),
+                        Only(ListenForSystemEventResult::Success),
+                    ),
+                )))
+                .with_pipeline_name(pipeline_name)
+                .with_job_name(job)
+                .build();
+
+                let script = generate_execute_job_after_job_complete(
+                    "",
+                    pipeline_name,
+                    nj_name,
+                    &previous_jobs,
+                );
+                let eh = EventHandler::new(
+                    vec![
+                        pipeline_tag.clone(),
+                        job_tag.clone(),
+                        description_tag.clone(),
+                    ],
+                    vec![listen_for_event],
                     script,
                 );
                 event_handlers.push(eh);
@@ -157,28 +175,73 @@ pub fn create_start_pipeline_job_event_handler(
         (IdentifierListItem::ParallelList(_), IdentifierListItem::SequentialList(_)) => todo!(),
         (IdentifierListItem::ParallelList(_), IdentifierListItem::ParallelList(_)) => todo!(),
     }
+
     event_handlers
 }
 
 fn generate_execute_job_after_job_complete(
-    _scope: &str,
-    _pipeline: &ast::PipelineSpecification,
-    _job: &str,
-    _previous_jobs: &[&str],
+    scope: &str,
+    pipeline: &str,
+    job: &str,
+    previous_jobs: &[&str],
 ) -> String {
-    // TODO: this will clearly not work. Fix it to do the right kind of thing.
-    "".to_string()
-}
+    let script_vec = previous_jobs
+        .iter()
+        .map(|job| format!("\"{job}\""))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        r###"pub async fn main (engine, event) {{
+    // mark this job as having completed.
+    let values = engine.get_pipeline_metadata_from_event(event).await;
+    let pipeline = values.0;
+    let job = values.1;
 
-#[allow(dead_code)]
-fn generate_execute_job_after_jobs_complete(
-    _scope: &str,
-    _pipeline: &ast::PipelineSpecification,
-    _job: &str,
-    _previous_jobs: &[&str],
-) -> String {
-    // TODO: this will clearly not work. Fix it to do the right kind of thing.
-    "".to_string()
+    let key = format!("{scope}/{{}}/{{}}", pipeline, job);
+    engine.log_message(format!("========> EVENT - Key {{:?}}", key)).await;
+    match event.get_type() {{
+        EventType::System(event_type) => {{
+            match event_type {{
+                SystemEventType::Done(scope, result) => {{
+                    match scope {{
+                        SystemEventScope::Job => {{
+                            engine.set_state_for_task("latest", key, result).await;
+                        }},
+                        _ => return,
+                    }}
+                }},
+                _ => return,
+            }}
+        }}
+        _ => {{
+            engine.log_message(format!("Result is not a EventType::System")).await;
+            return
+        }},
+    }}
+
+    // if any of the parallel jobs have not completed or failed, then we really do have nothing to do.
+    // return early.
+    for awaiting_job in [{script_vec}] {{
+        let key = format!("{scope}/{pipeline}/{{}}", awaiting_job);
+        let state = engine.get_from_state("latest", key).await;
+        match state {{
+            Some(result) => {{
+                match result {{
+                    SystemEventResult::Success => {{}},
+                    _ => {{
+                        return;
+                    }},
+                }}
+            }}
+            None => {{
+                return;
+            }}
+        }}
+    }}
+
+    engine.trigger_job("{pipeline}", "{job}").await;
+}}"###
+    )
 }
 
 fn flatten_jobs_for_start(job: &IdentifierListItem) -> Vec<&str> {
@@ -225,6 +288,7 @@ pub fn create_start_job_event_handler(
     task: &IdentifierListItem,
 ) -> Vec<EventHandler> {
     let pipeline_tag = Metadata::new_banner_pipeline(pipeline);
+    let job_tag = Metadata::new_banner_job(job);
     let description_tag = Metadata::new_banner_description(&format!(
         "Trigger the start of the job: {}/{}/{}",
         pipeline, job, task
@@ -239,9 +303,10 @@ pub fn create_start_job_event_handler(
     let mut event_handlers: Vec<EventHandler> = vec![];
     match task {
         IdentifierListItem::Identifier(task) => {
+            let task_tag = Metadata::new_banner_job(task);
             let script = generate_start_task_script(pipeline, job, task);
             let eh = EventHandler::new(
-                vec![pipeline_tag, description_tag],
+                vec![pipeline_tag, job_tag, task_tag, description_tag],
                 vec![listen_for_event],
                 script,
             );
@@ -257,8 +322,8 @@ fn create_start_empty_job_event_handler(
     pipeline: &str,
     job: &ast::JobSpecification,
 ) -> EventHandler {
-    let job_tag = Metadata::new_banner_job(&job.name);
     let pipeline_tag = Metadata::new_banner_pipeline(pipeline);
+    let job_tag = Metadata::new_banner_job(&job.name);
     let description_tag = Metadata::new_banner_description(&format!(
         "Trigger the start of empty job: {}/{}",
         pipeline, &job.name
@@ -385,7 +450,7 @@ fn generate_job_with_no_tasks_script(pipeline: &str, job: &str) -> String {
     )
 }
 
-fn generate_start_job_script(job: &str, pipeline: &str) -> String {
+fn generate_start_job_script(pipeline: &str, job: &str) -> String {
     format!(
         r###"pub async fn main (engine, event) {{
             engine.trigger_job("{pipeline}", "{job}").await;

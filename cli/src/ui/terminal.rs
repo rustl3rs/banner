@@ -154,18 +154,11 @@ fn set_status_on_job(
         super::pipeline::pipeline_metadata::IdentifierListItem::Identifier(j) => {
             let job_status =
                 engine.get_state_for_id(&format!("{}/{}/{}", "", pipeline_name, j.name));
-            // log::debug!(target: "task_log",
-            //     "Job status: {}/{}/{} - {:?}",
-            //     "",
-            //     pipeline_name,
-            //     j.name,
-            //     job_status
-            // );
             let js = match job_status {
                 Some(s) => match s.as_str() {
-                    "success" => Status::Success,
-                    "failure" => Status::Failed,
-                    "running" => Status::Running,
+                    "Success" => Status::Success,
+                    "Failure" => Status::Failed,
+                    "Running" => Status::Running,
                     _ => Status::Pending,
                 },
                 None => Status::Pending,
