@@ -4,8 +4,8 @@ use rune::Any;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
-    Engine, Event, EventType, Metadata, SystemEventResult, SystemEventScope, SystemEventType,
-    JOB_TAG, PIPELINE_TAG, TASK_TAG,
+    Engine, Event, EventType, ExecutionStatus, Metadata, SystemEventResult, SystemEventScope,
+    SystemEventType, JOB_TAG, PIPELINE_TAG, TASK_TAG,
 };
 
 #[derive(Any)]
@@ -23,6 +23,11 @@ impl<'a> RuneEngineWrapper {
         .with_pipeline_name(pipeline)
         .send_from(&self.tx)
         .await;
+
+        let _ = self.engine.set_state_for_id(
+            &format!("{}/{}", "", pipeline),
+            ExecutionStatus::Running.to_string(),
+        );
     }
 
     pub async fn trigger_job(&self, pipeline: &str, job: &str) {
@@ -34,8 +39,10 @@ impl<'a> RuneEngineWrapper {
         .send_from(&self.tx)
         .await;
 
-        self.engine
-            .set_state_for_id(&format!("{}/{}/{}", "", pipeline, job), "Running".into());
+        let _ = self.engine.set_state_for_id(
+            &format!("{}/{}/{}", "", pipeline, job),
+            ExecutionStatus::Running.to_string(),
+        );
     }
 
     pub async fn trigger_task(&self, pipeline: &str, job: &str, task: &str) {
@@ -47,6 +54,11 @@ impl<'a> RuneEngineWrapper {
         .with_task_name(task)
         .send_from(&self.tx)
         .await;
+
+        let _ = self.engine.set_state_for_id(
+            &format!("{}/{}/{}/{}", "", pipeline, job, task),
+            ExecutionStatus::Running.to_string(),
+        );
     }
 
     pub async fn log_message(&self, message: &str) {
@@ -69,7 +81,7 @@ impl<'a> RuneEngineWrapper {
 
         let _ = self.engine.set_state_for_id(
             &format!("{}/{}/{}", "", pipeline, job),
-            SystemEventResult::Success.to_string(),
+            ExecutionStatus::Success.to_string(),
         );
     }
 
@@ -85,7 +97,7 @@ impl<'a> RuneEngineWrapper {
 
         let _ = self.engine.set_state_for_id(
             &format!("{}/{}/{}", "", pipeline, job),
-            SystemEventResult::Failed.to_string(),
+            ExecutionStatus::Failed.to_string(),
         );
     }
 
@@ -99,6 +111,11 @@ impl<'a> RuneEngineWrapper {
         .with_task_name(task)
         .send_from(&self.tx)
         .await;
+
+        let _ = self.engine.set_state_for_id(
+            &format!("{}/{}/{}/{}", "", pipeline, job, task),
+            ExecutionStatus::Success.to_string(),
+        );
     }
 
     pub async fn task_fail(&self, pipeline: &str, job: &str, task: &str) {
@@ -111,6 +128,11 @@ impl<'a> RuneEngineWrapper {
         .with_task_name(task)
         .send_from(&self.tx)
         .await;
+
+        let _ = self.engine.set_state_for_id(
+            &format!("{}/{}/{}/{}", "", pipeline, job, task),
+            ExecutionStatus::Failed.to_string(),
+        );
     }
 
     pub async fn pipeline_success(&self, pipeline: &str) {
@@ -121,6 +143,11 @@ impl<'a> RuneEngineWrapper {
         .with_pipeline_name(pipeline)
         .send_from(&self.tx)
         .await;
+
+        let _ = self.engine.set_state_for_id(
+            &format!("{}/{}", "", pipeline),
+            ExecutionStatus::Success.to_string(),
+        );
     }
 
     pub async fn pipeline_fail(&self, pipeline: &str) {
@@ -131,6 +158,11 @@ impl<'a> RuneEngineWrapper {
         .with_pipeline_name(pipeline)
         .send_from(&self.tx)
         .await;
+
+        let _ = self.engine.set_state_for_id(
+            &format!("{}/{}", "", pipeline),
+            ExecutionStatus::Failed.to_string(),
+        );
     }
 
     pub async fn execute_task_name_in_scope(
@@ -171,7 +203,7 @@ impl<'a> RuneEngineWrapper {
                 log::warn!(target: "task_log", "get_from_state called on {key} with value {value}, leaving result: {result:?}");
                 match result {
                     Ok(r) => {
-                        log::warn!(target: "task_log", "Some(r): {:?}", Some(r));
+                        log::debug!(target: "task_log", "Some(r): {:?}", Some(r));
                         Some(r)
                     }
                     Err(_) => {
@@ -181,7 +213,7 @@ impl<'a> RuneEngineWrapper {
                 }
             }
             None => {
-                log::error!(target: "task_log", "get_from_state called on {key} which does not exist");
+                log::warn!(target: "task_log", "get_from_state called on {key} which does not exist");
                 None
             }
         }
@@ -192,7 +224,7 @@ impl<'a> RuneEngineWrapper {
         let result = self.engine.set_state_for_id(key, val);
         match result {
             Ok(_) => {
-                log::warn!(target: "task_log", "set_state_for_task called on {key} with value {value}");
+                log::debug!(target: "task_log", "set_state_for_task called on {key} with value {value}");
             }
             Err(e) => {
                 log::error!(target: "task_log", "set_state_for_task called on {key} but persistence failed: {e:?}");

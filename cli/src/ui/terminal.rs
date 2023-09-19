@@ -1,6 +1,6 @@
-use std::{error::Error, io, sync::Arc, time::Duration};
+use std::{error::Error, io, str::FromStr, sync::Arc, time::Duration};
 
-use banner_engine::{Engine, EventType, SystemEventScope, SystemEventType};
+use banner_engine::{Engine, EventType, ExecutionStatus, SystemEventScope, SystemEventType};
 use crossterm::{
     event::{DisableMouseCapture, Event, EventStream, KeyCode},
     execute,
@@ -155,12 +155,15 @@ fn set_status_on_job(
             let job_status =
                 engine.get_state_for_id(&format!("{}/{}/{}", "", pipeline_name, j.name));
             let js = match job_status {
-                Some(s) => match s.as_str() {
-                    "Success" => Status::Success,
-                    "Failure" => Status::Failed,
-                    "Running" => Status::Running,
-                    _ => Status::Pending,
-                },
+                Some(s) => {
+                    let status = ExecutionStatus::from_str(s.as_str()).unwrap();
+                    match status {
+                        ExecutionStatus::Success => Status::Success,
+                        ExecutionStatus::Failed => Status::Failed,
+                        ExecutionStatus::Running => Status::Running,
+                        _ => Status::Pending,
+                    }
+                }
                 None => Status::Pending,
             };
 
