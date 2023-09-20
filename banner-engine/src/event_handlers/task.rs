@@ -43,27 +43,21 @@ pub fn get_eventhandlers_for_task(
 
 pub fn get_eventhandlers_for_task_definition(task_def: &TaskDefinition) -> Vec<EventHandler> {
     let mut tags: Vec<Metadata> = task_def.tags().iter().map(|tag| tag.clone()).collect_vec();
-    let task_name = task_def
-        .tags()
-        .iter()
-        .find(|tag| tag.key() == TASK_TAG)
-        .unwrap()
-        .value()
-        .clone();
-    let job_name = task_def
-        .tags()
-        .iter()
-        .find(|tag| tag.key() == JOB_TAG)
-        .unwrap()
-        .value()
-        .clone();
     let pipeline_name = task_def
         .tags()
         .iter()
         .find(|tag| tag.key() == PIPELINE_TAG)
-        .unwrap()
-        .value()
-        .clone();
+        .map_or("_", |tag| tag.value());
+    let job_name = task_def
+        .tags()
+        .iter()
+        .find(|tag| tag.key() == JOB_TAG)
+        .map_or("_", |tag| tag.value());
+    let task_name = task_def
+        .tags()
+        .iter()
+        .find(|tag| tag.key() == TASK_TAG)
+        .map_or("_", |tag| tag.value());
     let description_tag =
         Metadata::new_banner_description(&format!("Execute the task: {}", task_name));
     tags.extend(vec![description_tag]);

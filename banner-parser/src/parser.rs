@@ -109,7 +109,7 @@ mod banner_parser_tests {
     fn can_parse_uri() {
         let code = r#######"
         import file://./single_task.ban
-        // import https://github.com/rustl3rs/banner/pipeline-assets/echo_task.ban
+        // import https://github.com/rustl3rs/banner/test-pipelines/echo_task.ban
         "#######;
 
         check(code, expect!["()"])
@@ -118,7 +118,7 @@ mod banner_parser_tests {
     #[traced_test]
     #[test]
     fn can_parse_banner_pipeline() {
-        let code = fs::read_to_string("../pipeline-assets/banner-pipeline-get-only.ban")
+        let code = fs::read_to_string("../test-pipelines/get-only.ban")
             .expect("Should have been able to read the file");
 
         check(&code, expect!["()"])
