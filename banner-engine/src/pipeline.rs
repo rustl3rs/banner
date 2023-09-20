@@ -846,6 +846,17 @@ mod event_handler_creation_tests {
         check_pipeline(ast, expect![[r####"
             [{
                 listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Trigger the start of the pipeline: test/unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "unit-test").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
                     ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-prod] },
                 tags:
                     banner.dev/pipeline: test,
@@ -868,38 +879,14 @@ mod event_handler_creation_tests {
                 "###
             }, {
                 listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: sit-test] },
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
                 tags:
                     banner.dev/pipeline: test,
-                    banner.dev/job: deploy-prod,
-                    banner.dev/description: Trigger the start of the job: test/deploy-prod,
+                    banner.dev/job: build-artefacts,
+                    banner.dev/description: Trigger the start of the single job: test/build-artefacts,
                 script: ###"
                     pub async fn main (engine, event) {
-                        engine.trigger_job("test", "deploy-prod").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-qa] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/job: sit-test,
-                    banner.dev/description: Trigger the start of the job: test/sit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "sit-test").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-ci] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/job: deploy-qa,
-                    banner.dev/description: Trigger the start of the job: test/deploy-qa,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "deploy-qa").await;
+                        engine.trigger_job("test", "build-artefacts").await;
                     }
                 "###
             }, {
@@ -908,7 +895,7 @@ mod event_handler_creation_tests {
                 tags:
                     banner.dev/pipeline: test,
                     banner.dev/job: deploy-ci,
-                    banner.dev/description: Trigger the start of the job: test/deploy-ci,
+                    banner.dev/description: Trigger the start of the single job: test/deploy-ci,
                 script: ###"
                     pub async fn main (engine, event) {
                         engine.trigger_job("test", "deploy-ci").await;
@@ -916,25 +903,38 @@ mod event_handler_creation_tests {
                 "###
             }, {
                 listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-ci] },
                 tags:
                     banner.dev/pipeline: test,
-                    banner.dev/job: build-artefacts,
-                    banner.dev/description: Trigger the start of the job: test/build-artefacts,
+                    banner.dev/job: deploy-qa,
+                    banner.dev/description: Trigger the start of the single job: test/deploy-qa,
                 script: ###"
                     pub async fn main (engine, event) {
-                        engine.trigger_job("test", "build-artefacts").await;
+                        engine.trigger_job("test", "deploy-qa").await;
                     }
                 "###
             }, {
                 listen_for_events:
-                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-qa] },
                 tags:
                     banner.dev/pipeline: test,
-                    banner.dev/description: Trigger the start of the pipeline: test/unit-test,
+                    banner.dev/job: sit-test,
+                    banner.dev/description: Trigger the start of the single job: test/sit-test,
                 script: ###"
                     pub async fn main (engine, event) {
-                        engine.trigger_job("test", "unit-test").await;
+                        engine.trigger_job("test", "sit-test").await;
+                    }
+                "###
+            }, {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: sit-test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/job: deploy-prod,
+                    banner.dev/description: Trigger the start of the single job: test/deploy-prod,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "deploy-prod").await;
                     }
                 "###
             }]"####]]).await;
@@ -953,6 +953,17 @@ mod event_handler_creation_tests {
 
         check_pipeline(ast, expect![[r####"
             [{
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Trigger the start of the pipeline: test/unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "unit-test").await;
+                    }
+                "###
+            }, {
                 listen_for_events:
                     ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
                 tags:
@@ -974,17 +985,6 @@ mod event_handler_creation_tests {
                         engine.pipeline_fail("test").await;
                     }
                 "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/description: Trigger the start of the pipeline: test/unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "unit-test").await;
-                    }
-                "###
             }]"####]]).await;
     }
 
@@ -1002,6 +1002,17 @@ mod event_handler_creation_tests {
 
         check_pipeline(ast, expect![[r####"
             [{
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Trigger the start of the pipeline: test/unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "unit-test").await;
+                    }
+                "###
+            }, {
                 listen_for_events:
                     ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: build-artefacts] },
                 tags:
@@ -1029,21 +1040,10 @@ mod event_handler_creation_tests {
                 tags:
                     banner.dev/pipeline: test,
                     banner.dev/job: build-artefacts,
-                    banner.dev/description: Trigger the start of the job: test/build-artefacts,
+                    banner.dev/description: Trigger the start of the single job: test/build-artefacts,
                 script: ###"
                     pub async fn main (engine, event) {
                         engine.trigger_job("test", "build-artefacts").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/description: Trigger the start of the pipeline: test/unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "unit-test").await;
                     }
                 "###
             }]"####]]).await;
@@ -1090,6 +1090,8 @@ mod event_handler_creation_tests {
                     ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build] },
                 tags:
                     banner.dev/pipeline: _,
+                    banner.dev/job: build,
+                    banner.dev/job: unit-test,
                     banner.dev/description: Trigger the start of the job: _/build/unit-test,
                 script: ###"
                     pub async fn main (engine, event) {
@@ -1168,6 +1170,8 @@ mod event_handler_creation_tests {
                     ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build] },
                 tags:
                     banner.dev/pipeline: _,
+                    banner.dev/job: build,
+                    banner.dev/job: unit-test,
                     banner.dev/description: Trigger the start of the job: _/build/unit-test,
                 script: ###"
                     pub async fn main (engine, event) {

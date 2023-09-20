@@ -198,7 +198,6 @@ fn generate_execute_job_after_job_complete(
     let job = values.1;
 
     let key = format!("{scope}/{{}}/{{}}", pipeline, job);
-    engine.log_message(format!("========> EVENT - Key {{:?}}", key)).await;
     match event.get_type() {{
         EventType::System(event_type) => {{
             match event_type {{

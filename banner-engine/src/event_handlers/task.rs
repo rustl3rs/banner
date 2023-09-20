@@ -275,8 +275,6 @@ fn generate_execute_task_after_tasks_complete(
     let task = values.2;
 
     let key = format!("{scope}/{{}}/{{}}/{{}}", pipeline, job, task);
-    // engine.log_message(format!("========> EVENT - Key {{:?}}", key)).await;
-    // engine.log_message(format!("=====> EventType1: {{:?}}", event.get_type())).await;
     match event.get_type() {{
         EventType::System(event_type) => {{
             match event_type {{
@@ -284,28 +282,13 @@ fn generate_execute_task_after_tasks_complete(
                     match scope {{
                         SystemEventScope::Task => {{
                             engine.set_state_for_task("latest", key, result).await;
-                            // match result {{
-                            //     SystemEventResult::Success => {{
-                            //         engine.set_state_for_task("latest", key, "success").await;
-                            //     }},
-                            //     SystemEventResult::Failure => {{
-                            //         engine.set_state_for_task("latest", key, "failure").await;
-                            //     }},
-                            //     _ => return,
-                            // }}
                         }},
                         _ => return,
                     }}
                 }},
                 _ => return,
             }}
-            // engine.log_message(format!("=====> EventType: {{}}", event_type)).await;
         }}
-        // Some(result) => {{
-        // }}
-        // None => {{
-        //     panic!("Result is None");
-        // }},
         _ => {{
             engine.log_message(format!("Result is not a EventType::System")).await;
             return
@@ -317,22 +300,16 @@ fn generate_execute_task_after_tasks_complete(
     for awaiting_task in [{script_vec}] {{
         let key = format!("{scope}/{pipeline}/{job}/{{}}", awaiting_task);
         let state = engine.get_from_state("latest", key).await;
-        // engine.log_message(format!("========> EVENT - State {{:?}}", state)).await;
         match state {{
             Some(result) => {{
-                // engine.log_message(format!("========> EVENT - Result {{}}", result)).await;
                 match result {{
-                    SystemEventResult::Success => {{
-                        // engine.log_message(format!("========> EVENT - Task {{}} has completed successfully.", awaiting_task)).await;
-                    }},
+                    SystemEventResult::Success => {{}},
                     _ => {{
-                        // engine.log_message(format!("========> EVENT - Task {{}} has did not completed successfully. You might want to try re-running.", awaiting_task)).await;
                         return;
                     }},
                 }}
             }}
             None => {{
-                // engine.log_message(format!("========> EVENT - Task {{}} has not completed successfully yet. Waiting for it to complete.", awaiting_task)).await;
                 return;
             }}
         }}
@@ -354,14 +331,29 @@ mod script_tests {
         let expect = expect![[r#"
             pub async fn main (engine, event) {
                 // mark this task as having completed.
-                let key = format!("scope/pipeline1/job1/task3");
-                match event {
-                    Some(result) => {
-                        engine.set_state_for_task("latest", key, result).await;
+                let values = engine.get_pipeline_metadata_from_event(event).await;
+                let pipeline = values.0;
+                let job = values.1;
+                let task = values.2;
+
+                let key = format!("scope/{}/{}/{}", pipeline, job, task);
+                match event.get_type() {
+                    EventType::System(event_type) => {
+                        match event_type {
+                            SystemEventType::Done(scope, result) => {
+                                match scope {
+                                    SystemEventScope::Task => {
+                                        engine.set_state_for_task("latest", key, result).await;
+                                    },
+                                    _ => return,
+                                }
+                            },
+                            _ => return,
+                        }
                     }
-                    None => {
-                        return;
-                        // panic!("Result is None");
+                    _ => {
+                        engine.log_message(format!("Result is not a EventType::System")).await;
+                        return
                     },
                 }
 
@@ -370,28 +362,22 @@ mod script_tests {
                 for awaiting_task in ["task1","task2"] {
                     let key = format!("scope/pipeline1/job1/{}", awaiting_task);
                     let state = engine.get_from_state("latest", key).await;
-                    engine.log_message(format!("========> EVENT - State {:?}", state)).await;
                     match state {
                         Some(result) => {
-                            // engine.log_message(format!("========> EVENT - Task {} - result {:?}", awaiting_task, result)).await;
                             match result {
-                                Success => {
-                                    engine.log_message(format!("========> EVENT - Task {} has completed successfully.", awaiting_task)).await;
-                                },
+                                SystemEventResult::Success => {},
                                 _ => {
-                                    engine.log_message(format!("========> EVENT - Task {} has did not complete successfully. You might want to try re-running.", awaiting_task)).await;
                                     return;
                                 },
                             }
                         }
                         None => {
-                            engine.log_message(format!("========> EVENT - Task {} has not completed successfully yet. Waiting for it to complete.", awaiting_task)).await;
                             return;
                         }
                     }
                 }
 
-                engine.execute_task_name_in_scope("scope", "pipeline1", "job1", "task3").await;
+                engine.trigger_task("pipeline1", "job1", "task3").await;
             }"#]];
         let script = generate_execute_task_after_tasks_complete(
             "scope",
