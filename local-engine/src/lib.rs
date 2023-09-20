@@ -38,7 +38,7 @@ use tag_missing_error::TagMissingError;
 //     Path(PathBuf),
 // }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct LocalEngine {
     pipelines: Vec<Pipeline>,
     specifications: Vec<PipelineSpecification>,
@@ -78,7 +78,6 @@ impl LocalEngine {
             Ok((pipeline, mut specifications)) => {
                 self.pipelines.push(pipeline);
                 self.specifications.append(&mut specifications);
-                ()
             }
             Err(e) => {
                 let f = filepath.to_str().unwrap();
@@ -153,9 +152,9 @@ impl Engine for LocalEngine {
         let docker = Docker::connect_with_local_defaults()?;
 
         // construct our container name
-        let pipeline_name = get_task_tag_value(&task, PIPELINE_TAG)?;
-        let job_name = get_task_tag_value(&task, JOB_TAG)?;
-        let task_name = get_task_tag_value(&task, TASK_TAG)?;
+        let pipeline_name = get_task_tag_value(task, PIPELINE_TAG)?;
+        let job_name = get_task_tag_value(task, JOB_TAG)?;
+        let task_name = get_task_tag_value(task, TASK_TAG)?;
         let container_name = format!("banner_{pipeline_name}_{job_name}_{task_name}");
         log::info!(target: "task_log", "Starting container: {container_name}");
 
@@ -165,14 +164,9 @@ impl Engine for LocalEngine {
             ..Default::default()
         };
         let mut ci_logs = docker.create_image(Some(cio), None, None);
-        loop {
-            if let Some(log) = ci_logs.try_next().await? {
-                if let Some(status) = log.status {
-                    log::info!(target: "task_log", "{task_name}: {}", status);
-                }
-                continue;
-            } else {
-                break;
+        while let Some(log) = ci_logs.try_next().await? {
+            if let Some(status) = log.status {
+                log::info!(target: "task_log", "{task_name}: {}", status);
             }
         }
 
@@ -207,16 +201,17 @@ impl Engine for LocalEngine {
             .map(|mount| {
                 let (source, mount_type) = self.get_dir_for_mount_source(
                     &mount.host_path,
-                    &pipeline_name,
-                    &job_name,
-                    &task_name,
+                    pipeline_name,
+                    job_name,
+                    task_name,
                 );
-                let mut m = Mount::default();
-                m.target = Some(mount.container_path.clone());
-                m.source = source;
-                m.typ = mount_type;
-                m.read_only = Some(false);
-                m
+                Mount {
+                    target: Some(mount.container_path.clone()),
+                    source,
+                    typ: mount_type,
+                    read_only: Some(false),
+                    ..Default::default()
+                }
             })
             .collect();
         let host_config = HostConfig {
@@ -257,7 +252,7 @@ impl Engine for LocalEngine {
 
         // TODO: spawn this and a metrics task.
         //       metrics task to gather CPU/Memory and Network usage of the container and make them available for prometheus? emit as metrics events.
-        stream_logs_from_container_to_stdout(&container_name, &task_name).await?;
+        stream_logs_from_container_to_stdout(&container_name, task_name).await?;
 
         // get the container status so we can get it's exit code.
         let inspect_options = InspectContainerOptions { size: false };
@@ -305,10 +300,7 @@ impl Engine for LocalEngine {
     fn get_state_for_id(&self, key: &str) -> Option<String> {
         let hm = self.state.read().unwrap();
         let result = hm.get(key);
-        match result {
-            Some(val) => Some(val.to_string()),
-            None => None,
-        }
+        result.map(|val| val.to_string())
     }
 
     /// Returns a value from state based on the key.
@@ -324,30 +316,14 @@ impl Engine for LocalEngine {
     }
 }
 
-fn get_task_definition<'a>(pipelines: &'a Vec<Pipeline>, task_name: &'a str) -> &'a TaskDefinition {
-    pipelines
-        .iter()
-        .find_map(|pipeline| {
-            Some(
-                pipeline
-                    .tasks
-                    .iter()
-                    .find(|task| (*task).get_name() == task_name)
-                    .unwrap(),
-            )
-        })
-        .unwrap()
-}
-
 // return a TaskDefinition for a set of Tags from a given pipeline.
 fn get_task_definition_for_tags<'a>(
-    pipelines: &'a Vec<Pipeline>,
-    tags: &'a Vec<Tag>,
+    pipelines: &'a [Pipeline],
+    tags: &'a [Tag],
 ) -> &'a TaskDefinition {
     let tasks: Vec<&TaskDefinition> = pipelines
         .iter()
-        .map(|pipeline| pipeline.tasks.iter())
-        .flatten()
+        .flat_map(|pipeline| pipeline.tasks.iter())
         .filter(|task| tags.iter().all(|tag| task.tags().contains(tag)))
         .collect();
 
@@ -389,7 +365,7 @@ async fn remove_container(container_name: &str) -> Result<(), Box<dyn Error + Se
         force: true,
         ..Default::default()
     });
-    Ok(docker.remove_container(&container_name, options).await?)
+    Ok(docker.remove_container(container_name, options).await?)
 }
 
 async fn check_availability_of_docker() -> Result<(), Box<dyn Error + Send + Sync>> {

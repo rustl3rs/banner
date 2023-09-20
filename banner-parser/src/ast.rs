@@ -60,7 +60,7 @@ impl StringLiteral {
         };
         // subtract 1 for the starting `r` char
         // since we are zero based, we don't need to subtract an extra 1 for the ending `"`
-        let count = raw.as_str().find("\"").unwrap() as u8 - 1;
+        let count = raw.as_str().find('\"').unwrap() as u8 - 1;
         let raw = raw.into_inner().next().unwrap().as_str().to_string();
         StringLiteral::RawString(count, raw)
     }
@@ -459,12 +459,12 @@ impl Display for IdentifierListItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IdentifierListItem::SequentialList(tasks) => {
-                for task in tasks.into_iter() {
+                for task in tasks.iter() {
                     write!(f, "{},", task)?
                 }
             }
             IdentifierListItem::ParallelList(tasks) => {
-                for task in tasks.into_iter() {
+                for task in tasks.iter() {
                     write!(f, "{},", task)?
                 }
             }
@@ -583,7 +583,7 @@ pub struct Pipeline {
     pub tasks: Vec<TaskSpecification>,
     pub jobs: Vec<JobSpecification>,
     pub pipelines: Vec<PipelineSpecification>,
-    eoi: EOI,
+    eoi: EndOfInput,
 }
 
 impl<'pest> FromPest<'pest> for Pipeline {
@@ -669,4 +669,4 @@ impl ops::Add<Pipeline> for Pipeline {
 
 #[derive(Debug, Clone, FromPest, Default)]
 #[pest_ast(rule(Rule::EOI))]
-struct EOI;
+struct EndOfInput;

@@ -41,7 +41,7 @@ pub fn create_finished_pipeline_event_handler(
 }
 
 fn create_success_event_listener(pipeline: &str, job: &str) -> ListenForEvent {
-    ListenForEvent::new(ListenForEventType::System(Only(
+    ListenForEvent::new_builder(ListenForEventType::System(Only(
         ListenForSystemEventType::Done(
             Only(ListenForSystemEventScope::Job),
             Only(ListenForSystemEventResult::Success),
@@ -53,7 +53,7 @@ fn create_success_event_listener(pipeline: &str, job: &str) -> ListenForEvent {
 }
 
 fn create_fail_event_listener(pipeline: &str, job: &str) -> ListenForEvent {
-    ListenForEvent::new(ListenForEventType::System(Only(
+    ListenForEvent::new_builder(ListenForEventType::System(Only(
         ListenForSystemEventType::Done(
             Only(ListenForSystemEventScope::Job),
             Only(ListenForSystemEventResult::Failed),
@@ -70,18 +70,18 @@ pub fn create_start_empty_pipeline_event_handler(pipeline: &PipelineSpecificatio
         "Trigger the start of the pipeline: {}",
         &pipeline.name
     ));
-    let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+    let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(Only(
         ListenForSystemEventType::Trigger(Only(ListenForSystemEventScope::Pipeline)),
     )))
     .with_pipeline_name(&pipeline.name)
     .build();
     let script = generate_pipeline_with_no_jobs_script(&pipeline.name);
-    let eh = EventHandler::new(
+
+    EventHandler::new(
         vec![pipeline_tag, description_tag],
         vec![listen_for_event],
         script,
-    );
-    eh
+    )
 }
 
 pub fn create_start_pipeline_event_handler(
@@ -93,7 +93,7 @@ pub fn create_start_pipeline_event_handler(
         "Trigger the start of the pipeline: {}/{}",
         &pipeline.name, &job
     ));
-    let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+    let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(Only(
         ListenForSystemEventType::Trigger(Only(ListenForSystemEventScope::Pipeline)),
     )))
     .with_pipeline_name(&pipeline.name)
@@ -102,30 +102,29 @@ pub fn create_start_pipeline_event_handler(
         IdentifierListItem::Identifier(job) => generate_start_pipeline_script_single_job(&pipeline.name, job),
         IdentifierListItem::SequentialList(_jobs) => panic!("Sequential lists in this context are not supported. This should really never happen, since the parser should have caught this."),
         IdentifierListItem::ParallelList(jobs) => {
-            let start_jobs:Vec<&str> = jobs.iter().map(|j| match j {
+            let start_jobs:Vec<&str> = jobs.iter().flat_map(|j| match j {
                 IdentifierListItem::Identifier(id) => vec![id.as_str()],
                 IdentifierListItem::SequentialList(list) => get_first_jobs_sequential(list),
                 IdentifierListItem::ParallelList(list) => get_all_jobs_parallel(list),
-            }).flatten().collect();
+            }).collect();
             generate_start_pipeline_script_multi_job(&pipeline.name, start_jobs)
         },
     };
-    let eh = EventHandler::new(
+
+    EventHandler::new(
         vec![pipeline_tag, description_tag],
         vec![listen_for_event],
         script,
-    );
-    eh
+    )
 }
 
 fn get_all_jobs_parallel(list: &[IdentifierListItem]) -> Vec<&str> {
     list.iter()
-        .map(|j| match j {
+        .flat_map(|j| match j {
             IdentifierListItem::Identifier(id) => vec![id.as_str()],
             IdentifierListItem::SequentialList(list) => get_first_jobs_sequential(list),
             IdentifierListItem::ParallelList(list) => get_all_jobs_parallel(list),
         })
-        .flatten()
         .collect()
 }
 
@@ -133,8 +132,8 @@ fn get_first_jobs_sequential(list: &[IdentifierListItem]) -> Vec<&str> {
     let first = list.first().unwrap();
     match first {
         IdentifierListItem::Identifier(id) => vec![id.as_str()],
-        IdentifierListItem::SequentialList(list) => get_first_jobs_sequential(&list),
-        IdentifierListItem::ParallelList(list) => get_all_jobs_parallel(&list),
+        IdentifierListItem::SequentialList(list) => get_first_jobs_sequential(list),
+        IdentifierListItem::ParallelList(list) => get_all_jobs_parallel(list),
     }
 }
 
@@ -145,7 +144,7 @@ pub fn get_eventhandlers_for_pipeline(pipeline: &ast::PipelineSpecification) -> 
     //   * an EH to deal with the successful completion of the last job in the pipeline
     tracing::trace!("get_eventhandlers_for_pipeline: pipeline: {pipeline:?}");
     let mut event_handlers: Vec<EventHandler> = vec![];
-    if pipeline.jobs.len() == 0 {
+    if pipeline.jobs.is_empty() {
         let eh = create_start_empty_pipeline_event_handler(pipeline);
         event_handlers.push(eh);
         return event_handlers;

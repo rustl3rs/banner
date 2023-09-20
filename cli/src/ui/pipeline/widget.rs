@@ -9,54 +9,10 @@ use super::{
     pipeline_metadata::{IdentifierListItem, PipelineSpecification},
 };
 
-/// The Canvas widget may be used to draw more detailed figures using braille patterns (each
-/// cell can have a braille character in 8 different positions).
-/// # Examples
-///
-/// ```
-/// # use ratatui::widgets::{Block, Borders};
-/// # use ratatui::layout::Rect;
-/// # use ratatui::widgets::canvas::{Canvas, Shape, Line, Rectangle, Map, MapResolution};
-/// # use ratatui::style::Color;
-/// Canvas::default()
-///     .block(Block::default().title("Canvas").borders(Borders::ALL))
-///     .x_bounds([-180.0, 180.0])
-///     .y_bounds([-90.0, 90.0])
-///     .paint(|ctx| {
-///         ctx.draw(&Map {
-///             resolution: MapResolution::High,
-///             color: Color::White
-///         });
-///         ctx.layer();
-///         ctx.draw(&Line {
-///             x1: 0.0,
-///             y1: 10.0,
-///             x2: 10.0,
-///             y2: 10.0,
-///             color: Color::White,
-///         });
-///         ctx.draw(&Rectangle {
-///             x: 10.0,
-///             y: 20.0,
-///             width: 10.0,
-///             height: 10.0,
-///             color: Color::Red
-///         });
-///     });
-/// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PipelineWidget<'a> {
     block: Option<Block<'a>>,
     pipeline: Option<&'a PipelineSpecification>,
-}
-
-impl<'a> Default for PipelineWidget<'a> {
-    fn default() -> PipelineWidget<'a> {
-        PipelineWidget {
-            block: None,
-            pipeline: None,
-        }
-    }
 }
 
 impl<'a> PipelineWidget<'a> {
@@ -72,7 +28,7 @@ impl<'a> PipelineWidget<'a> {
 }
 
 impl<'a> Widget for PipelineWidget<'a> {
-    fn render(mut self, area: Rect, buf: &mut Buffer) {
+    fn render(self, area: Rect, buf: &mut Buffer) {
         if let Some(block) = self.block {
             block.render(area, buf);
         }
@@ -99,10 +55,10 @@ impl<'a> Widget for PipelineWidget<'a> {
     }
 }
 
-struct Position {
-    x: u16,
-    y: u16,
-}
+// struct Position {
+//     x: u16,
+//     y: u16,
+// }
 
 fn render_job(
     previous_job: Option<&IdentifierListItem>,

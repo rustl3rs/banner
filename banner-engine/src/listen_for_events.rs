@@ -16,7 +16,7 @@ pub struct ListenForEvent {
 }
 
 impl ListenForEvent {
-    pub fn new(r#type: ListenForEventType) -> ListenForEventBuilder {
+    pub fn new_builder(r#type: ListenForEventType) -> ListenForEventBuilder {
         ListenForEventBuilder {
             event: Self {
                 r#type,
@@ -42,7 +42,7 @@ impl ListenForEvent {
                         (Only(ListenForSystemEventScope::Pipeline), SystemEventScope::Pipeline)
                         | (Only(ListenForSystemEventScope::Job), SystemEventScope::Job)
                         | (Only(ListenForSystemEventScope::Task), SystemEventScope::Task) => {
-                            matching_banner_metadata(&self.metadata, &other.metadata())
+                            matching_banner_metadata(&self.metadata, other.metadata())
                         }
                         (Any, _) => true,
                         (_, _) => false,
@@ -58,7 +58,7 @@ impl ListenForEvent {
                     | (
                         Only(ListenForSystemEventScope::EventHandler),
                         SystemEventScope::EventHandler,
-                    ) => matching_banner_metadata(&self.metadata, &other.metadata()),
+                    ) => matching_banner_metadata(&self.metadata, other.metadata()),
                     (Any, _) => true,
                     (_, _) => false,
                 },
@@ -78,7 +78,7 @@ impl ListenForEvent {
                         | (Only(ListenForSystemEventResult::Failed), SystemEventResult::Failed)
                         | (Only(ListenForSystemEventResult::Aborted), SystemEventResult::Aborted)
                         | (Only(ListenForSystemEventResult::Errored), SystemEventResult::Errored)
-                        | (Any, _) => matching_banner_metadata(&self.metadata, &other.metadata()),
+                        | (Any, _) => matching_banner_metadata(&self.metadata, other.metadata()),
                         (_, _) => false,
                     },
                     (_, _) => false,
@@ -89,10 +89,10 @@ impl ListenForEvent {
             | (ListenForEventType::Metric, EventType::Metric)
             | (ListenForEventType::Log, EventType::Log)
             | (ListenForEventType::Notification, EventType::Notification) => {
-                matching_banner_metadata(&self.metadata, &other.metadata())
+                matching_banner_metadata(&self.metadata, other.metadata())
             }
             (ListenForEventType::UserDefined, EventType::UserDefined) => {
-                matching_banner_metadata(&self.metadata, &other.metadata())
+                matching_banner_metadata(&self.metadata, other.metadata())
             }
             (_, _) => false,
         }
@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn lf_events_like_each_other() {
-        let e1 = Event::new(EventType::System(SystemEventType::Done(
+        let e1 = Event::new_builder(EventType::System(SystemEventType::Done(
             SystemEventScope::Task,
             SystemEventResult::Success,
         )))
@@ -252,7 +252,7 @@ mod tests {
         .build();
 
         // exact match
-        let lfe1 = ListenForEvent::new(ListenForEventType::System(Select::Only(
+        let lfe1 = ListenForEvent::new_builder(ListenForEventType::System(Select::Only(
             ListenForSystemEventType::Done(
                 Select::Only(ListenForSystemEventScope::Task),
                 Select::Only(ListenForSystemEventResult::Success),
@@ -273,7 +273,7 @@ mod tests {
         };
 
         // failed task
-        let lfe3 = ListenForEvent::new(ListenForEventType::System(Select::Only(
+        let lfe3 = ListenForEvent::new_builder(ListenForEventType::System(Select::Only(
             ListenForSystemEventType::Done(
                 Select::Only(ListenForSystemEventScope::Task),
                 Select::Only(ListenForSystemEventResult::Failed),
@@ -285,7 +285,7 @@ mod tests {
         .build();
 
         // successful task2
-        let lfe4 = ListenForEvent::new(ListenForEventType::System(Select::Only(
+        let lfe4 = ListenForEvent::new_builder(ListenForEventType::System(Select::Only(
             ListenForSystemEventType::Done(
                 Select::Only(ListenForSystemEventScope::Task),
                 Select::Only(ListenForSystemEventResult::Success),
@@ -297,7 +297,7 @@ mod tests {
         .build();
 
         // any result for task1
-        let lfe5 = ListenForEvent::new(ListenForEventType::System(Select::Only(
+        let lfe5 = ListenForEvent::new_builder(ListenForEventType::System(Select::Only(
             ListenForSystemEventType::Done(
                 Select::Only(ListenForSystemEventScope::Task),
                 Select::Any,
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn construct_log_event() {
-        ListenForEvent::new(ListenForEventType::Log)
+        ListenForEvent::new_builder(ListenForEventType::Log)
             .with_job_name("job_name")
             .with_pipeline_name("pipeline_name")
             .build();

@@ -66,7 +66,7 @@ impl EventHandler {
         match result {
             Ok(_) => (),
             Err(e) => {
-                Event::new(EventType::System(SystemEventType::Done(
+                Event::new_builder(EventType::System(SystemEventType::Done(
                     SystemEventScope::EventHandler,
                     SystemEventResult::Errored,
                 )))
@@ -149,8 +149,8 @@ async fn execute_event_script(
                 let bufvec = buffer.into_inner();
                 let message = std::str::from_utf8(&bufvec);
                 log::error!(target: "task_log", "{}", message.unwrap());
-                Event::new(EventType::Log)
-                    .with_log_message(&message.unwrap())
+                Event::new_builder(EventType::Log)
+                    .with_log_message(message.unwrap())
                     .send_from(&tx)
                     .await;
             }
@@ -165,8 +165,8 @@ async fn execute_event_script(
         let bufvec = buffer.into_inner();
         let message = std::str::from_utf8(&bufvec);
         log::error!(target: "task_log", "{}", message.unwrap());
-        Event::new(EventType::Log)
-            .with_log_message(&message.unwrap())
+        Event::new_builder(EventType::Log)
+            .with_log_message(message.unwrap())
             .send_from(&tx)
             .await;
     }
@@ -176,7 +176,7 @@ async fn execute_event_script(
         tx: tx.clone(),
     };
 
-    let vm = match Vm::new(runtime, Arc::new(unit)).send_execute(&["main"], (wrapper, event)) {
+    let vm = match Vm::new(runtime, Arc::new(unit)).send_execute(["main"], (wrapper, event)) {
         Ok(vm) => vm,
         Err(e) => {
             if !diagnostics.is_empty() {
@@ -186,8 +186,8 @@ async fn execute_event_script(
                 let bufvec = buffer.into_inner();
                 let message = std::str::from_utf8(&bufvec);
                 log::error!(target: "task_log", "{}", message.unwrap());
-                Event::new(EventType::Log)
-                    .with_log_message(&message.unwrap())
+                Event::new_builder(EventType::Log)
+                    .with_log_message(message.unwrap())
                     .send_from(&tx)
                     .await;
             }
@@ -345,15 +345,20 @@ mod tests {
         let (tx, mut rx) = mpsc::channel::<Event>(100);
         let eng = Arc::new(MockEngine {});
 
-        let result =
-            execute_event_script(eng, Event::new(EventType::UserDefined).build(), tx, script).await;
+        let result = execute_event_script(
+            eng,
+            Event::new_builder(EventType::UserDefined).build(),
+            tx,
+            script,
+        )
+        .await;
         assert!(result.is_ok());
         log::debug!("{result:?}");
         let message = rx.recv().await;
         log::debug!("{message:?}");
         assert_eq!(
             message.unwrap(),
-            Event::new(EventType::System(SystemEventType::Trigger(
+            Event::new_builder(EventType::System(SystemEventType::Trigger(
                 SystemEventScope::Pipeline
             )))
             .with_metadata(Metadata::new_banner_pipeline("pipeline_1"))
@@ -362,7 +367,7 @@ mod tests {
         let message = rx.recv().await;
         assert_eq!(
             message.unwrap(),
-            Event::new(EventType::System(SystemEventType::Trigger(
+            Event::new_builder(EventType::System(SystemEventType::Trigger(
                 SystemEventScope::Job
             )))
             .with_metadata(Metadata::new_banner_pipeline("pipeline_1"))
@@ -372,7 +377,7 @@ mod tests {
         let message = rx.recv().await;
         assert_eq!(
             message.unwrap(),
-            Event::new(EventType::System(SystemEventType::Trigger(
+            Event::new_builder(EventType::System(SystemEventType::Trigger(
                 SystemEventScope::Task
             )))
             .with_metadata(Metadata::new_banner_pipeline("pipeline_1"))
@@ -398,23 +403,23 @@ mod event_handler_tests {
     #[tokio::test]
     async fn test_is_listening_for() {
         let tags = vec![];
-        let listen_for_events = vec![ListenForEvent::new(ListenForEventType::System(Only(
-            ListenForSystemEventType::Done(
+        let listen_for_events = vec![ListenForEvent::new_builder(ListenForEventType::System(
+            Only(ListenForSystemEventType::Done(
                 Only(ListenForSystemEventScope::Task),
                 Only(ListenForSystemEventResult::Success),
-            ),
-        )))
+            )),
+        ))
         .build()];
         let script = String::from("");
         let eh = EventHandler::new(tags, listen_for_events, script);
-        let listen_for = Event::new(EventType::System(SystemEventType::Done(
+        let listen_for = Event::new_builder(EventType::System(SystemEventType::Done(
             SystemEventScope::Task,
             SystemEventResult::Success,
         )))
         .build();
         assert!(eh.is_listening_for(&listen_for));
 
-        let listen_for = Event::new(EventType::System(SystemEventType::Done(
+        let listen_for = Event::new_builder(EventType::System(SystemEventType::Done(
             SystemEventScope::Task,
             SystemEventResult::Failed,
         )))

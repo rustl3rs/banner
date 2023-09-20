@@ -11,7 +11,9 @@ pub(crate) enum IdentifierListItem {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct JobSpecification {
+    #[allow(dead_code)]
     pub name: String,
+    #[allow(dead_code)]
     pub tasks: Vec<IdentifierListItem>,
 }
 
@@ -48,7 +50,7 @@ impl Metadata {
     }
 
     pub(crate) fn get_position(&self) -> Option<(u16, u16)> {
-        self.postion.read().unwrap().clone()
+        *self.postion.read().unwrap()
     }
 
     pub(crate) fn get_status(&self) -> Status {

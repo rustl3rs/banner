@@ -7,6 +7,7 @@ use crate::{
     JOB_TAG, PIPELINE_TAG, TASK_TAG,
 };
 
+#[allow(dead_code)]
 pub fn get_eventhandlers_for_task(
     pipeline: Option<&PipelineSpecification>,
     job: Option<&JobSpecification>,
@@ -25,7 +26,7 @@ pub fn get_eventhandlers_for_task(
     let task_tag = Metadata::new_banner_task(&task.name);
     let description_tag =
         Metadata::new_banner_description(&format!("Execute the task: {}", &task.name));
-    let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+    let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(Only(
         ListenForSystemEventType::Trigger(Only(ListenForSystemEventScope::Task)),
     )))
     .with_pipeline_name(pipeline_name)
@@ -42,7 +43,7 @@ pub fn get_eventhandlers_for_task(
 }
 
 pub fn get_eventhandlers_for_task_definition(task_def: &TaskDefinition) -> Vec<EventHandler> {
-    let mut tags: Vec<Metadata> = task_def.tags().iter().map(|tag| tag.clone()).collect_vec();
+    let mut tags: Vec<Metadata> = task_def.tags().iter().cloned().collect_vec();
     let pipeline_name = task_def
         .tags()
         .iter()
@@ -62,7 +63,7 @@ pub fn get_eventhandlers_for_task_definition(task_def: &TaskDefinition) -> Vec<E
         Metadata::new_banner_description(&format!("Execute the task: {}", task_name));
     tags.extend(vec![description_tag]);
 
-    let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+    let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(Only(
         ListenForSystemEventType::Trigger(Only(ListenForSystemEventScope::Task)),
     )))
     .with_pipeline_name(pipeline_name)
@@ -92,7 +93,7 @@ pub fn create_start_task_event_handler(
                 pipeline, &job.name, task
             ));
 
-            let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+            let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(Only(
                 ListenForSystemEventType::Done(
                     Only(ListenForSystemEventScope::Task),
                     Only(ListenForSystemEventResult::Success),
@@ -133,7 +134,7 @@ pub fn create_start_task_event_handler(
             let events = prev_tasks
                 .iter()
                 .map(|task| {
-                    ListenForEvent::new(ListenForEventType::System(Only(
+                    ListenForEvent::new_builder(ListenForEventType::System(Only(
                         ListenForSystemEventType::Done(Only(ListenForSystemEventScope::Task), Any),
                     )))
                     .with_pipeline_name(pipeline)
@@ -158,7 +159,7 @@ pub fn create_start_task_event_handler(
         (IdentifierListItem::ParallelList(_), IdentifierListItem::Identifier(prev)) => {
             let job_tag = Metadata::new_banner_job(&job.name);
             let pipeline_tag = Metadata::new_banner_pipeline(pipeline);
-            let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+            let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(Only(
                 ListenForSystemEventType::Done(
                     Only(ListenForSystemEventScope::Task),
                     Only(ListenForSystemEventResult::Success),
@@ -253,7 +254,7 @@ fn generate_execute_task_after_tasks_complete(
     pipeline: &str,
     job: &str,
     task: &str,
-    parallel_tasks_to_complete: &Vec<&str>,
+    parallel_tasks_to_complete: &[&str],
 ) -> String {
     let script_vec = parallel_tasks_to_complete
         .iter()

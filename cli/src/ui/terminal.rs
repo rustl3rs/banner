@@ -20,10 +20,10 @@ use ratatui::{
 use tokio::{select, sync::mpsc::Sender};
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
 
-use crate::ui::pipeline::pipeline_metadata::PipelineSpecification;
+// use crate::ui::pipeline::;
 
 use super::{
-    pipeline::{job::Status, pipeline::PipelineWidget, pipeline_metadata::IdentifierListItem},
+    pipeline::{IdentifierListItem, PipelineSpecification, PipelineWidget, Status},
     state::{UiLayout, UiState},
 };
 
@@ -69,28 +69,28 @@ pub async fn create_terminal_ui(
 
                         if event == Event::Key(KeyCode::Char('s').into()) {
                             log::info!(target: "task_log", "Start Pipeline UI Event received");
-                            banner_engine::Event::new(EventType::System(SystemEventType::Trigger(SystemEventScope::Pipeline)))
+                            banner_engine::Event::new_builder(EventType::System(SystemEventType::Trigger(SystemEventScope::Pipeline)))
                                 .with_pipeline_name("banner")
                                 .send_from(&tx).await;
                         }
 
                         if event == Event::Key(KeyCode::Char('h').into()) {
                             log::info!(target: "task_log", "Print EventHandler UI Event received");
-                            banner_engine::Event::new(EventType::UserDefined)
+                            banner_engine::Event::new_builder(EventType::UserDefined)
                                 .with_pipeline_name("banner")
                                 .send_from(&tx).await;
                         }
 
                         if event == Event::Key(KeyCode::Char('L').into()) {
                             log::info!(target: "task_log", "FullScreen logs event received");
-                            banner_engine::Event::new(EventType::UserDefined)
+                            banner_engine::Event::new_builder(EventType::UserDefined)
                                 .with_pipeline_name("banner")
                                 .send_from(&tx).await;
                             ui_layout.set_full_screen_logs();
                         }
                         if event == Event::Key(KeyCode::Char('m').into()) {
                             log::info!(target: "task_log", "Multi panel screen event received");
-                            banner_engine::Event::new(EventType::UserDefined)
+                            banner_engine::Event::new_builder(EventType::UserDefined)
                                 .with_pipeline_name("banner")
                                 .send_from(&tx).await;
                             ui_layout.set_multi_panel();
@@ -98,7 +98,7 @@ pub async fn create_terminal_ui(
 
                         if event == Event::Key(KeyCode::Char('E').into()) {
                             log::info!(target: "task_log", "FullScreen Events event received");
-                            banner_engine::Event::new(EventType::UserDefined)
+                            banner_engine::Event::new_builder(EventType::UserDefined)
                                 .with_pipeline_name("banner")
                                 .send_from(&tx).await;
                             ui_layout.set_full_screen_events();
@@ -106,7 +106,7 @@ pub async fn create_terminal_ui(
 
                         if event == Event::Key(KeyCode::Char('P').into()) {
                                                     log::info!(target: "task_log", "FullScreen Pipeline event received");
-                                                    banner_engine::Event::new(EventType::UserDefined)
+                                                    banner_engine::Event::new_builder(EventType::UserDefined)
                                                         .with_pipeline_name("banner")
                                                         .send_from(&tx).await;
                                                     ui_layout.set_full_screen_pipeline();
@@ -151,7 +151,7 @@ fn set_status_on_job(
     engine: &Arc<dyn Engine + Send + Sync>,
 ) {
     match job {
-        super::pipeline::pipeline_metadata::IdentifierListItem::Identifier(j) => {
+        super::pipeline::IdentifierListItem::Identifier(j) => {
             let job_status =
                 engine.get_state_for_id(&format!("{}/{}/{}", "", pipeline_name, j.name));
             let js = match job_status {
@@ -169,12 +169,12 @@ fn set_status_on_job(
 
             j.set_status(js);
         }
-        super::pipeline::pipeline_metadata::IdentifierListItem::SequentialList(list) => {
+        super::pipeline::IdentifierListItem::SequentialList(list) => {
             for job in list.iter_mut() {
                 set_status_on_job(pipeline_name, job, engine);
             }
         }
-        super::pipeline::pipeline_metadata::IdentifierListItem::ParallelList(list) => {
+        IdentifierListItem::ParallelList(list) => {
             for job in list.iter_mut() {
                 set_status_on_job(pipeline_name, job, engine);
             }
@@ -344,8 +344,8 @@ fn multi_panel_layout<B: Backend>(
 }
 
 pub fn split_frame(split_at: u8) -> Vec<Constraint> {
-    let mut constraints = Vec::new();
-    constraints.push(Constraint::Percentage(split_at.into()));
-    constraints.push(Constraint::Percentage((100 - split_at).into()));
-    constraints
+    vec![
+        Constraint::Percentage(split_at.into()),
+        Constraint::Percentage((100 - split_at).into()),
+    ]
 }

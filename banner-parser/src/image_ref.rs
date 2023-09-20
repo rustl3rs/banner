@@ -40,12 +40,12 @@ pub struct ImageRef {
 
     // without this, the compiler complains that EOI is never used. But it is used, in the FromPest impl.
     #[allow(dead_code)]
-    eoi: EOI,
+    eoi: EndOfInput,
 }
 
 #[derive(Debug, FromPest, Clone)]
 #[pest_ast(rule(Rule::EOI))]
-struct EOI;
+struct EndOfInput;
 
 impl<'a> ::from_pest::FromPest<'a> for ImageRef {
     type Rule = Rule;

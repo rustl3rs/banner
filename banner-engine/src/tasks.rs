@@ -164,8 +164,7 @@ impl From<&TaskSpecification> for TaskDefinition {
             .map(|s| s.into())
             .collect();
         command.push(task.script.clone().as_str().into());
-        let td = Self::new(tags, image, command, vec![], vec![]);
-        td
+        Self::new(tags, image, command, vec![], vec![])
     }
 }
 

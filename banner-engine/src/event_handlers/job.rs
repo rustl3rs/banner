@@ -21,13 +21,13 @@ pub fn get_eventhandlers_for_job(
     //   * an EH to trigger the first task in the job
     //   * an EH per other task in the job that triggers that task on the completion of the task preceeding it.
     //   * an EH to deal with the successful completion of the last task in the pipeline
-    if job.tasks.len() == 0 {
+    if job.tasks.is_empty() {
         let eh = create_start_empty_job_event_handler(pipeline, job);
         event_handlers.push(eh);
         return event_handlers;
     }
 
-    let mut iterator = job.tasks.iter().rev();
+    let mut iterator = job.tasks.iter().rev().peekable();
     let mut some_task = iterator.next();
 
     // Create event handler to emit an event when the last task finishes.
@@ -40,9 +40,9 @@ pub fn get_eventhandlers_for_job(
     while let Some(task) = some_task {
         // For every job we need to create:
         //   * an event handler to trigger on successful completion of the previous task.
-        let next = iterator.clone().next();
-        if next.is_some() {
-            let mut veh = create_start_task_event_handler(pipeline, job, task, next.unwrap());
+        let next = iterator.peek();
+        if let Some(jt) = next {
+            let mut veh = create_start_task_event_handler(pipeline, job, task, jt);
             event_handlers.append(&mut veh);
         } else {
             // Create event handler to accept job triggers.  This event will only ever
@@ -80,7 +80,7 @@ pub fn create_start_pipeline_job_event_handler(
                 "Trigger the start of the single job: {}/{}",
                 pipeline_name, &nj_name
             ));
-            let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+            let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(Only(
                 ListenForSystemEventType::Done(
                     Only(ListenForSystemEventScope::Job),
                     Only(ListenForSystemEventResult::Success),
@@ -103,7 +103,7 @@ pub fn create_start_pipeline_job_event_handler(
             // job finishes.
             let pipeline_tag = Metadata::new_banner_pipeline(pipeline_name);
 
-            let lfe = ListenForEvent::new(ListenForEventType::System(Only(
+            let lfe = ListenForEvent::new_builder(ListenForEventType::System(Only(
                 ListenForSystemEventType::Done(
                     Only(ListenForSystemEventScope::Job),
                     Only(ListenForSystemEventResult::Success),
@@ -144,12 +144,12 @@ pub fn create_start_pipeline_job_event_handler(
             let previous_jobs = flatten_jobs_for_finish(current);
 
             for job in previous_jobs.iter() {
-                let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
-                    ListenForSystemEventType::Done(
+                let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(
+                    Only(ListenForSystemEventType::Done(
                         Only(ListenForSystemEventScope::Job),
                         Only(ListenForSystemEventResult::Success),
-                    ),
-                )))
+                    )),
+                ))
                 .with_pipeline_name(pipeline_name)
                 .with_job_name(job)
                 .build();
@@ -292,7 +292,7 @@ pub fn create_start_job_event_handler(
         "Trigger the start of the job: {}/{}/{}",
         pipeline, job, task
     ));
-    let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+    let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(Only(
         ListenForSystemEventType::Trigger(Only(ListenForSystemEventScope::Job)),
     )))
     .with_pipeline_name(pipeline)
@@ -327,7 +327,7 @@ fn create_start_empty_job_event_handler(
         "Trigger the start of empty job: {}/{}",
         pipeline, &job.name
     ));
-    let listen_for_event = ListenForEvent::new(ListenForEventType::System(Only(
+    let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(Only(
         ListenForSystemEventType::Done(
             Only(ListenForSystemEventScope::Job),
             Only(ListenForSystemEventResult::Success),
@@ -336,12 +336,12 @@ fn create_start_empty_job_event_handler(
     .with_pipeline_name(pipeline)
     .with_job_name(&job.name)
     .build();
-    let eh = EventHandler::new(
+
+    EventHandler::new(
         vec![pipeline_tag, job_tag, description_tag],
         vec![listen_for_event],
         generate_job_with_no_tasks_script(pipeline, &job.name),
-    );
-    eh
+    )
 }
 
 fn create_finished_job_event_handlers(
@@ -394,7 +394,7 @@ fn create_fail_event_listener(
     job: &ast::JobSpecification,
     task: &str,
 ) -> ListenForEvent {
-    let listen_for_fail_event = ListenForEvent::new(ListenForEventType::System(Only(
+    ListenForEvent::new_builder(ListenForEventType::System(Only(
         ListenForSystemEventType::Done(
             Only(ListenForSystemEventScope::Task),
             Only(ListenForSystemEventResult::Failed),
@@ -403,8 +403,7 @@ fn create_fail_event_listener(
     .with_pipeline_name(pipeline)
     .with_job_name(&job.name)
     .with_task_name(task)
-    .build();
-    listen_for_fail_event
+    .build()
 }
 
 fn create_success_event_listener(
@@ -412,7 +411,7 @@ fn create_success_event_listener(
     job: &ast::JobSpecification,
     task: &str,
 ) -> ListenForEvent {
-    let listen_for_success_event = ListenForEvent::new(ListenForEventType::System(Only(
+    ListenForEvent::new_builder(ListenForEventType::System(Only(
         ListenForSystemEventType::Done(
             Only(ListenForSystemEventScope::Task),
             Only(ListenForSystemEventResult::Success),
@@ -421,8 +420,7 @@ fn create_success_event_listener(
     .with_pipeline_name(pipeline)
     .with_job_name(&job.name)
     .with_task_name(task)
-    .build();
-    listen_for_success_event
+    .build()
 }
 
 fn generate_finish_job_on_fail_script(pipeline: &str, job_name: &str) -> String {

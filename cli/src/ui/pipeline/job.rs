@@ -57,6 +57,7 @@ impl StatusStyle {
             .add_modifier(Modifier::BOLD)
     }
 
+    #[allow(dead_code)]
     pub fn label_style(&self) -> style::Style {
         style::Style::default()
             .fg(self.label_color)
@@ -64,6 +65,7 @@ impl StatusStyle {
             .add_modifier(Modifier::BOLD)
     }
 
+    #[allow(dead_code)]
     pub fn inner_style(&self) -> style::Style {
         style::Style::default()
             .bg(self.background_color)
@@ -100,6 +102,7 @@ mod Box {
     pub(crate) const BOTTOM_RIGHT: &str = "┘";
     pub(crate) const VERTICAL: &str = "│";
     pub(crate) const HORIZONTAL: &str = "─";
+    #[allow(dead_code)]
     pub(crate) const SHADOW: &str = "░";
 }
 
@@ -135,7 +138,7 @@ impl Job {
     pub fn draw(&self, buf: &mut Buffer) {
         let (x, y) = self.top_left;
         let border_style = self.status.border_style();
-        let inner_style = self.status.inner_style();
+        // let inner_style = self.status.inner_style();
         let text_style = self.status.text_style();
 
         // draw the box.
@@ -190,9 +193,8 @@ impl Job {
             (left, right) if left.top_left.1 == right.top_left.1 => {
                 for i in lx..rx {
                     let symbol = buf.get(i, ry).symbol.clone();
-                    match symbol.as_str() {
-                        " " => buf.set_string(i, ly, Connector::HORIZONTAL, connector_style),
-                        _ => (),
+                    if symbol.as_str() == " " {
+                        buf.set_string(i, ly, Connector::HORIZONTAL, connector_style)
                     }
                 }
                 buf.set_string(rx - 1, ry, Connector::ARROW_RIGHT, connector_style);
@@ -222,9 +224,8 @@ impl Job {
                 // renders the horizontal line + arrow closest to the right side job.
                 for i in midpoint..rx {
                     let symbol = buf.get(i, ry).symbol.clone();
-                    match symbol.as_str() {
-                        " " => buf.set_string(i, ry, Connector::HORIZONTAL, connector_style),
-                        _ => (),
+                    if symbol.as_str() == " " {
+                        buf.set_string(i, ry, Connector::HORIZONTAL, connector_style)
                     }
                 }
                 buf.set_string(rx - 1, ry, Connector::ARROW_RIGHT, connector_style);

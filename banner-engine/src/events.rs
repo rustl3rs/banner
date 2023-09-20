@@ -17,7 +17,7 @@ pub struct Event {
 }
 
 impl Event {
-    pub fn new(r#type: EventType) -> EventBuilder {
+    pub fn new_builder(r#type: EventType) -> EventBuilder {
         EventBuilder {
             event: Self {
                 r#type,
@@ -32,12 +32,11 @@ impl Event {
     }
 
     pub fn get_type(&self) -> EventType {
-        self.r#type.clone()
+        self.r#type
     }
 
     pub fn time_emitted(&self) -> DateTime<Utc> {
-        let dt = Utc.timestamp_millis_opt(self.time_emitted).unwrap();
-        dt
+        Utc.timestamp_millis_opt(self.time_emitted).unwrap()
     }
 
     pub fn metadata(&self) -> &[Metadata] {
@@ -287,7 +286,7 @@ mod tests {
 
     #[test]
     fn events_like_each_other() {
-        let e1 = Event::new(EventType::System(SystemEventType::Done(
+        let e1 = Event::new_builder(EventType::System(SystemEventType::Done(
             SystemEventScope::Task,
             SystemEventResult::Success,
         )))
@@ -296,7 +295,7 @@ mod tests {
         .with_task_name("task_1")
         .build();
 
-        let e2 = Event::new(EventType::System(SystemEventType::Done(
+        let e2 = Event::new_builder(EventType::System(SystemEventType::Done(
             SystemEventScope::Task,
             SystemEventResult::Success,
         )))
@@ -314,7 +313,7 @@ mod tests {
             metadata: vec![],
         };
 
-        let e4 = Event::new(EventType::System(SystemEventType::Done(
+        let e4 = Event::new_builder(EventType::System(SystemEventType::Done(
             SystemEventScope::Task,
             SystemEventResult::Failed,
         )))
@@ -323,7 +322,7 @@ mod tests {
         .with_task_name("task_1")
         .build();
 
-        let e5 = Event::new(EventType::System(SystemEventType::Done(
+        let e5 = Event::new_builder(EventType::System(SystemEventType::Done(
             SystemEventScope::Task,
             SystemEventResult::Success,
         )))
@@ -340,7 +339,7 @@ mod tests {
 
     #[test]
     fn construct_log_event() {
-        Event::new(EventType::Log)
+        Event::new_builder(EventType::Log)
             .with_job_name("job_name")
             .with_pipeline_name("pipeline_name")
             .with_log_message("my log message")

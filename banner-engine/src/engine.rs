@@ -77,7 +77,7 @@ pub async fn start_engine(
         debug!(target: "task_log", "received event: {:?}", event);
 
         if let Some(event) = event {
-            if event == Event::new(crate::EventType::UserDefined).build() {
+            if event == Event::new_builder(crate::EventType::UserDefined).build() {
                 log::debug!(target: "task_log", "received user defined event");
                 engine.get_pipelines().into_iter().for_each(|p| {
                     log::debug!(target: "task_log", "Number of event handlers: {}", p.event_handlers.len());
@@ -100,7 +100,7 @@ pub async fn start_engine(
                 .filter_map(|pipeline| {
                     let handlers = pipeline.events_matching(&event);
                     log::debug!(target: "event_log", "handlers: {:?}", handlers);
-                    if handlers.len() > 0 {
+                    if !handlers.is_empty() {
                         Some(handlers)
                     } else {
                         None

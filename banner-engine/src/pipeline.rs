@@ -1,10 +1,7 @@
 use std::{collections::HashSet, error::Error, fmt::Display, fs, path::PathBuf};
 
 use banner_parser::{
-    ast::{
-        self, IdentifierListItem, Import, JobSpecification, PipelineSpecification,
-        TaskSpecification,
-    },
+    ast::{self, IdentifierListItem, Import, PipelineSpecification, TaskSpecification},
     grammar::{BannerParser, Rule},
     image_ref::{self, ImageRefParser},
     FromPest, Iri, Parser,
@@ -16,7 +13,7 @@ use log::trace;
 use crate::{
     event_handler::EventHandler,
     event_handlers::{
-        get_eventhandlers_for_job, get_eventhandlers_for_pipeline, get_eventhandlers_for_task,
+        get_eventhandlers_for_job, get_eventhandlers_for_pipeline,
         get_eventhandlers_for_task_definition,
     },
     listen_for_events::matching_banner_metadata,
@@ -66,7 +63,7 @@ pub async fn build_and_validate_pipeline(
     // TODO: limit the depth of the importing.
     let mut all_imports: HashSet<String> = HashSet::new();
 
-    while main_segment.imports.len() > 0 {
+    while !main_segment.imports.is_empty() {
         let imports = main_segment.imports.clone();
 
         // detect any cycles.
@@ -75,7 +72,7 @@ pub async fn build_and_validate_pipeline(
         let isc = import_set.clone();
         let cyclic_uris: HashSet<_> = all_imports.intersection(&isc).collect();
         // remove cycles from the imports and keep going
-        if cyclic_uris.len() > 0 {
+        if !cyclic_uris.is_empty() {
             cyclic_uris.into_iter().for_each(|uri| {
                 import_set.remove(uri);
                 errors.push(Box::new(CyclicImportError::new(format!(
@@ -102,7 +99,7 @@ pub async fn build_and_validate_pipeline(
         }
     }
 
-    if errors.len() > 0 {
+    if !errors.is_empty() {
         let error = AggregatePipelineConstructionError::new(errors);
         return Err(Box::new(error));
     }
@@ -223,8 +220,8 @@ fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sy
     Ok(())
 }
 
-fn ident_list_contains_item(list: &Vec<IdentifierListItem>, item: &str) -> bool {
-    for ident in list.into_iter() {
+fn ident_list_contains_item(list: &[IdentifierListItem], item: &str) -> bool {
+    for ident in list.iter() {
         match ident {
             IdentifierListItem::Identifier(id) => {
                 if id == item {
@@ -258,13 +255,7 @@ fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
                 let replacement = ast
                     .images
                     .iter()
-                    .find_map(|image| {
-                        if format!("${{{}}}", image.name) == task.image {
-                            Some(image)
-                        } else {
-                            None
-                        }
-                    })
+                    .find(|image| format!("${{{}}}", image.name) == task.image)
                     .unwrap();
                 // replace the image
                 task_def.set_image(replacement.image.clone().into());
@@ -299,100 +290,49 @@ fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
 
     // Must convert tasks, jobs and pipelines for now.
     // In future must also support free floating `on_event`
-    // let task_events: Vec<EventHandler> = ast
-    //     .tasks
-    //     .iter()
-    //     .map(|task| {
-    //         log::trace!(target: "task_log", "Getting event handlers for task: {}", task.name);
-    //         let jobs: Vec<&JobSpecification> = ast
-    //             .jobs
-    //             .iter()
-    //             .filter(|job| ident_list_contains_item(&job.tasks, &task.name))
-    //             .collect();
-    //         if jobs.len() > 0 {
-    //             jobs.iter()
-    //                 .map(|job| {
-    //                     let pipelines: Vec<&PipelineSpecification> = ast
-    //                         .pipelines
-    //                         .iter()
-    //                         .filter(|pipeline| ident_list_contains_item(&pipeline.jobs, &job.name))
-    //                         .collect();
-    //                     if pipelines.len() > 0 {
-    //                         pipelines
-    //                             .iter()
-    //                             .map(|pipeline| {
-    //                                 let veh: Vec<EventHandler> = get_eventhandlers_for_task(
-    //                                     Some(*pipeline),
-    //                                     Some(*job),
-    //                                     &task,
-    //                                 );
-    //                                 veh
-    //                             })
-    //                             .flatten()
-    //                             .collect()
-    //                     } else {
-    //                         let veh: Vec<EventHandler> =
-    //                             get_eventhandlers_for_task(None, Some(*job), &task);
-    //                         veh
-    //                     }
-    //                 })
-    //                 .flatten()
-    //                 .collect()
-    //         } else {
-    //             let veh: Vec<EventHandler> = get_eventhandlers_for_task(None, None, &task);
-    //             veh
-    //         }
-    //     })
-    //     .flatten()
-    //     .collect();
-
     let task_events: Vec<EventHandler> = tasks
         .iter()
-        .map(|task| get_eventhandlers_for_task_definition(task))
-        .flatten()
+        .flat_map(get_eventhandlers_for_task_definition)
         .collect();
 
     let job_events: Vec<EventHandler> = ast
         .jobs
         .iter()
-        .map(|job| {
+        .flat_map(|job| {
             let pipelines: Vec<&PipelineSpecification> = ast
                 .pipelines
                 .iter()
                 .filter(|pipeline| ident_list_contains_item(&pipeline.jobs, &job.name))
                 .collect();
-            if pipelines.len() > 0 {
+            if !pipelines.is_empty() {
                 pipelines
                     .iter()
-                    .map(|pipeline| {
+                    .flat_map(|pipeline| {
                         let veh: Vec<EventHandler> =
                             get_eventhandlers_for_job(Some(*pipeline), job);
                         veh
                     })
-                    .flatten()
                     .collect::<Vec<EventHandler>>()
             } else {
                 let veh: Vec<EventHandler> = get_eventhandlers_for_job(None, job);
                 veh
             }
         })
-        .flatten()
         .collect();
 
     let pipeline_events: Vec<EventHandler> = ast
         .pipelines
         .iter()
-        .map(|pipeline| {
+        .flat_map(|pipeline| {
             let veh: Vec<EventHandler> = get_eventhandlers_for_pipeline(pipeline);
             veh
         })
-        .flatten()
         .collect();
 
     let event_handlers = pipeline_events
         .into_iter()
-        .chain(job_events.into_iter())
-        .chain(task_events.into_iter())
+        .chain(job_events)
+        .chain(task_events)
         .collect();
 
     Pipeline {
@@ -436,14 +376,14 @@ async fn load_url<'a>(uri: &Iri<'a>) -> Result<ast::Pipeline, Box<dyn Error + Se
         let body = hyper::body::to_bytes(resp).await?;
         let code = std::str::from_utf8(&body).unwrap();
 
-        try_code_to_ast(code, &uri)
+        try_code_to_ast(code, uri)
     } else {
         let client = hyper::Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
         let resp = client.get(uri.as_str().parse()?).await?;
         let body = hyper::body::to_bytes(resp.into_body()).await?;
         let code = std::str::from_utf8(&body).unwrap();
 
-        try_code_to_ast(code, &uri)
+        try_code_to_ast(code, uri)
     }
 }
 
@@ -453,14 +393,14 @@ fn load_file(uri: &Iri) -> Result<ast::Pipeline, Box<dyn Error + Send + Sync>> {
         uri.authority().unwrap(),
         uri.path().as_str()
     ));
-    let pipeline = fs::read_to_string(&file).expect("Should have been able to read the file");
+    let pipeline = fs::read_to_string(file).expect("Should have been able to read the file");
     try_code_to_ast(&pipeline, uri)
 }
 
 // This should be infallible.
 // The pipelines that get passed in should already have undergone transformation and validation
 fn code_to_ast(code: &str) -> ast::Pipeline {
-    let parsed = BannerParser::parse(Rule::pipeline_definition, &code);
+    let parsed = BannerParser::parse(Rule::pipeline_definition, code);
     tracing::trace!("Code tree: {:#?}", parsed);
     match parsed {
         Ok(mut parse_tree) => match ast::Pipeline::from_pest(&mut parse_tree) {
@@ -478,13 +418,13 @@ fn code_to_ast(code: &str) -> ast::Pipeline {
 }
 
 fn try_code_to_ast(code: &str, uri: &Iri) -> Result<ast::Pipeline, Box<dyn Error + Sync + Send>> {
-    let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, &code).unwrap();
+    let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, code).unwrap();
     match ast::Pipeline::from_pest(&mut parse_tree) {
         Ok(tree) => Ok(tree),
         Err(e) => {
             trace!("ERROR parsing/ingesting URI: {uri}\n{:#?}", e);
             let error = CompositionError::new(uri);
-            return Err(Box::new(error));
+            Err(Box::new(error))
         }
     }
 }
