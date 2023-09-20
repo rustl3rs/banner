@@ -183,13 +183,15 @@ fn render_connector(
             let (x, y) = id.get_position().unwrap();
             let tx = x * 10 + 5;
             let ty = y * 5 + 3;
-            let cj = Job::new((tx, ty), Status::Pending, Status::Pending, String::from(""));
+            let status = id.get_status();
+            let cj = Job::new((tx, ty), status, Status::Pending, String::from(""));
             match previous_job {
                 IdentifierListItem::Identifier(pid) => {
                     let (x, y) = pid.get_position().unwrap();
                     let tx = x * 10 + 5;
                     let ty = y * 5 + 3;
-                    let pj = Job::new((tx, ty), Status::Pending, Status::Pending, String::from(""));
+                    let status = pid.get_status();
+                    let pj = Job::new((tx, ty), status, Status::Pending, String::from(""));
                     pj.connect(&cj, buf);
                 }
                 IdentifierListItem::SequentialList(list) => {

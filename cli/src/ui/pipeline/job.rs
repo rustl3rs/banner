@@ -184,7 +184,7 @@ impl Job {
         let (lx, ly) = (left.top_left.0 + 5, left.top_left.1 + 2);
         let (rx, ry) = (right.top_left.0, right.top_left.1 + 2);
 
-        let connector_style = self.status.connector_style();
+        let connector_style = right.status.connector_style();
 
         match (left, right) {
             (left, right) if left.top_left.1 == right.top_left.1 => {

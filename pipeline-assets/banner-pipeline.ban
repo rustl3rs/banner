@@ -10,7 +10,7 @@ task get-source(image: ${git_image}, execute: r#"clone https://github.com/rustl3
 let rust_build_image = Image {
     name=rust,
     mount=[
-        banner.unit-test.get-source.src => "/source-code",
+        banner.get-source.get-source.src => "/source-code",
     ],
     env=[
         BANNER_ENV_VAR="hello banner!",
@@ -57,16 +57,27 @@ task test(image: ${rust_build_image}, execute: "bash -exo pipefail -c") {
     "#
 }
 
+job get-source [
+    get-source,
+]
 
-job unit-test [
+job check-format [
+    check-format,
+]
+
+job check-clippy [
+    check-clippy,
+]
+
+job test [
+    test,
+]
+
+pipeline banner [
     get-source,
     {
         check-format,
         check-clippy,
     },
     test,
-]
-
-pipeline banner [
-    unit-test,
 ]
