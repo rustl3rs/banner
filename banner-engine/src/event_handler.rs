@@ -316,7 +316,7 @@ mod tests {
             _key: &str,
             _value: String,
         ) -> Result<(), Box<dyn Error + Send + Sync>> {
-            todo!()
+            Ok(())
         }
     }
 
