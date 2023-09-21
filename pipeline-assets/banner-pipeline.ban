@@ -25,7 +25,8 @@ task check-clippy(image: ${rust_build_image}, execute: "bash -eo pipefail -c") {
     cd /source-code
 
     # would be good to run pedantic; but we aren't there yet.
-    cargo clippy
+    # `-Dwarnings` ensures clippy exists non-zero if there are warnings.
+    cargo clippy -- -Dwarnings -Wclippy::pedantic
     "#
 }
 
