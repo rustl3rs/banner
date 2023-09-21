@@ -181,7 +181,7 @@ mod pipeline_from_ast_tests {
                     ],
                     jobs: [],
                     pipelines: [],
-                    eoi: EOI,
+                    eoi: EndOfInput,
                 }"#]],
         )
     }
@@ -230,7 +230,7 @@ mod pipeline_from_ast_tests {
                     ],
                     jobs: [],
                     pipelines: [],
-                    eoi: EOI,
+                    eoi: EndOfInput,
                 }"#]],
         )
     }
@@ -291,7 +291,7 @@ mod pipeline_from_ast_tests {
                             ],
                         },
                     ],
-                    eoi: EOI,
+                    eoi: EndOfInput,
                 }"#]],
         )
     }
@@ -374,7 +374,7 @@ mod pipeline_from_ast_tests {
                             ],
                         },
                     ],
-                    eoi: EOI,
+                    eoi: EndOfInput,
                 }"#]],
         )
     }
@@ -417,7 +417,7 @@ mod pipeline_from_ast_tests {
                             ],
                         },
                     ],
-                    eoi: EOI,
+                    eoi: EndOfInput,
                 }"#]],
         )
     }
@@ -450,7 +450,7 @@ mod pipeline_from_ast_tests {
                         },
                     ],
                     pipelines: [],
-                    eoi: EOI,
+                    eoi: EndOfInput,
                 }"#]],
         )
     }
@@ -514,7 +514,7 @@ mod pipeline_from_ast_tests {
                     ],
                     jobs: [],
                     pipelines: [],
-                    eoi: EOI,
+                    eoi: EndOfInput,
                 }"#]],
         )
     }
@@ -541,56 +541,56 @@ mod pipeline_from_ast_tests {
         check(
             &code,
             expect![[r#"
-            Pipeline {
-                imports: [],
-                images: [],
-                tasks: [],
-                jobs: [
-                    JobSpecification {
-                        name: "build",
-                        tasks: [
-                            Identifier(
-                                "task1",
-                            ),
-                            ParallelList(
-                                [
-                                    Identifier(
-                                        "task2",
-                                    ),
-                                    Identifier(
-                                        "task3",
-                                    ),
-                                    SequentialList(
-                                        [
-                                            Identifier(
-                                                "task5",
-                                            ),
-                                            Identifier(
-                                                "task6",
-                                            ),
-                                            ParallelList(
-                                                [
-                                                    Identifier(
-                                                        "task7",
-                                                    ),
-                                                    Identifier(
-                                                        "task8",
-                                                    ),
-                                                ],
-                                            ),
-                                        ],
-                                    ),
-                                ],
-                            ),
-                            Identifier(
-                                "task4",
-                            ),
-                        ],
-                    },
-                ],
-                pipelines: [],
-                eoi: EOI,
-            }"#]],
+                Pipeline {
+                    imports: [],
+                    images: [],
+                    tasks: [],
+                    jobs: [
+                        JobSpecification {
+                            name: "build",
+                            tasks: [
+                                Identifier(
+                                    "task1",
+                                ),
+                                ParallelList(
+                                    [
+                                        Identifier(
+                                            "task2",
+                                        ),
+                                        Identifier(
+                                            "task3",
+                                        ),
+                                        SequentialList(
+                                            [
+                                                Identifier(
+                                                    "task5",
+                                                ),
+                                                Identifier(
+                                                    "task6",
+                                                ),
+                                                ParallelList(
+                                                    [
+                                                        Identifier(
+                                                            "task7",
+                                                        ),
+                                                        Identifier(
+                                                            "task8",
+                                                        ),
+                                                    ],
+                                                ),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                Identifier(
+                                    "task4",
+                                ),
+                            ],
+                        },
+                    ],
+                    pipelines: [],
+                    eoi: EndOfInput,
+                }"#]],
         )
     }
 }
