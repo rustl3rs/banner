@@ -79,7 +79,7 @@ impl From<&banner_engine::JobSpecification> for JobSpecification {
 impl From<&banner_engine::IdentifierListItem> for IdentifierListItem {
     fn from(item: &banner_engine::IdentifierListItem) -> Self {
         match item {
-            banner_engine::IdentifierListItem::Identifier(i) => {
+            banner_engine::IdentifierListItem::Identifier(i, _) => {
                 IdentifierListItem::Identifier(Metadata::new(i.clone()))
             }
             banner_engine::IdentifierListItem::SequentialList(list) => {

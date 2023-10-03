@@ -405,53 +405,129 @@ impl<'pest> FromPest<'pest> for ImageDefinition {
     }
 }
 
-// #[derive(Debug, Clone, Default)]
-// pub type IdentifierList = Vec<IdentifierListItem>;
+#[derive(Debug, Clone, PartialEq)]
+pub enum IdentifierMarker {
+    JobMacro,
+    Optional,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum IdentifierListItem {
-    Identifier(String),
+    Identifier(String, Vec<IdentifierMarker>),
     SequentialList(Vec<IdentifierListItem>),
     ParallelList(Vec<IdentifierListItem>),
 }
 
+pub struct IdentifierListItemIter<'a> {
+    stack: Vec<&'a IdentifierListItem>,
+}
+
+impl IdentifierListItem {
+    pub fn iter(&self) -> IdentifierListItemIter {
+        IdentifierListItemIter { stack: vec![self] }
+    }
+}
+
+impl<'a> Iterator for IdentifierListItemIter<'a> {
+    type Item = &'a IdentifierListItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(item) = self.stack.pop() {
+            match item {
+                IdentifierListItem::Identifier(_, _) => {
+                    return Some(item);
+                }
+                IdentifierListItem::SequentialList(list)
+                | IdentifierListItem::ParallelList(list) => {
+                    self.stack.extend(list);
+                }
+            }
+        }
+
+        None
+    }
+}
+
 impl Default for IdentifierListItem {
     fn default() -> Self {
-        Self::Identifier("".to_string())
+        Self::Identifier("".to_string(), vec![])
     }
 }
 
 fn from_ident_list(pest: &mut Pairs<Rule>) -> Vec<IdentifierListItem> {
     let mut tasks = Vec::<IdentifierListItem>::new();
-    let clone = pest.clone();
+    let mut clone = pest.clone();
     if clone.peek().is_none() {
         return tasks;
     };
 
-    // let pair = clone.next().unwrap();
+    loop {
+        let pair = clone.next();
+        if pair.is_none() {
+            break;
+        }
 
-    for pair in clone.into_iter() {
+        let pair = pair.unwrap();
+
         match pair.as_rule() {
-        Rule::identifier => {
-            let task = IdentifierListItem::Identifier(pair.as_str().to_string());
-            tasks.push(task);
+            Rule::identifier => {
+                let task = IdentifierListItem::Identifier(pair.as_str().to_string(), vec![]);
+                if let Some(next) = clone.peek() {
+                    match next.as_rule() {
+                        Rule::job_macro_marker => {
+                            let mut markers = Vec::<IdentifierMarker>::new();
+                            loop {
+                                if clone.peek().is_none() || clone.peek().unwrap().as_rule() != Rule::job_macro_marker {
+                                    break;
+                                }
+                                let pair = clone.next().unwrap();
+                                if pair.as_rule() != Rule::job_macro_marker {
+                                    break;
+                                }
+                                let marker = match pair.as_str() {
+                                    // "?" => IdentifierMarker::Optional,
+                                    "!" => IdentifierMarker::JobMacro,
+                                    _ => panic!("unexpected job macro marker: {}", pair.as_str()),
+                                };
+                                markers.push(marker);
+                            }
+    
+                            tasks.push(IdentifierListItem::Identifier(
+                                task.to_string(),
+                                markers,
+                            ));
+                        }
+                        Rule::identifier => {
+                            tasks.push(task);
+                        }
+                        Rule::sequential_identifier_list  |
+                        Rule::parallel_identifier_list => {
+                            tasks.push(task);
+                        }
+                        _ => panic!(
+                            "expected identifier or job_macro_marker, found {:#?}",
+                            next.as_rule()
+                        ),
+                    }
+                } else {
+                    tasks.push(task);
+                }
+            }
+            Rule::sequential_identifier_list => {
+                let sequential_tasks = from_ident_list(&mut pair.into_inner());
+                tasks.push(IdentifierListItem::SequentialList(sequential_tasks));
+            }
+            Rule::parallel_identifier_list => {
+                let parallel_tasks = from_ident_list(&mut pair.into_inner());
+                tasks.push(IdentifierListItem::ParallelList(parallel_tasks));
+            }
+            _ => panic!(
+                "expected identifier, sequential_identifier_list or parallel_identifier_list, found {:#?}",
+                pair.as_rule()
+            ),
         }
-        Rule::sequential_identifier_list => {
-            let sequential_tasks = from_ident_list(&mut pair.into_inner());
-            tasks.push(IdentifierListItem::SequentialList(sequential_tasks));
-        }
-        Rule::parallel_identifier_list => {
-            let parallel_tasks = from_ident_list(&mut pair.into_inner());
-            tasks.push(IdentifierListItem::ParallelList(parallel_tasks));
-        }
-        _ => panic!(
-            "expected identifier, sequential_identifier_list or parallel_identifier_list, found {:#?}",
-            pair.as_rule()
-        ),
-    }
     }
 
-    // *pest = clone;
     tasks
 }
 
@@ -468,17 +544,19 @@ impl Display for IdentifierListItem {
                     write!(f, "{},", task)?
                 }
             }
-            IdentifierListItem::Identifier(task_name) => write!(f, "{}", task_name)?,
+            IdentifierListItem::Identifier(task_name, markers) => {
+                write!(f, "{}", task_name)?;
+                for marker in markers.iter() {
+                    match marker {
+                        IdentifierMarker::JobMacro => write!(f, "!")?,
+                        IdentifierMarker::Optional => write!(f, "?")?,
+                    }
+                }
+            }
         }
         Ok(())
     }
 }
-
-// impl PartialEq for IdentifierListItem {
-//     fn eq(&self, _other: &Self) -> bool {
-//         todo!()
-//     }
-// }
 
 #[derive(Debug, Clone, Default)]
 pub struct JobSpecification {
@@ -491,13 +569,13 @@ impl JobSpecification {
         let mut tasks = Vec::<String>::new();
         for task in self.tasks.iter() {
             match task {
-                IdentifierListItem::Identifier(task_name) => {
+                IdentifierListItem::Identifier(task_name, _) => {
                     tasks.push(task_name.to_string());
                 }
                 IdentifierListItem::SequentialList(task_list) => {
                     for task in task_list.iter() {
                         match task {
-                            IdentifierListItem::Identifier(task_name) => {
+                            IdentifierListItem::Identifier(task_name, _) => {
                                 tasks.push(task_name.to_string());
                             }
                             _ => panic!("expected IdentifierListItem::Identifier"),
@@ -507,7 +585,7 @@ impl JobSpecification {
                 IdentifierListItem::ParallelList(task_list) => {
                     for task in task_list.iter() {
                         match task {
-                            IdentifierListItem::Identifier(task_name) => {
+                            IdentifierListItem::Identifier(task_name, _) => {
                                 tasks.push(task_name.to_string());
                             }
                             _ => panic!("expected IdentifierListItem::Identifier"),
@@ -549,6 +627,14 @@ impl<'pest> FromPest<'pest> for JobSpecification {
 pub struct PipelineSpecification {
     pub name: String,
     pub jobs: Vec<IdentifierListItem>,
+}
+
+impl PipelineSpecification {
+    pub fn iter_jobs(&self) -> impl Iterator<Item = &IdentifierListItem> {
+        let jobs: Vec<&IdentifierListItem> = self.jobs.iter().collect();
+        let iterator = IdentifierListItemIter { stack: jobs };
+        iterator
+    }
 }
 
 impl<'pest> FromPest<'pest> for PipelineSpecification {

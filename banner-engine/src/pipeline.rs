@@ -1,7 +1,10 @@
 use std::{collections::HashSet, error::Error, fmt::Display, fs, path::PathBuf};
 
 use banner_parser::{
-    ast::{self, IdentifierListItem, Import, PipelineSpecification, TaskSpecification},
+    ast::{
+        self, IdentifierListItem, IdentifierMarker, Import, JobSpecification,
+        PipelineSpecification, TaskSpecification,
+    },
     grammar::{BannerParser, Rule},
     image_ref::{self, ImageRefParser},
     FromPest, Iri, Parser,
@@ -155,7 +158,26 @@ fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sy
         };
     }
 
-    // 3. annotate all tasks with their task, job and pipeline names
+    // 3. Create a job for any job macro defined in the pipeline directive
+    // After that is done, remove any reference to a IdentifierWithMarkers from the pipelines list of jobs.
+    for pipeline in ast.pipelines.iter() {
+        for job in pipeline.iter_jobs() {
+            match job {
+                IdentifierListItem::Identifier(job, markers) => {
+                    if markers.contains(&IdentifierMarker::JobMacro) {
+                        let job_spec = JobSpecification {
+                            name: job.clone(),
+                            tasks: vec![IdentifierListItem::Identifier(job.clone(), vec![])],
+                        };
+                        ast.jobs.push(job_spec);
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
+
+    // 4. annotate all tasks with their task, job and pipeline names
     // A task can be reused in multiple jobs, so we need to create a new task definition for each
     // task described in the job descriptions and annotate them with the job and pipeline names.
     // While this is particularly wasteful on memory, it makes it easier to reason about the
@@ -223,7 +245,7 @@ fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sy
 fn ident_list_contains_item(list: &[IdentifierListItem], item: &str) -> bool {
     for ident in list.iter() {
         match ident {
-            IdentifierListItem::Identifier(id) => {
+            IdentifierListItem::Identifier(id, _) => {
                 if id == item {
                     return true;
                 }
@@ -716,6 +738,154 @@ mod build_pipeline_tests {
                 )"####]],
         )
         .await
+    }
+
+    #[traced_test]
+    #[tokio::test]
+    async fn can_parse_job_macro() {
+        let code = r#######"
+                task unit-test(image: alpine, execute: "/bin/sh -c") {
+                    r#"
+                    // this is a comment
+                    echo -n "testing, testing, 1, 2, 3!"
+                    "#
+                }
+                
+                pipeline test [
+                    unit-test!,
+                ]
+            "#######;
+
+        check(&code, expect![[r####"
+            (
+                Pipeline {
+                    tasks: [
+                        TaskDefinition {
+                            tags: [
+                                banner.dev/task: unit-test,
+                                banner.dev/job: unit-test,
+                                banner.dev/pipeline: test,
+                            ],
+                            image: Image {
+                                source: "alpine:latest",
+                                credentials: None,
+                            },
+                            command: [
+                                "/bin/sh",
+                                "-c",
+                                "\n                    // this is a comment\n                    echo -n \"testing, testing, 1, 2, 3!\"\n                    ",
+                            ],
+                            inputs: [],
+                            outputs: [],
+                        },
+                    ],
+                    event_handlers: [
+                        {
+                            listen_for_events:
+                                ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
+                            tags:
+                                banner.dev/pipeline: test,
+                                banner.dev/description: Trigger the start of the pipeline: test/unit-test!,
+                            script: ###"
+                                pub async fn main (engine, event) {
+                                    engine.trigger_job("test", "unit-test").await;
+                                }
+                            "###
+                        },
+                        {
+                            listen_for_events:
+                                ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+                            tags:
+                                banner.dev/pipeline: test,
+                                banner.dev/description: Signal the completion of the pipeline: test; Last job was: unit-test!,
+                            script: ###"
+                                pub async fn main (engine, event) {
+                                    engine.pipeline_success("test").await;
+                                }
+                            "###
+                        },
+                        {
+                            listen_for_events:
+                                ListenForEvent { type: System(Only(Done(Only(Job), Only(Failed)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+                            tags:
+                                banner.dev/pipeline: test,
+                                banner.dev/description: Signal the completion of the pipeline: test; Last job was: unit-test!,
+                            script: ###"
+                                pub async fn main (engine, event) {
+                                    engine.pipeline_fail("test").await;
+                                }
+                            "###
+                        },
+                        {
+                            listen_for_events:
+                                ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test, banner.dev/task: unit-test] },
+                            tags:
+                                banner.dev/pipeline: test,
+                                banner.dev/job: unit-test,
+                                banner.dev/description: Signal the completion of the job: test/unit-test; Last task was: unit-test,
+                            script: ###"
+                                pub async fn main (engine, event) {
+                                    engine.job_success("test", "unit-test").await;
+                                }
+                            "###
+                        },
+                        {
+                            listen_for_events:
+                                ListenForEvent { type: System(Only(Done(Only(Task), Only(Failed)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test, banner.dev/task: unit-test] },
+                            tags:
+                                banner.dev/pipeline: test,
+                                banner.dev/job: unit-test,
+                                banner.dev/description: Signal the completion of the job: test/unit-test; Last task was: unit-test,
+                            script: ###"
+                                pub async fn main (engine, event) {
+                                    engine.job_fail("test", "unit-test").await;
+                                }
+                            "###
+                        },
+                        {
+                            listen_for_events:
+                                ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+                            tags:
+                                banner.dev/pipeline: test,
+                                banner.dev/job: unit-test,
+                                banner.dev/job: unit-test,
+                                banner.dev/description: Trigger the start of the job: test/unit-test/unit-test,
+                            script: ###"
+                                pub async fn main (engine, event) {
+                                    engine.trigger_task("test", "unit-test", "unit-test").await;
+                                }
+                            "###
+                        },
+                        {
+                            listen_for_events:
+                                ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test, banner.dev/task: unit-test] },
+                            tags:
+                                banner.dev/task: unit-test,
+                                banner.dev/job: unit-test,
+                                banner.dev/pipeline: test,
+                                banner.dev/description: Execute the task: unit-test,
+                            script: ###"
+                                pub async fn main (engine, event) {
+                                    engine.execute_task_name_in_scope("", "test", "unit-test", "unit-test").await;
+                                }
+                            "###
+                        },
+                    ],
+                },
+                [
+                    PipelineSpecification {
+                        name: "test",
+                        jobs: [
+                            Identifier(
+                                "unit-test",
+                                [
+                                    JobMacro,
+                                ],
+                            ),
+                        ],
+                    },
+                ],
+            )"####]]).await
     }
 }
 

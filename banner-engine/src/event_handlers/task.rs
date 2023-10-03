@@ -87,7 +87,7 @@ pub fn create_start_task_event_handler(
 
     let mut event_handlers: Vec<EventHandler> = vec![];
     match (task, next) {
-        (IdentifierListItem::Identifier(task), IdentifierListItem::Identifier(next)) => {
+        (IdentifierListItem::Identifier(task, _), IdentifierListItem::Identifier(next, _)) => {
             let description_tag = Metadata::new_banner_description(&format!(
                 "Trigger the start of the task: {}/{}/{}",
                 pipeline, &job.name, task
@@ -113,8 +113,8 @@ pub fn create_start_task_event_handler(
 
             event_handlers.push(eh);
         }
-        (IdentifierListItem::Identifier(task), IdentifierListItem::SequentialList(_))
-        | (IdentifierListItem::Identifier(task), IdentifierListItem::ParallelList(_)) => {
+        (IdentifierListItem::Identifier(task, _), IdentifierListItem::SequentialList(_))
+        | (IdentifierListItem::Identifier(task, _), IdentifierListItem::ParallelList(_)) => {
             // create an event handler that will trigger the task when all the previous parallel tasks have completed.
             let job_tag = Metadata::new_banner_job(&job.name);
             let pipeline_tag = Metadata::new_banner_pipeline(pipeline);
@@ -153,10 +153,10 @@ pub fn create_start_task_event_handler(
 
             event_handlers.push(eh);
         }
-        (IdentifierListItem::SequentialList(_), IdentifierListItem::Identifier(_)) => todo!(),
+        (IdentifierListItem::SequentialList(_), IdentifierListItem::Identifier(_, _)) => todo!(),
         (IdentifierListItem::SequentialList(_), IdentifierListItem::SequentialList(_)) => todo!(),
         (IdentifierListItem::SequentialList(_), IdentifierListItem::ParallelList(_)) => todo!(),
-        (IdentifierListItem::ParallelList(_), IdentifierListItem::Identifier(prev)) => {
+        (IdentifierListItem::ParallelList(_), IdentifierListItem::Identifier(prev, _)) => {
             let job_tag = Metadata::new_banner_job(&job.name);
             let pipeline_tag = Metadata::new_banner_pipeline(pipeline);
             let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(Only(
@@ -199,7 +199,7 @@ pub fn create_start_task_event_handler(
 
 fn flatten_task_for_start(task: &IdentifierListItem) -> Vec<&str> {
     match task {
-        IdentifierListItem::Identifier(task) => vec![task],
+        IdentifierListItem::Identifier(task, _) => vec![task],
         IdentifierListItem::SequentialList(tasks) => {
             let first_task = tasks.first().unwrap();
             flatten_task_for_finish(first_task)
@@ -217,7 +217,7 @@ fn flatten_task_for_start(task: &IdentifierListItem) -> Vec<&str> {
 
 fn flatten_task_for_finish(task: &IdentifierListItem) -> Vec<&str> {
     match task {
-        IdentifierListItem::Identifier(task) => vec![task],
+        IdentifierListItem::Identifier(task, _) => vec![task],
         IdentifierListItem::SequentialList(tasks) => {
             let last_task = tasks.last().unwrap();
             flatten_task_for_finish(last_task)
@@ -404,8 +404,8 @@ mod flatten_tasks_tests {
     #[test]
     fn two_parallel_tasks_to_finish() {
         let tasks = IdentifierListItem::ParallelList(vec![
-            IdentifierListItem::Identifier("task1".to_string()),
-            IdentifierListItem::Identifier("task2".to_string()),
+            IdentifierListItem::Identifier("task1".to_string(), vec![]),
+            IdentifierListItem::Identifier("task2".to_string(), vec![]),
         ]);
         check_flatten_tasks_for_finish(
             &tasks,
@@ -420,8 +420,8 @@ mod flatten_tasks_tests {
     #[test]
     fn two_parallel_tasks_to_start() {
         let tasks = IdentifierListItem::ParallelList(vec![
-            IdentifierListItem::Identifier("task1".to_string()),
-            IdentifierListItem::Identifier("task2".to_string()),
+            IdentifierListItem::Identifier("task1".to_string(), vec![]),
+            IdentifierListItem::Identifier("task2".to_string(), vec![]),
         ]);
         check_flatten_tasks_for_start(
             &tasks,
@@ -437,10 +437,10 @@ mod flatten_tasks_tests {
     fn sequential_and_parallel_tasks_to_finish() {
         let tasks = IdentifierListItem::ParallelList(vec![
             IdentifierListItem::SequentialList(vec![
-                IdentifierListItem::Identifier("task2".to_string()),
-                IdentifierListItem::Identifier("task3".to_string()),
+                IdentifierListItem::Identifier("task2".to_string(), vec![]),
+                IdentifierListItem::Identifier("task3".to_string(), vec![]),
             ]),
-            IdentifierListItem::Identifier("task1".to_string()),
+            IdentifierListItem::Identifier("task1".to_string(), vec![]),
         ]);
         check_flatten_tasks_for_finish(
             &tasks,
@@ -452,10 +452,10 @@ mod flatten_tasks_tests {
         );
 
         let tasks = IdentifierListItem::ParallelList(vec![
-            IdentifierListItem::Identifier("task1".to_string()),
+            IdentifierListItem::Identifier("task1".to_string(), vec![]),
             IdentifierListItem::SequentialList(vec![
-                IdentifierListItem::Identifier("task2".to_string()),
-                IdentifierListItem::Identifier("task3".to_string()),
+                IdentifierListItem::Identifier("task2".to_string(), vec![]),
+                IdentifierListItem::Identifier("task3".to_string(), vec![]),
             ]),
         ]);
         check_flatten_tasks_for_finish(
@@ -468,12 +468,12 @@ mod flatten_tasks_tests {
         );
 
         let tasks = IdentifierListItem::SequentialList(vec![
-            IdentifierListItem::Identifier("task1".to_string()),
+            IdentifierListItem::Identifier("task1".to_string(), vec![]),
             IdentifierListItem::ParallelList(vec![
-                IdentifierListItem::Identifier("task2".to_string()),
+                IdentifierListItem::Identifier("task2".to_string(), vec![]),
                 IdentifierListItem::SequentialList(vec![
-                    IdentifierListItem::Identifier("task3".to_string()),
-                    IdentifierListItem::Identifier("task4".to_string()),
+                    IdentifierListItem::Identifier("task3".to_string(), vec![]),
+                    IdentifierListItem::Identifier("task4".to_string(), vec![]),
                 ]),
             ]),
         ]);
@@ -491,10 +491,10 @@ mod flatten_tasks_tests {
     fn sequential_and_parallel_tasks_to_start() {
         let tasks = IdentifierListItem::ParallelList(vec![
             IdentifierListItem::SequentialList(vec![
-                IdentifierListItem::Identifier("task2".to_string()),
-                IdentifierListItem::Identifier("task3".to_string()),
+                IdentifierListItem::Identifier("task2".to_string(), vec![]),
+                IdentifierListItem::Identifier("task3".to_string(), vec![]),
             ]),
-            IdentifierListItem::Identifier("task1".to_string()),
+            IdentifierListItem::Identifier("task1".to_string(), vec![]),
         ]);
         check_flatten_tasks_for_start(
             &tasks,
@@ -506,10 +506,10 @@ mod flatten_tasks_tests {
         );
 
         let tasks = IdentifierListItem::ParallelList(vec![
-            IdentifierListItem::Identifier("task1".to_string()),
+            IdentifierListItem::Identifier("task1".to_string(), vec![]),
             IdentifierListItem::SequentialList(vec![
-                IdentifierListItem::Identifier("task2".to_string()),
-                IdentifierListItem::Identifier("task3".to_string()),
+                IdentifierListItem::Identifier("task2".to_string(), vec![]),
+                IdentifierListItem::Identifier("task3".to_string(), vec![]),
             ]),
         ]);
         check_flatten_tasks_for_start(
@@ -522,12 +522,12 @@ mod flatten_tasks_tests {
         );
 
         let tasks = IdentifierListItem::SequentialList(vec![
-            IdentifierListItem::Identifier("task1".to_string()),
+            IdentifierListItem::Identifier("task1".to_string(), vec![]),
             IdentifierListItem::ParallelList(vec![
-                IdentifierListItem::Identifier("task2".to_string()),
+                IdentifierListItem::Identifier("task2".to_string(), vec![]),
                 IdentifierListItem::SequentialList(vec![
-                    IdentifierListItem::Identifier("task3".to_string()),
-                    IdentifierListItem::Identifier("task4".to_string()),
+                    IdentifierListItem::Identifier("task3".to_string(), vec![]),
+                    IdentifierListItem::Identifier("task4".to_string(), vec![]),
                 ]),
             ]),
         ]);

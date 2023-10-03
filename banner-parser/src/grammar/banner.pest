@@ -85,10 +85,11 @@ heir_query_fragment = @{ (ASCII_ALPHA | ASCII_DIGIT | "-" | "." | "_" | "~" | ":
 
 job_specification = { "job" ~ identifier ~ sequential_identifier_list }
 pipeline_specification = { "pipeline" ~ identifier ~ sequential_identifier_list }
+job_macro_marker = { "!" }
 
 parallel_identifier_list = {
-    "{" ~ (identifier | sequential_identifier_list) ~ ("," ~ (identifier | sequential_identifier_list))* ~ ","? ~ "}"
+    "{" ~ (identifier ~ job_macro_marker? | sequential_identifier_list) ~ ("," ~ (identifier ~ job_macro_marker? | sequential_identifier_list))* ~ ","? ~ "}"
 }
 sequential_identifier_list = {
-    "[" ~ (identifier | parallel_identifier_list) ~ ("," ~ (identifier | parallel_identifier_list))* ~ ","? ~ "]"
+    "[" ~ (identifier ~ job_macro_marker? | parallel_identifier_list) ~ ("," ~ (identifier ~ job_macro_marker? | parallel_identifier_list))* ~ ","? ~ "]"
 }

@@ -69,7 +69,10 @@ pub fn create_start_pipeline_job_event_handler(
 ) -> Vec<EventHandler> {
     let mut event_handlers: Vec<EventHandler> = vec![];
     match (current, next) {
-        (IdentifierListItem::Identifier(job_name), IdentifierListItem::Identifier(nj_name)) => {
+        (
+            IdentifierListItem::Identifier(job_name, _),
+            IdentifierListItem::Identifier(nj_name, _),
+        ) => {
             // nj = next job
             // The next_job should be triggered when the current job completes.
             // This is a sequential part of the pipeline, so it's a straight forward one job finishes
@@ -96,8 +99,8 @@ pub fn create_start_pipeline_job_event_handler(
             );
             event_handlers.push(eh);
         }
-        (IdentifierListItem::Identifier(job_name), IdentifierListItem::SequentialList(_))
-        | (IdentifierListItem::Identifier(job_name), IdentifierListItem::ParallelList(_)) => {
+        (IdentifierListItem::Identifier(job_name, _), IdentifierListItem::SequentialList(_))
+        | (IdentifierListItem::Identifier(job_name, _), IdentifierListItem::ParallelList(_)) => {
             // if we have a straight forward job followed by a list of jobs; either parallel
             // or sequential; then we need to trigger the first job in the list when the current
             // job finishes.
@@ -130,8 +133,8 @@ pub fn create_start_pipeline_job_event_handler(
         }
         (IdentifierListItem::SequentialList(_), IdentifierListItem::SequentialList(_)) => todo!(),
         (IdentifierListItem::SequentialList(_), IdentifierListItem::ParallelList(_)) => todo!(),
-        (IdentifierListItem::SequentialList(_), IdentifierListItem::Identifier(nj_name))
-        | (IdentifierListItem::ParallelList(_), IdentifierListItem::Identifier(nj_name)) => {
+        (IdentifierListItem::SequentialList(_), IdentifierListItem::Identifier(nj_name, _))
+        | (IdentifierListItem::ParallelList(_), IdentifierListItem::Identifier(nj_name, _)) => {
             // if we have any list type before a straight forward job, then we need to trigger
             // the next job after all the last jobs in the previous list have finished.
             let pipeline_tag = Metadata::new_banner_pipeline(pipeline_name);
@@ -245,7 +248,7 @@ fn generate_execute_job_after_job_complete(
 
 fn flatten_jobs_for_start(job: &IdentifierListItem) -> Vec<&str> {
     match job {
-        IdentifierListItem::Identifier(task) => vec![task],
+        IdentifierListItem::Identifier(task, _) => vec![task],
         IdentifierListItem::SequentialList(tasks) => {
             let first_task = tasks.first().unwrap();
             flatten_jobs_for_finish(first_task)
@@ -263,7 +266,9 @@ fn flatten_jobs_for_start(job: &IdentifierListItem) -> Vec<&str> {
 
 fn flatten_jobs_for_finish(job: &IdentifierListItem) -> Vec<&str> {
     match job {
-        IdentifierListItem::Identifier(job) => vec![job],
+        IdentifierListItem::Identifier(job, _) => {
+            vec![job]
+        }
         IdentifierListItem::SequentialList(list) => {
             let last_job = list.last().unwrap();
             flatten_jobs_for_finish(last_job)
@@ -301,7 +306,7 @@ pub fn create_start_job_event_handler(
 
     let mut event_handlers: Vec<EventHandler> = vec![];
     match task {
-        IdentifierListItem::Identifier(task) => {
+        IdentifierListItem::Identifier(task, _) => {
             let task_tag = Metadata::new_banner_job(task);
             let script = generate_start_task_script(pipeline, job, task);
             let eh = EventHandler::new(
@@ -358,7 +363,7 @@ fn create_finished_job_event_handlers(
 
     let mut event_handlers: Vec<EventHandler> = vec![];
     match task {
-        IdentifierListItem::Identifier(task) => {
+        IdentifierListItem::Identifier(task, _) => {
             let listen_for_success_event = create_success_event_listener(pipeline, job, task);
             let script = generate_finish_job_on_success_script(pipeline, &job.name);
             let eh = EventHandler::new(

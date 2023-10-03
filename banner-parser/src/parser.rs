@@ -123,6 +123,25 @@ mod banner_parser_tests {
 
         check(&code, expect!["()"])
     }
+
+    #[traced_test]
+    #[test]
+    fn can_parse_job_macro() {
+        let code = r#######"
+        task unit-test(image: alpine, execute: "/bin/sh -c") {
+            r#"
+            // this is a comment
+            echo -n "testing, testing, 1, 2, 3!"
+            "#
+        }
+        
+        pipeline test [
+            unit-test!,
+        ]
+        "#######;
+
+        check(&code, expect!["()"])
+    }
 }
 
 #[cfg(test)]
@@ -277,6 +296,7 @@ mod pipeline_from_ast_tests {
                             tasks: [
                                 Identifier(
                                     "cowsay",
+                                    [],
                                 ),
                             ],
                         },
@@ -287,6 +307,7 @@ mod pipeline_from_ast_tests {
                             jobs: [
                                 Identifier(
                                     "build",
+                                    [],
                                 ),
                             ],
                         },
@@ -357,9 +378,11 @@ mod pipeline_from_ast_tests {
                             tasks: [
                                 Identifier(
                                     "cowsay",
+                                    [],
                                 ),
                                 Identifier(
                                     "cowsay",
+                                    [],
                                 ),
                             ],
                         },
@@ -370,6 +393,7 @@ mod pipeline_from_ast_tests {
                             jobs: [
                                 Identifier(
                                     "build",
+                                    [],
                                 ),
                             ],
                         },
@@ -403,6 +427,7 @@ mod pipeline_from_ast_tests {
                             tasks: [
                                 Identifier(
                                     "build",
+                                    [],
                                 ),
                             ],
                         },
@@ -413,6 +438,7 @@ mod pipeline_from_ast_tests {
                             jobs: [
                                 Identifier(
                                     "build",
+                                    [],
                                 ),
                             ],
                         },
@@ -442,9 +468,11 @@ mod pipeline_from_ast_tests {
                             tasks: [
                                 Identifier(
                                     "build",
+                                    [],
                                 ),
                                 Identifier(
                                     "test",
+                                    [],
                                 ),
                             ],
                         },
@@ -551,30 +579,37 @@ mod pipeline_from_ast_tests {
                             tasks: [
                                 Identifier(
                                     "task1",
+                                    [],
                                 ),
                                 ParallelList(
                                     [
                                         Identifier(
                                             "task2",
+                                            [],
                                         ),
                                         Identifier(
                                             "task3",
+                                            [],
                                         ),
                                         SequentialList(
                                             [
                                                 Identifier(
                                                     "task5",
+                                                    [],
                                                 ),
                                                 Identifier(
                                                     "task6",
+                                                    [],
                                                 ),
                                                 ParallelList(
                                                     [
                                                         Identifier(
                                                             "task7",
+                                                            [],
                                                         ),
                                                         Identifier(
                                                             "task8",
+                                                            [],
                                                         ),
                                                     ],
                                                 ),
@@ -584,6 +619,7 @@ mod pipeline_from_ast_tests {
                                 ),
                                 Identifier(
                                     "task4",
+                                    [],
                                 ),
                             ],
                         },
@@ -592,6 +628,102 @@ mod pipeline_from_ast_tests {
                     eoi: EndOfInput,
                 }"#]],
         )
+    }
+
+    #[traced_test]
+    #[test]
+    fn can_parse_parallel_jobs_in_pipeline() {
+        let code = r#######"
+            pipeline test [
+                task1!,
+                {
+                    task2!,
+                    task3!,
+                    [
+                        task5!,
+                        task6!,
+                        {task7!,task8!}
+                    ]
+                },
+                task4!,
+            ]
+        "#######;
+
+        check(&code, expect![[r#"
+            Pipeline {
+                imports: [],
+                images: [],
+                tasks: [],
+                jobs: [],
+                pipelines: [
+                    PipelineSpecification {
+                        name: "test",
+                        jobs: [
+                            Identifier(
+                                "task1",
+                                [
+                                    JobMacro,
+                                ],
+                            ),
+                            ParallelList(
+                                [
+                                    Identifier(
+                                        "task2",
+                                        [
+                                            JobMacro,
+                                        ],
+                                    ),
+                                    Identifier(
+                                        "task3",
+                                        [
+                                            JobMacro,
+                                        ],
+                                    ),
+                                    SequentialList(
+                                        [
+                                            Identifier(
+                                                "task5",
+                                                [
+                                                    JobMacro,
+                                                ],
+                                            ),
+                                            Identifier(
+                                                "task6",
+                                                [
+                                                    JobMacro,
+                                                ],
+                                            ),
+                                            ParallelList(
+                                                [
+                                                    Identifier(
+                                                        "task7",
+                                                        [
+                                                            JobMacro,
+                                                        ],
+                                                    ),
+                                                    Identifier(
+                                                        "task8",
+                                                        [
+                                                            JobMacro,
+                                                        ],
+                                                    ),
+                                                ],
+                                            ),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            Identifier(
+                                "task4",
+                                [
+                                    JobMacro,
+                                ],
+                            ),
+                        ],
+                    },
+                ],
+                eoi: EndOfInput,
+            }"#]]);
     }
 }
 

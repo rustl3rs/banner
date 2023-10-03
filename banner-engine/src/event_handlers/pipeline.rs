@@ -18,7 +18,7 @@ pub fn create_finished_pipeline_event_handler(
 
     let mut event_handlers = Vec::<EventHandler>::new();
     match job {
-        IdentifierListItem::Identifier(job) => {
+        IdentifierListItem::Identifier(job, _) => {
             let event = create_success_event_listener(&pipeline.name, job);
             let script = generate_finish_pipeline_on_success_script(&pipeline.name);
             let eh = EventHandler::new(
@@ -99,11 +99,11 @@ pub fn create_start_pipeline_event_handler(
     .with_pipeline_name(&pipeline.name)
     .build();
     let script = match job {
-        IdentifierListItem::Identifier(job) => generate_start_pipeline_script_single_job(&pipeline.name, job),
+        IdentifierListItem::Identifier(job, _) => generate_start_pipeline_script_single_job(&pipeline.name, job),
         IdentifierListItem::SequentialList(_jobs) => panic!("Sequential lists in this context are not supported. This should really never happen, since the parser should have caught this."),
         IdentifierListItem::ParallelList(jobs) => {
             let start_jobs:Vec<&str> = jobs.iter().flat_map(|j| match j {
-                IdentifierListItem::Identifier(id) => vec![id.as_str()],
+                IdentifierListItem::Identifier(id, _) => vec![id.as_str()],
                 IdentifierListItem::SequentialList(list) => get_first_jobs_sequential(list),
                 IdentifierListItem::ParallelList(list) => get_all_jobs_parallel(list),
             }).collect();
@@ -121,7 +121,7 @@ pub fn create_start_pipeline_event_handler(
 fn get_all_jobs_parallel(list: &[IdentifierListItem]) -> Vec<&str> {
     list.iter()
         .flat_map(|j| match j {
-            IdentifierListItem::Identifier(id) => vec![id.as_str()],
+            IdentifierListItem::Identifier(id, _) => vec![id.as_str()],
             IdentifierListItem::SequentialList(list) => get_first_jobs_sequential(list),
             IdentifierListItem::ParallelList(list) => get_all_jobs_parallel(list),
         })
@@ -131,7 +131,9 @@ fn get_all_jobs_parallel(list: &[IdentifierListItem]) -> Vec<&str> {
 fn get_first_jobs_sequential(list: &[IdentifierListItem]) -> Vec<&str> {
     let first = list.first().unwrap();
     match first {
-        IdentifierListItem::Identifier(id) => vec![id.as_str()],
+        IdentifierListItem::Identifier(id, _) => {
+            vec![id.as_str()]
+        }
         IdentifierListItem::SequentialList(list) => get_first_jobs_sequential(list),
         IdentifierListItem::ParallelList(list) => get_all_jobs_parallel(list),
     }
@@ -201,7 +203,7 @@ fn get_event_handlers_for_job_type(
 
     let next_job = next_job.unwrap();
     match next_job {
-        IdentifierListItem::Identifier(_) => {
+        IdentifierListItem::Identifier(_, _) => {
             log::debug!(
                 target: "task_log",
                 "get_event_handlers_for_job_type: NEXT JOB: {next_job:?}"
@@ -219,7 +221,7 @@ fn get_event_handlers_for_job_type(
 
             for job in list.iter() {
                 match job {
-                    IdentifierListItem::Identifier(_) => (),
+                    IdentifierListItem::Identifier(_, _) => (),
                     IdentifierListItem::SequentialList(list) => {
                         let mut iter = list.iter();
                         let _ = iter.next();

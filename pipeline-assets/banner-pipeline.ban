@@ -58,27 +58,11 @@ task test(image: ${rust_build_image}, execute: "bash -exo pipefail -c") {
     "#
 }
 
-job get-source [
-    get-source,
-]
-
-job check-format [
-    check-format,
-]
-
-job check-clippy [
-    check-clippy,
-]
-
-job test [
-    test,
-]
-
 pipeline banner [
-    get-source,
+    get-source!,
     {
-        check-format,
-        check-clippy,
+        check-format!,
+        check-clippy!,
     },
-    test,
+    test!,
 ]
