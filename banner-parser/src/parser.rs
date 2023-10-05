@@ -649,7 +649,9 @@ mod pipeline_from_ast_tests {
             ]
         "#######;
 
-        check(&code, expect![[r#"
+        check(
+            &code,
+            expect![[r#"
             Pipeline {
                 imports: [],
                 images: [],
@@ -723,7 +725,8 @@ mod pipeline_from_ast_tests {
                     },
                 ],
                 eoi: EndOfInput,
-            }"#]]);
+            }"#]],
+        );
     }
 }
 

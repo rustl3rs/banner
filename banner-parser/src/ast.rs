@@ -491,7 +491,7 @@ fn from_ident_list(pest: &mut Pairs<Rule>) -> Vec<IdentifierListItem> {
                                 };
                                 markers.push(marker);
                             }
-    
+
                             tasks.push(IdentifierListItem::Identifier(
                                 task.to_string(),
                                 markers,
