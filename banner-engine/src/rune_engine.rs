@@ -69,36 +69,38 @@ impl<'a> RuneEngineWrapper {
             .await;
     }
 
-    pub async fn job_success(&self, pipeline: &str, job: &str) {
+    pub async fn job_complete(&self, event: &Event) {
+        let (pipeline, job, _) = self.get_pipeline_metadata_from_event(event).await;
+        let key = format!("{scope}/{pipeline}/{job}", scope = "");
+        let result = match event.get_type() {
+            EventType::System(SystemEventType::Done(SystemEventScope::Task, result)) => {
+                match result {
+                    SystemEventResult::Success => {
+                        let _ = self
+                            .engine
+                            .set_state_for_id(&key, ExecutionStatus::Success.to_string());
+                    }
+                    _ => {
+                        let _ = self
+                            .engine
+                            .set_state_for_id(&key, ExecutionStatus::Failed.to_string());
+                    }
+                }
+                result
+            }
+            _ => {
+                panic!("Invalid event type for job complete")
+            }
+        };
+
         Event::new_builder(EventType::System(SystemEventType::Done(
             SystemEventScope::Job,
-            SystemEventResult::Success,
+            result,
         )))
         .with_pipeline_name(pipeline)
         .with_job_name(job)
         .send_from(&self.tx)
         .await;
-
-        let _ = self.engine.set_state_for_id(
-            &format!("{}/{}/{}", "", pipeline, job),
-            ExecutionStatus::Success.to_string(),
-        );
-    }
-
-    pub async fn job_fail(&self, pipeline: &str, job: &str) {
-        Event::new_builder(EventType::System(SystemEventType::Done(
-            SystemEventScope::Job,
-            SystemEventResult::Failed,
-        )))
-        .with_pipeline_name(pipeline)
-        .with_job_name(job)
-        .send_from(&self.tx)
-        .await;
-
-        let _ = self.engine.set_state_for_id(
-            &format!("{}/{}/{}", "", pipeline, job),
-            ExecutionStatus::Failed.to_string(),
-        );
     }
 
     pub async fn task_success(&self, pipeline: &str, job: &str, task: &str) {
@@ -219,7 +221,7 @@ impl<'a> RuneEngineWrapper {
         }
     }
 
-    pub async fn set_state_for_task(&self, _scope: &str, key: &str, value: SystemEventResult) {
+    pub async fn set_state_for_task(&self, _scope: &str, key: &str, value: &SystemEventResult) {
         let val = value.to_string();
         let result = self.engine.set_state_for_id(key, val);
         match result {

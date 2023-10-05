@@ -364,27 +364,17 @@ fn create_finished_job_event_handlers(
     let mut event_handlers: Vec<EventHandler> = vec![];
     match task {
         IdentifierListItem::Identifier(task, _) => {
-            let listen_for_success_event = create_success_event_listener(pipeline, job, task);
-            let script = generate_finish_job_on_success_script(pipeline, &job.name);
+            let listen_for_event = create_finish_event_listener(pipeline, job, task);
+            let script = generate_finish_job_script();
             let eh = EventHandler::new(
                 vec![
                     pipeline_tag.clone(),
                     job_tag.clone(),
                     description_tag.clone(),
                 ],
-                vec![listen_for_success_event],
+                vec![listen_for_event],
                 script,
             );
-            event_handlers.push(eh);
-
-            let listen_for_fail_event = create_fail_event_listener(pipeline, job, task);
-            let script = generate_finish_job_on_fail_script(pipeline, &job.name);
-            let eh = EventHandler::new(
-                vec![pipeline_tag, job_tag, description_tag],
-                vec![listen_for_fail_event],
-                script,
-            );
-
             event_handlers.push(eh);
         }
         IdentifierListItem::SequentialList(_) => todo!(),
@@ -394,16 +384,13 @@ fn create_finished_job_event_handlers(
     event_handlers
 }
 
-fn create_fail_event_listener(
+fn create_finish_event_listener(
     pipeline: &str,
     job: &ast::JobSpecification,
     task: &str,
 ) -> ListenForEvent {
     ListenForEvent::new_builder(ListenForEventType::System(Only(
-        ListenForSystemEventType::Done(
-            Only(ListenForSystemEventScope::Task),
-            Only(ListenForSystemEventResult::Failed),
-        ),
+        ListenForSystemEventType::Done(Any, Any),
     )))
     .with_pipeline_name(pipeline)
     .with_job_name(&job.name)
@@ -411,35 +398,10 @@ fn create_fail_event_listener(
     .build()
 }
 
-fn create_success_event_listener(
-    pipeline: &str,
-    job: &ast::JobSpecification,
-    task: &str,
-) -> ListenForEvent {
-    ListenForEvent::new_builder(ListenForEventType::System(Only(
-        ListenForSystemEventType::Done(
-            Only(ListenForSystemEventScope::Task),
-            Only(ListenForSystemEventResult::Success),
-        ),
-    )))
-    .with_pipeline_name(pipeline)
-    .with_job_name(&job.name)
-    .with_task_name(task)
-    .build()
-}
-
-fn generate_finish_job_on_fail_script(pipeline: &str, job_name: &str) -> String {
+fn generate_finish_job_script() -> String {
     format!(
         r###"pub async fn main (engine, event) {{
-            engine.job_fail("{pipeline}", "{job_name}").await;
-        }}"###
-    )
-}
-
-fn generate_finish_job_on_success_script(pipeline: &str, job_name: &str) -> String {
-    format!(
-        r###"pub async fn main (engine, event) {{
-            engine.job_success("{pipeline}", "{job_name}").await;
+            engine.job_complete(event).await;
         }}"###
     )
 }

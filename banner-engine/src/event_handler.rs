@@ -226,12 +226,11 @@ fn module() -> Result<Module, ContextError> {
     module.async_inst_fn("trigger_job", RuneEngineWrapper::trigger_job)?;
     module.async_inst_fn("trigger_task", RuneEngineWrapper::trigger_task)?;
     module.async_inst_fn("log_message", RuneEngineWrapper::log_message)?;
-    module.async_inst_fn("job_success", RuneEngineWrapper::job_success)?;
-    module.async_inst_fn("job_fail", RuneEngineWrapper::job_fail)?;
-    module.async_inst_fn("task_success", RuneEngineWrapper::task_success)?;
-    module.async_inst_fn("task_fail", RuneEngineWrapper::task_fail)?;
     module.async_inst_fn("pipeline_success", RuneEngineWrapper::pipeline_success)?;
     module.async_inst_fn("pipeline_fail", RuneEngineWrapper::pipeline_fail)?;
+    module.async_inst_fn("job_complete", RuneEngineWrapper::job_complete)?;
+    module.async_inst_fn("task_success", RuneEngineWrapper::task_success)?;
+    module.async_inst_fn("task_fail", RuneEngineWrapper::task_fail)?;
     module.async_inst_fn(
         "execute_task_name_in_scope",
         RuneEngineWrapper::execute_task_name_in_scope,
