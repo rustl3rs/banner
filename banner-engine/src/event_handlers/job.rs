@@ -390,7 +390,7 @@ fn create_finish_event_listener(
     task: &str,
 ) -> ListenForEvent {
     ListenForEvent::new_builder(ListenForEventType::System(Only(
-        ListenForSystemEventType::Done(Any, Any),
+        ListenForSystemEventType::Done(Only(ListenForSystemEventScope::Task), Any),
     )))
     .with_pipeline_name(pipeline)
     .with_job_name(&job.name)

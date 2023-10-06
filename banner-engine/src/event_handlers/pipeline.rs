@@ -19,18 +19,13 @@ pub fn create_finished_pipeline_event_handler(
     let mut event_handlers = Vec::<EventHandler>::new();
     match job {
         IdentifierListItem::Identifier(job, _) => {
-            let event = create_success_event_listener(&pipeline.name, job);
-            let script = generate_finish_pipeline_on_success_script(&pipeline.name);
+            let event = create_pipeline_complete_event_listener(&pipeline.name, job);
+            let script = generate_finish_pipeline_script();
             let eh = EventHandler::new(
                 vec![pipeline_tag.clone(), description_tag.clone()],
                 vec![event],
                 script,
             );
-            event_handlers.push(eh);
-
-            let event = create_fail_event_listener(&pipeline.name, job);
-            let script = generate_finish_pipeline_on_fail_script(&pipeline.name);
-            let eh = EventHandler::new(vec![pipeline_tag, description_tag], vec![event], script);
             event_handlers.push(eh);
         }
         IdentifierListItem::SequentialList(_jobs) => todo!(),
@@ -40,24 +35,9 @@ pub fn create_finished_pipeline_event_handler(
     event_handlers
 }
 
-fn create_success_event_listener(pipeline: &str, job: &str) -> ListenForEvent {
+fn create_pipeline_complete_event_listener(pipeline: &str, job: &str) -> ListenForEvent {
     ListenForEvent::new_builder(ListenForEventType::System(Only(
-        ListenForSystemEventType::Done(
-            Only(ListenForSystemEventScope::Job),
-            Only(ListenForSystemEventResult::Success),
-        ),
-    )))
-    .with_pipeline_name(pipeline)
-    .with_job_name(job)
-    .build()
-}
-
-fn create_fail_event_listener(pipeline: &str, job: &str) -> ListenForEvent {
-    ListenForEvent::new_builder(ListenForEventType::System(Only(
-        ListenForSystemEventType::Done(
-            Only(ListenForSystemEventScope::Job),
-            Only(ListenForSystemEventResult::Failed),
-        ),
+        ListenForSystemEventType::Done(Only(ListenForSystemEventScope::Job), Any),
     )))
     .with_pipeline_name(pipeline)
     .with_job_name(job)
@@ -255,6 +235,14 @@ fn get_event_handlers_for_job_type(
     event_handlers.extend(eh);
 
     event_handlers
+}
+
+fn generate_finish_pipeline_script() -> String {
+    format!(
+        r###"pub async fn main (engine, event) {{
+            engine.pipeline_complete(event).await;
+        }}"###
+    )
 }
 
 fn generate_finish_pipeline_on_success_script(pipeline: &str) -> String {

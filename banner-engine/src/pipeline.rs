@@ -794,51 +794,26 @@ mod build_pipeline_tests {
                         },
                         {
                             listen_for_events:
-                                ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+                                ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
                             tags:
                                 banner.dev/pipeline: test,
                                 banner.dev/description: Signal the completion of the pipeline: test; Last job was: unit-test!,
                             script: ###"
                                 pub async fn main (engine, event) {
-                                    engine.pipeline_success("test").await;
+                                    engine.pipeline_complete(event).await;
                                 }
                             "###
                         },
                         {
                             listen_for_events:
-                                ListenForEvent { type: System(Only(Done(Only(Job), Only(Failed)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
-                            tags:
-                                banner.dev/pipeline: test,
-                                banner.dev/description: Signal the completion of the pipeline: test; Last job was: unit-test!,
-                            script: ###"
-                                pub async fn main (engine, event) {
-                                    engine.pipeline_fail("test").await;
-                                }
-                            "###
-                        },
-                        {
-                            listen_for_events:
-                                ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test, banner.dev/task: unit-test] },
+                                ListenForEvent { type: System(Only(Done(Only(Task), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test, banner.dev/task: unit-test] },
                             tags:
                                 banner.dev/pipeline: test,
                                 banner.dev/job: unit-test,
                                 banner.dev/description: Signal the completion of the job: test/unit-test; Last task was: unit-test,
                             script: ###"
                                 pub async fn main (engine, event) {
-                                    engine.job_success("test", "unit-test").await;
-                                }
-                            "###
-                        },
-                        {
-                            listen_for_events:
-                                ListenForEvent { type: System(Only(Done(Only(Task), Only(Failed)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test, banner.dev/task: unit-test] },
-                            tags:
-                                banner.dev/pipeline: test,
-                                banner.dev/job: unit-test,
-                                banner.dev/description: Signal the completion of the job: test/unit-test; Last task was: unit-test,
-                            script: ###"
-                                pub async fn main (engine, event) {
-                                    engine.job_fail("test", "unit-test").await;
+                                    engine.job_complete(event).await;
                                 }
                             "###
                         },
@@ -948,24 +923,13 @@ mod event_handler_creation_tests {
                 "###
             }, {
                 listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-prod] },
+                    ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-prod] },
                 tags:
                     banner.dev/pipeline: test,
                     banner.dev/description: Signal the completion of the pipeline: test; Last job was: deploy-prod,
                 script: ###"
                     pub async fn main (engine, event) {
-                        engine.pipeline_success("test").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Failed)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-prod] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: deploy-prod,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.pipeline_fail("test").await;
+                        engine.pipeline_complete(event).await;
                     }
                 "###
             }, {
@@ -1056,24 +1020,13 @@ mod event_handler_creation_tests {
                 "###
             }, {
                 listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+                    ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
                 tags:
                     banner.dev/pipeline: test,
                     banner.dev/description: Signal the completion of the pipeline: test; Last job was: unit-test,
                 script: ###"
                     pub async fn main (engine, event) {
-                        engine.pipeline_success("test").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Failed)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.pipeline_fail("test").await;
+                        engine.pipeline_complete(event).await;
                     }
                 "###
             }]"####]]).await;
@@ -1105,24 +1058,13 @@ mod event_handler_creation_tests {
                 "###
             }, {
                 listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: build-artefacts] },
+                    ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: build-artefacts] },
                 tags:
                     banner.dev/pipeline: test,
                     banner.dev/description: Signal the completion of the pipeline: test; Last job was: build-artefacts,
                 script: ###"
                     pub async fn main (engine, event) {
-                        engine.pipeline_success("test").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Failed)))), metadata: [banner.dev/pipeline: test, banner.dev/job: build-artefacts] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: build-artefacts,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.pipeline_fail("test").await;
+                        engine.pipeline_complete(event).await;
                     }
                 "###
             }, {
@@ -1154,26 +1096,14 @@ mod event_handler_creation_tests {
         check_job(ast, expect![[r####"
             [{
                 listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: unit-test] },
+                    ListenForEvent { type: System(Only(Done(Only(Task), Any))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: unit-test] },
                 tags:
                     banner.dev/pipeline: _,
                     banner.dev/job: build,
                     banner.dev/description: Signal the completion of the job: _/build; Last task was: unit-test,
                 script: ###"
                     pub async fn main (engine, event) {
-                        engine.job_success("_", "build").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Failed)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: unit-test] },
-                tags:
-                    banner.dev/pipeline: _,
-                    banner.dev/job: build,
-                    banner.dev/description: Signal the completion of the job: _/build; Last task was: unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.job_fail("_", "build").await;
+                        engine.job_complete(event).await;
                     }
                 "###
             }, {
@@ -1208,26 +1138,14 @@ mod event_handler_creation_tests {
         check_job(ast, expect![[r####"
             [{
                 listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: publish-docker] },
+                    ListenForEvent { type: System(Only(Done(Only(Task), Any))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: publish-docker] },
                 tags:
                     banner.dev/pipeline: _,
                     banner.dev/job: build,
                     banner.dev/description: Signal the completion of the job: _/build; Last task was: publish-docker,
                 script: ###"
                     pub async fn main (engine, event) {
-                        engine.job_success("_", "build").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Failed)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: publish-docker] },
-                tags:
-                    banner.dev/pipeline: _,
-                    banner.dev/job: build,
-                    banner.dev/description: Signal the completion of the job: _/build; Last task was: publish-docker,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.job_fail("_", "build").await;
+                        engine.job_complete(event).await;
                     }
                 "###
             }, {
@@ -1310,48 +1228,25 @@ mod event_handler_creation_tests {
                 "###
             }, {
                 listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build] },
+                    ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build] },
                 tags:
                     banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
                     banner.dev/description: Signal the completion of the pipeline: test_simple_pipeline_with_job_and_task; Last job was: build,
                 script: ###"
                     pub async fn main (engine, event) {
-                        engine.pipeline_success("test_simple_pipeline_with_job_and_task").await;
+                        engine.pipeline_complete(event).await;
                     }
                 "###
             }, {
                 listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Failed)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build] },
-                tags:
-                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
-                    banner.dev/description: Signal the completion of the pipeline: test_simple_pipeline_with_job_and_task; Last job was: build,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.pipeline_fail("test_simple_pipeline_with_job_and_task").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build, banner.dev/task: unit-test] },
+                    ListenForEvent { type: System(Only(Done(Only(Task), Any))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build, banner.dev/task: unit-test] },
                 tags:
                     banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
                     banner.dev/job: build,
                     banner.dev/description: Signal the completion of the job: test_simple_pipeline_with_job_and_task/build; Last task was: unit-test,
                 script: ###"
                     pub async fn main (engine, event) {
-                        engine.job_success("test_simple_pipeline_with_job_and_task", "build").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Failed)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build, banner.dev/task: unit-test] },
-                tags:
-                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
-                    banner.dev/job: build,
-                    banner.dev/description: Signal the completion of the job: test_simple_pipeline_with_job_and_task/build; Last task was: unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.job_fail("test_simple_pipeline_with_job_and_task", "build").await;
+                        engine.job_complete(event).await;
                     }
                 "###
             }, {

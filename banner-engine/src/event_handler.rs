@@ -96,25 +96,6 @@ impl EventHandler {
     }
 }
 
-// fn get_target_pipeline_and_task(tags: &[Metadata]) -> (&str, &str, &str) {
-//     let pipeline_name = tags.iter().find(|tag| tag.key() == PIPELINE_TAG);
-//     let job_name = tags.iter().find(|tag| tag.key() == JOB_TAG);
-//     let task_name = tags.iter().find(|tag| tag.key() == TASK_TAG);
-//     let pipeline_name = match pipeline_name {
-//         Some(pt) => pt.value(),
-//         None => "_",
-//     };
-//     let job_name = match job_name {
-//         Some(jt) => jt.value(),
-//         None => "_",
-//     };
-//     let task_name = match task_name {
-//         Some(tt) => tt.value(),
-//         None => "_",
-//     };
-//     (pipeline_name, job_name, task_name)
-// }
-
 async fn execute_event_script(
     engine: Arc<dyn Engine + Sync + Send>,
     event: Event,
@@ -226,11 +207,8 @@ fn module() -> Result<Module, ContextError> {
     module.async_inst_fn("trigger_job", RuneEngineWrapper::trigger_job)?;
     module.async_inst_fn("trigger_task", RuneEngineWrapper::trigger_task)?;
     module.async_inst_fn("log_message", RuneEngineWrapper::log_message)?;
-    module.async_inst_fn("pipeline_success", RuneEngineWrapper::pipeline_success)?;
-    module.async_inst_fn("pipeline_fail", RuneEngineWrapper::pipeline_fail)?;
+    module.async_inst_fn("pipeline_complete", RuneEngineWrapper::pipeline_complete)?;
     module.async_inst_fn("job_complete", RuneEngineWrapper::job_complete)?;
-    module.async_inst_fn("task_success", RuneEngineWrapper::task_success)?;
-    module.async_inst_fn("task_fail", RuneEngineWrapper::task_fail)?;
     module.async_inst_fn(
         "execute_task_name_in_scope",
         RuneEngineWrapper::execute_task_name_in_scope,
@@ -243,7 +221,6 @@ fn module() -> Result<Module, ContextError> {
     )?;
     module.ty::<Event>()?;
     module.inst_fn("get_type", Event::get_type)?;
-    // module.inst_fn("type", Event::r#type)?;
     module.ty::<EventType>()?;
     module.ty::<SystemEventType>()?;
     module.ty::<SystemEventScope>()?;

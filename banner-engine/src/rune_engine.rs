@@ -69,6 +69,39 @@ impl<'a> RuneEngineWrapper {
             .await;
     }
 
+    pub async fn pipeline_complete(&self, event: &Event) {
+        let (pipeline, _, _) = self.get_pipeline_metadata_from_event_tags(event).await;
+        let key = format!("{scope}/{pipeline}", scope = "");
+        let result = match event.get_type() {
+            EventType::System(SystemEventType::Done(SystemEventScope::Job, result)) => {
+                match result {
+                    SystemEventResult::Success => {
+                        let _ = self
+                            .engine
+                            .set_state_for_id(&key, ExecutionStatus::Success.to_string());
+                    }
+                    _ => {
+                        let _ = self
+                            .engine
+                            .set_state_for_id(&key, ExecutionStatus::Failed.to_string());
+                    }
+                }
+                result
+            }
+            _ => {
+                panic!("Invalid event type for pipeline complete")
+            }
+        };
+
+        Event::new_builder(EventType::System(SystemEventType::Done(
+            SystemEventScope::Pipeline,
+            result,
+        )))
+        .with_pipeline_name(pipeline)
+        .send_from(&self.tx)
+        .await;
+    }
+
     pub async fn job_complete(&self, event: &Event) {
         let (pipeline, job, _) = self.get_pipeline_metadata_from_event(event).await;
         let key = format!("{scope}/{pipeline}/{job}", scope = "");
@@ -133,36 +166,6 @@ impl<'a> RuneEngineWrapper {
 
         let _ = self.engine.set_state_for_id(
             &format!("{}/{}/{}/{}", "", pipeline, job, task),
-            ExecutionStatus::Failed.to_string(),
-        );
-    }
-
-    pub async fn pipeline_success(&self, pipeline: &str) {
-        Event::new_builder(EventType::System(SystemEventType::Done(
-            SystemEventScope::Pipeline,
-            SystemEventResult::Success,
-        )))
-        .with_pipeline_name(pipeline)
-        .send_from(&self.tx)
-        .await;
-
-        let _ = self.engine.set_state_for_id(
-            &format!("{}/{}", "", pipeline),
-            ExecutionStatus::Success.to_string(),
-        );
-    }
-
-    pub async fn pipeline_fail(&self, pipeline: &str) {
-        Event::new_builder(EventType::System(SystemEventType::Done(
-            SystemEventScope::Pipeline,
-            SystemEventResult::Failed,
-        )))
-        .with_pipeline_name(pipeline)
-        .send_from(&self.tx)
-        .await;
-
-        let _ = self.engine.set_state_for_id(
-            &format!("{}/{}", "", pipeline),
             ExecutionStatus::Failed.to_string(),
         );
     }
@@ -253,6 +256,25 @@ impl<'a> RuneEngineWrapper {
         match event.metadata().iter().find(|md| md.key() == TASK_TAG) {
             Some(task) => (pipeline, job, task.value()),
             None => (pipeline, job, ""),
+        }
+    }
+
+    pub async fn get_pipeline_metadata_from_event_tags(
+        &self,
+        event: &'a Event,
+    ) -> (&'a str, Option<&'a str>, Option<&'a str>) {
+        let pipeline = event
+            .metadata()
+            .iter()
+            .find(|md| md.key() == PIPELINE_TAG)
+            .unwrap()
+            .value();
+        match event.metadata().iter().find(|md| md.key() == JOB_TAG) {
+            Some(job) => match event.metadata().iter().find(|md| md.key() == TASK_TAG) {
+                Some(task) => (pipeline, Some(job.value()), Some(task.value())),
+                None => (pipeline, Some(job.value()), None),
+            },
+            None => (pipeline, None, None),
         }
     }
 }
