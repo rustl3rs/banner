@@ -28,6 +28,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct Pipeline {
+    pub name: String,
     pub tasks: Vec<TaskDefinition>,
     pub event_handlers: Vec<EventHandler>,
     pub pragmas: Vec<Pragma>,
@@ -366,6 +367,7 @@ fn ast_to_repr(ast: ast::Pipeline, pragma_builder: PragmasBuilder) -> Pipeline {
         .collect();
 
     Pipeline {
+        name: ast.pipelines[0].name.clone(),
         tasks,
         event_handlers,
         pragmas,

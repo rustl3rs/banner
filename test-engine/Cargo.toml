@@ -1,5 +1,5 @@
 [package]
-name = "k8s-engine"
+name = "test-engine"
 version = "0.0.1"
 authors = ["Paul Saunders <pms1969@gmail.com>"]
 categories = ["CICD"]
@@ -7,8 +7,12 @@ edition = "2021"
 keywords = ["ci", "continuous", "integration", "deployment", "delivery",]
 readme = "README.md"
 repository = "https://github.com/rustl3rs/banner"
-description = "A Kubernetes engine for Banner."
+description = "A test engine for Banner."
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-trait = {workspace = true}
+banner-engine = { path = "../banner-engine" }
+local-engine = { path = "../local-engine" }

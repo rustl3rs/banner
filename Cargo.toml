@@ -1,6 +1,6 @@
 [workspace]
 
-members = ["cli", "banner-engine", "k8s-engine", "local-engine", "banner-parser"]
+members = ["cli", "banner-engine", "test-engine", "local-engine", "banner-parser", "tests"]
 resolver = "2"
 
 [workspace.dependencies]

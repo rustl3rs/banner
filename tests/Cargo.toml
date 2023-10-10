@@ -1,0 +1,17 @@
+[package]
+name = "tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dev-dependencies]
+expect-test = "1.4.0"
+tracing-test = {workspace = true}
+tokio = {version = "1.25", features = ["test-util", "macros"]}
+
+banner-engine = { path = "../banner-engine" }
+test-engine = { path = "../test-engine" }
+
+[[test]]
+name = "test_engine"
+path = "test_engine.rs"
