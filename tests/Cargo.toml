@@ -1,16 +1,26 @@
 [package]
 name = "tests"
 version = "0.1.0"
+authors = ["Paul Saunders <pms1969@gmail.com>"]
+categories = ["CICD"]
+keywords = ["ci", "continuous", "integration", "deployment", "delivery",]
 edition = "2021"
 publish = false
+readme = "README.md"
+repository = "https://github.com/rustl3rs/banner"
+description = "Tests all test pipelines to ensure no regressions in Banner."
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dev-dependencies]
-expect-test = "1.4.0"
-tracing-test = {workspace = true}
-tokio = {version = "1.25", features = ["test-util", "macros"]}
-
 banner-engine = { path = "../banner-engine" }
 test-engine = { path = "../test-engine" }
+
+tokio = {workspace = true}
+expect-test = {workspace = true}
+tracing-test = {workspace = true}
+
+rstest = "0.18.2"
 
 [[test]]
 name = "test_engine"

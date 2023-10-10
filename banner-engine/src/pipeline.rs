@@ -367,11 +367,18 @@ fn ast_to_repr(ast: ast::Pipeline, pragma_builder: PragmasBuilder) -> Pipeline {
         .collect();
 
     Pipeline {
-        name: ast.pipelines[0].name.clone(),
+        name: get_pipeline_name(ast.pipelines),
         tasks,
         event_handlers,
         pragmas,
     }
+}
+
+fn get_pipeline_name(pipelines: Vec<PipelineSpecification>) -> String {
+    if pipelines.len() == 0 {
+        return "_".to_string();
+    }
+    pipelines[0].name.clone()
 }
 
 async fn get_segments(

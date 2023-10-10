@@ -1,23 +1,45 @@
 use std::{error::Error, path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
-use banner_engine::{Engine, ExecutionResult, Pipeline, PipelineSpecification, TaskDefinition};
+use banner_engine::{
+    start_engine, Engine, Event, ExecutionResult, Pipeline, PipelineSpecification, PragmasBuilder,
+    TaskDefinition,
+};
 use local_engine::LocalEngine;
+use tokio::sync::mpsc;
 
 pub struct TestEngine {
     local_engine: Arc<dyn Engine + Send + Sync>,
+    tx: Option<mpsc::Sender<Event>>,
 }
 
 impl TestEngine {
     pub async fn new(filepath: PathBuf) -> Self {
         let mut engine = LocalEngine::new();
         engine
-            .with_pipeline_from_file(filepath.clone())
+            .with_pipeline_from_file(
+                filepath.clone(),
+                PragmasBuilder::new().register_context("test"),
+            )
             .await
             .expect(&format!("Failed to load pipeline from file - {filepath:?}"));
         Self {
             local_engine: Arc::new(engine),
+            tx: None,
         }
+    }
+
+    pub async fn start(&mut self) {
+        self.local_engine.confirm_requirements().await.unwrap();
+        self.local_engine.initialise().await.unwrap();
+
+        let (tx, rx) = mpsc::channel(100);
+
+        self.tx = Some(tx.clone());
+        let engine = self.local_engine.clone();
+        let _ = start_engine(&engine, rx, tx).await;
+        // build_and_send_events(&self.local_engine, &self.tx).await;
+        // wait_complete(rx);
     }
 }
 

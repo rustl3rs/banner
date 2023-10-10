@@ -9,3 +9,4 @@ job build [
 ]
 
 task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
+task test(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}

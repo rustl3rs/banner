@@ -58,7 +58,7 @@ mod task_definition_tests {
     use super::*;
     fn check(input: &str) {
         let parse_tree = BannerParser::parse(Rule::task_definition, input);
-        println!("{parse_tree:?}");
+        tracing::debug!("{parse_tree:?}");
         match parse_tree {
             Ok(_) => {}
             Err(e) => {
@@ -93,7 +93,7 @@ mod mount_tests {
     use super::*;
     fn check(input: &str) {
         let parse_tree = BannerParser::parse(Rule::mount, input);
-        println!("{parse_tree:?}");
+        tracing::debug!("{parse_tree:?}");
         match parse_tree {
             Ok(_) => {}
             Err(e) => {
@@ -122,7 +122,7 @@ mod image_spec_tests {
     use super::*;
     fn check(input: &str) {
         let parse_tree = BannerParser::parse(Rule::image_specification, input);
-        println!("INPUT: {input}\nTREE: {parse_tree:?}");
+        tracing::debug!("INPUT: {input}\nTREE: {parse_tree:?}");
         match parse_tree {
             Ok(_) => {}
             Err(e) => {
@@ -155,7 +155,7 @@ mod let_statement_tests {
     use super::*;
     fn check(input: &str) {
         let parse_tree = BannerParser::parse(Rule::let_statement, input);
-        println!("INPUT: {input}\nTREE: {parse_tree:?}");
+        tracing::debug!("INPUT: {input}\nTREE: {parse_tree:?}");
         match parse_tree {
             Ok(_) => {}
             Err(e) => {
@@ -191,7 +191,7 @@ mod env_var_tests {
     use super::*;
     fn check(input: &str) {
         let parse_tree = BannerParser::parse(Rule::env_var, input);
-        println!("INPUT: {input}\nTREE: {parse_tree:?}");
+        tracing::debug!("INPUT: {input}\nTREE: {parse_tree:?}");
         match parse_tree {
             Ok(_) => {}
             Err(e) => {
@@ -214,7 +214,7 @@ mod string_tests {
     use super::*;
     fn check(input: &str) {
         let parse_tree = BannerParser::parse(Rule::string_literal, input);
-        println!("INPUT: {input}\nTREE: {parse_tree:?}");
+        tracing::debug!("INPUT: {input}\nTREE: {parse_tree:?}");
         match parse_tree {
             Ok(_) => {}
             Err(e) => {
@@ -246,7 +246,7 @@ mod pragma_tests {
     use super::*;
     fn check(input: &str) {
         let parse_tree = BannerParser::parse(Rule::pragma, input);
-        println!("INPUT: {input}\nTREE: {parse_tree:?}");
+        tracing::debug!("INPUT: {input}\nTREE: {parse_tree:?}");
         match parse_tree {
             Ok(_) => {}
             Err(e) => {
