@@ -168,6 +168,88 @@ mod pipeline_from_ast_tests {
 
     #[traced_test]
     #[test]
+    fn test_pipeline_with_pragma() {
+        let code = r#######"
+#pragma test assert(success);
+#pragma test
+assert_order(
+    pipeline_trigger(test),
+    job_trigger(build),
+    task_trigger(cowsay),
+    task_success(cowsay),
+    job_success(build),
+    pipeline_success(test),
+);
+#pragma end;
+
+task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
+
+job build [
+    cowsay,
+]
+
+pipeline test [
+    build,
+]
+        "#######;
+
+        check(&code, expect![[r#"
+            Pipeline {
+                pragmas: [
+                    Pragma {
+                        context: "test",
+                        src: "assert(success)",
+                    },
+                    Pragma {
+                        context: "test",
+                        src: "assert_order(\n    pipeline_trigger(test),\n    job_trigger(build),\n    task_trigger(cowsay),\n    task_success(cowsay),\n    job_success(build),\n    pipeline_success(test),\n);",
+                    },
+                ],
+                imports: [],
+                images: [],
+                tasks: [
+                    TaskSpecification {
+                        tags: [],
+                        name: "cowsay",
+                        image: "kmcgivern/cowsay-alpine:latest",
+                        command: RawString(
+                            1,
+                            "",
+                        ),
+                        script: RawString(
+                            1,
+                            "",
+                        ),
+                    },
+                ],
+                jobs: [
+                    JobSpecification {
+                        name: "build",
+                        tasks: [
+                            Identifier(
+                                "cowsay",
+                                [],
+                            ),
+                        ],
+                    },
+                ],
+                pipelines: [
+                    PipelineSpecification {
+                        name: "test",
+                        jobs: [
+                            Identifier(
+                                "build",
+                                [],
+                            ),
+                        ],
+                    },
+                ],
+                eoi: EndOfInput,
+            }"#]]);
+    }
+
+    #[traced_test]
+    #[test]
     fn test_double_forward_slash_in_string() {
         let code = r#######"
         task unit-test(image: rustl3rs/banner-rust-build, execute: "/bin/bash -c") {
@@ -182,6 +264,7 @@ mod pipeline_from_ast_tests {
             &code,
             expect![[r#"
                 Pipeline {
+                    pragmas: [],
                     imports: [],
                     images: [],
                     tasks: [
@@ -221,6 +304,7 @@ mod pipeline_from_ast_tests {
             &code,
             expect![[r#"
                 Pipeline {
+                    pragmas: [],
                     imports: [],
                     images: [],
                     tasks: [
@@ -273,6 +357,7 @@ mod pipeline_from_ast_tests {
             &code,
             expect![[r#"
                 Pipeline {
+                    pragmas: [],
                     imports: [],
                     images: [],
                     tasks: [
@@ -342,6 +427,7 @@ mod pipeline_from_ast_tests {
             &code,
             expect![[r#"
                 Pipeline {
+                    pragmas: [],
                     imports: [
                         Import {
                             uri: "file://./single_task.ban",
@@ -418,6 +504,7 @@ mod pipeline_from_ast_tests {
             &code,
             expect![[r#"
                 Pipeline {
+                    pragmas: [],
                     imports: [],
                     images: [],
                     tasks: [],
@@ -459,6 +546,7 @@ mod pipeline_from_ast_tests {
             &code,
             expect![[r#"
                 Pipeline {
+                    pragmas: [],
                     imports: [],
                     images: [],
                     tasks: [],
@@ -505,6 +593,7 @@ mod pipeline_from_ast_tests {
             &code,
             expect![[r#"
                 Pipeline {
+                    pragmas: [],
                     imports: [],
                     images: [
                         ImageDefinition {
@@ -570,6 +659,7 @@ mod pipeline_from_ast_tests {
             &code,
             expect![[r#"
                 Pipeline {
+                    pragmas: [],
                     imports: [],
                     images: [],
                     tasks: [],
@@ -652,80 +742,81 @@ mod pipeline_from_ast_tests {
         check(
             &code,
             expect![[r#"
-            Pipeline {
-                imports: [],
-                images: [],
-                tasks: [],
-                jobs: [],
-                pipelines: [
-                    PipelineSpecification {
-                        name: "test",
-                        jobs: [
-                            Identifier(
-                                "task1",
-                                [
-                                    JobMacro,
-                                ],
-                            ),
-                            ParallelList(
-                                [
-                                    Identifier(
-                                        "task2",
-                                        [
-                                            JobMacro,
-                                        ],
-                                    ),
-                                    Identifier(
-                                        "task3",
-                                        [
-                                            JobMacro,
-                                        ],
-                                    ),
-                                    SequentialList(
-                                        [
-                                            Identifier(
-                                                "task5",
-                                                [
-                                                    JobMacro,
-                                                ],
-                                            ),
-                                            Identifier(
-                                                "task6",
-                                                [
-                                                    JobMacro,
-                                                ],
-                                            ),
-                                            ParallelList(
-                                                [
-                                                    Identifier(
-                                                        "task7",
-                                                        [
-                                                            JobMacro,
-                                                        ],
-                                                    ),
-                                                    Identifier(
-                                                        "task8",
-                                                        [
-                                                            JobMacro,
-                                                        ],
-                                                    ),
-                                                ],
-                                            ),
-                                        ],
-                                    ),
-                                ],
-                            ),
-                            Identifier(
-                                "task4",
-                                [
-                                    JobMacro,
-                                ],
-                            ),
-                        ],
-                    },
-                ],
-                eoi: EndOfInput,
-            }"#]],
+                Pipeline {
+                    pragmas: [],
+                    imports: [],
+                    images: [],
+                    tasks: [],
+                    jobs: [],
+                    pipelines: [
+                        PipelineSpecification {
+                            name: "test",
+                            jobs: [
+                                Identifier(
+                                    "task1",
+                                    [
+                                        JobMacro,
+                                    ],
+                                ),
+                                ParallelList(
+                                    [
+                                        Identifier(
+                                            "task2",
+                                            [
+                                                JobMacro,
+                                            ],
+                                        ),
+                                        Identifier(
+                                            "task3",
+                                            [
+                                                JobMacro,
+                                            ],
+                                        ),
+                                        SequentialList(
+                                            [
+                                                Identifier(
+                                                    "task5",
+                                                    [
+                                                        JobMacro,
+                                                    ],
+                                                ),
+                                                Identifier(
+                                                    "task6",
+                                                    [
+                                                        JobMacro,
+                                                    ],
+                                                ),
+                                                ParallelList(
+                                                    [
+                                                        Identifier(
+                                                            "task7",
+                                                            [
+                                                                JobMacro,
+                                                            ],
+                                                        ),
+                                                        Identifier(
+                                                            "task8",
+                                                            [
+                                                                JobMacro,
+                                                            ],
+                                                        ),
+                                                    ],
+                                                ),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                Identifier(
+                                    "task4",
+                                    [
+                                        JobMacro,
+                                    ],
+                                ),
+                            ],
+                        },
+                    ],
+                    eoi: EndOfInput,
+                }"#]],
         );
     }
 }

@@ -67,6 +67,50 @@ impl StringLiteral {
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
+pub struct Pragma {
+    pub context: String,
+    pub src: String,
+}
+
+impl<'pest> FromPest<'pest> for Pragma {
+    type Rule = Rule;
+    type FatalError = ::from_pest::Void;
+
+    fn from_pest(
+        pest: &mut Pairs<'pest, Self::Rule>,
+    ) -> Result<Self, from_pest::ConversionError<Self::FatalError>> {
+        tracing::trace!("PRAGMA: pest = {:#?}", pest);
+        let mut clone = pest.clone();
+        let mut pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("PRAGMA: pair = {:#?}", pair);
+
+        if pair.as_rule() != Rule::identifier {
+            tracing::trace!("PRAGMA: Pragma.context NoMatch");
+            return Err(from_pest::ConversionError::NoMatch);
+        }
+
+        let context = pair.as_str().to_string();
+        tracing::trace!("PRAGMA: context = {:#?}", context);
+
+        pair = clone.next().ok_or(from_pest::ConversionError::NoMatch)?;
+        tracing::trace!("PRAGMA: pair = {:#?}", pair);
+
+        let src = match pair.as_rule() {
+            Rule::pragma_body | Rule::pragma_identifier => pair.as_str().to_string(),
+            _ => {
+                tracing::trace!("PRAGMA: Pragma.value NoMatch");
+                return Err(from_pest::ConversionError::NoMatch);
+            }
+        };
+
+        let pragma = Pragma { context, src };
+
+        *pest = clone;
+        Ok(pragma)
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct TaskSpecification {
     pub tags: Vec<Tag>,
     pub name: String,
@@ -664,6 +708,7 @@ impl<'pest> FromPest<'pest> for PipelineSpecification {
 
 #[derive(Debug, Clone, Default)]
 pub struct Pipeline {
+    pub pragmas: Vec<Pragma>,
     pub imports: Vec<Import>,
     pub images: Vec<ImageDefinition>,
     pub tasks: Vec<TaskSpecification>,
@@ -718,6 +763,11 @@ impl<'pest> FromPest<'pest> for Pipeline {
                     let this = TaskSpecification::from_pest(&mut inner)?;
                     pipeline.tasks.push(this);
                 }
+                Rule::pragma => {
+                    tracing::trace!("pragma");
+                    let this = Pragma::from_pest(&mut inner)?;
+                    pipeline.pragmas.push(this);
+                }
                 Rule::EOI => {}
                 _ => panic!("unexpected pair: {pair:?}"),
             }
@@ -731,6 +781,11 @@ impl ops::Add<Pipeline> for Pipeline {
 
     fn add(self, rhs: Pipeline) -> Pipeline {
         Pipeline {
+            pragmas: self
+                .pragmas
+                .into_iter()
+                .chain(rhs.pragmas)
+                .collect::<Vec<_>>(),
             imports: self
                 .imports
                 .into_iter()

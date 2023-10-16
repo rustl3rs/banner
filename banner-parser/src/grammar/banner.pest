@@ -5,8 +5,22 @@ pipeline_definition = {
         | task_definition
         | job_specification
         | pipeline_specification
+        | pragma
         )*
     ~ EOI
+}
+
+pragma = ${ 
+    "#pragma" ~ WHITESPACE_NO_NEWLINE+ ~ identifier ~ 
+        (WHITESPACE_NO_NEWLINE+ ~ pragma_identifier ~ WHITESPACE_NO_NEWLINE* ~ ";" 
+        | NEWLINE ~ pragma_body ~ NEWLINE ~ "#pragma" ~ WHITESPACE+ ~ "end;")
+}
+pragma_identifier = !{ (ASCII_ALPHANUMERIC | "(" | ")" | "-" | "_" )+ }
+pragma_body = {
+    (
+        !(NEWLINE ~ "#pragma" ~ WHITESPACE_NO_NEWLINE ~ "end;") 
+        ~ ANY
+    )*
 }
 
 let_statement = {
@@ -65,6 +79,7 @@ raw_string_interior = {
     )*
 }
 
+WHITESPACE_NO_NEWLINE = _{ " " | "\t" }
 WHITESPACE = _{ " " | "\t" | NEWLINE }
 COMMENT = _{ "//" ~ (!NEWLINE ~ ANY)* }
 

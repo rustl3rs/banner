@@ -241,3 +241,36 @@ mod string_tests {
         check(input);
     }
 }
+
+#[cfg(test)]
+mod pragma_tests {
+    use pest::Parser;
+
+    use super::*;
+    fn check(input: &str) {
+        let parse_tree = BannerParser::parse(Rule::pragma, input);
+        println!("INPUT: {}\nTREE: {:?}", input, parse_tree);
+        match parse_tree {
+            Ok(_) => {}
+            Err(e) => {
+                println!("{:#?}", e);
+                assert!(false)
+            }
+        }
+    }
+
+    #[test]
+    fn can_parse_singleline_pragma() {
+        let input = r##"#pragma test assert(success);"##;
+        check(input);
+    }
+
+    #[test]
+    fn can_parse_mulitline_pragma() {
+        let input = r##"#pragma test
+                assert(success);
+#pragma end;
+            "##;
+        check(input);
+    }
+}
