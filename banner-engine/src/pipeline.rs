@@ -20,6 +20,7 @@ use crate::{
         get_eventhandlers_for_task_definition,
     },
     listen_for_events::matching_banner_metadata,
+    pragma::{Pragma, PragmasBuilder},
     Event, Metadata, MountPoint, Tag, TaskDefinition, TaskResource, MATCHING_TAG,
 };
 
@@ -27,6 +28,7 @@ use crate::{
 pub struct Pipeline {
     pub tasks: Vec<TaskDefinition>,
     pub event_handlers: Vec<EventHandler>,
+    pub pragmas: Vec<Pragma>,
 }
 
 impl Pipeline {
@@ -57,6 +59,7 @@ impl Pipeline {
 
 pub async fn build_and_validate_pipeline(
     code: &str,
+    pragma_builder: PragmasBuilder,
 ) -> Result<(Pipeline, Vec<PipelineSpecification>), Box<dyn Error + Send + Sync>> {
     let mut main_segment = code_to_ast(code);
     // try and gather all the errors in one place before returning them all.
@@ -109,7 +112,7 @@ pub async fn build_and_validate_pipeline(
 
     post_process(&mut main_segment)?;
     let specifications = main_segment.pipelines.clone();
-    let pipeline = ast_to_repr(main_segment);
+    let pipeline = ast_to_repr(main_segment, pragma_builder);
     Ok((pipeline, specifications))
 }
 
@@ -265,7 +268,9 @@ fn ident_list_contains_item(list: &[IdentifierListItem], item: &str) -> bool {
     false
 }
 
-fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
+fn ast_to_repr(ast: ast::Pipeline, pragma_builder: PragmasBuilder) -> Pipeline {
+    let pragmas = pragma_builder.build_from(&ast.pragmas);
+
     let tasks: Vec<TaskDefinition> = ast
         .tasks
         .iter()
@@ -360,6 +365,7 @@ fn ast_to_repr(ast: ast::Pipeline) -> Pipeline {
     Pipeline {
         tasks,
         event_handlers,
+        pragmas,
     }
 }
 
@@ -562,7 +568,7 @@ mod build_pipeline_tests {
     use super::*;
 
     async fn check(code: &str, expect: Expect) {
-        match build_and_validate_pipeline(code).await {
+        match build_and_validate_pipeline(code, PragmasBuilder::new()).await {
             Ok(ast) => {
                 let actual = format!("{:#?}", ast);
                 expect.assert_eq(&actual);
@@ -620,6 +626,7 @@ mod build_pipeline_tests {
                                 "###
                             },
                         ],
+                        pragmas: [],
                     },
                     [],
                 )"####]],
@@ -690,6 +697,7 @@ mod build_pipeline_tests {
                             "###
                         },
                     ],
+                    pragmas: [],
                 },
                 [],
             )"####]]).await
@@ -733,6 +741,7 @@ mod build_pipeline_tests {
                                 "###
                             },
                         ],
+                        pragmas: [],
                     },
                     [],
                 )"####]],
@@ -846,6 +855,7 @@ mod build_pipeline_tests {
                             "###
                         },
                     ],
+                    pragmas: [],
                 },
                 [
                     PipelineSpecification {
@@ -872,7 +882,7 @@ mod event_handler_creation_tests {
     use super::*;
 
     async fn check_all(pipeline: ast::Pipeline, expect: Expect) {
-        let actual = ast_to_repr(pipeline);
+        let actual = ast_to_repr(pipeline, PragmasBuilder::new());
         expect.assert_eq(&format!("{actual:?}"))
     }
 
@@ -1272,6 +1282,6 @@ mod event_handler_creation_tests {
                         engine.execute_task_name_in_scope("", "_", "_", "_").await;
                     }
                 "###
-            }] }"####]]).await;
+            }], pragmas: [] }"####]]).await;
     }
 }

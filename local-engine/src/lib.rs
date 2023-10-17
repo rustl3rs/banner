@@ -7,8 +7,8 @@ use banner_engine::HostPath;
 use banner_engine::PipelineSpecification;
 use banner_engine::Tag;
 use banner_engine::{
-    build_and_validate_pipeline, Engine, ExecutionResult, Pipeline, TaskDefinition, JOB_TAG,
-    PIPELINE_TAG, TASK_TAG,
+    build_and_validate_pipeline, Engine, ExecutionResult, Pipeline, PragmasBuilder, TaskDefinition,
+    JOB_TAG, PIPELINE_TAG, TASK_TAG,
 };
 use bollard::container::InspectContainerOptions;
 use bollard::container::{
@@ -71,10 +71,11 @@ impl LocalEngine {
     pub async fn with_pipeline_from_file(
         &mut self,
         filepath: PathBuf,
+        pragmas_builder: PragmasBuilder,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let pipeline =
             fs::read_to_string(&filepath).expect("Should have been able to read the file");
-        match build_and_validate_pipeline(&pipeline).await {
+        match build_and_validate_pipeline(&pipeline, pragmas_builder).await {
             Ok((pipeline, mut specifications)) => {
                 self.pipelines.push(pipeline);
                 self.specifications.append(&mut specifications);

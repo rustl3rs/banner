@@ -2,8 +2,8 @@ use banner_parser::ast::{self, IdentifierListItem, PipelineSpecification};
 
 use crate::{
     event_handler::EventHandler, event_handlers::create_start_pipeline_job_event_handler,
-    ListenForEvent, ListenForEventType, ListenForSystemEventResult, ListenForSystemEventScope,
-    ListenForSystemEventType, Metadata, Select::*,
+    ListenForEvent, ListenForEventType, ListenForSystemEventScope, ListenForSystemEventType,
+    Metadata, Select::*,
 };
 
 pub fn create_finished_pipeline_event_handler(
@@ -241,22 +241,6 @@ fn generate_finish_pipeline_script() -> String {
     format!(
         r###"pub async fn main (engine, event) {{
             engine.pipeline_complete(event).await;
-        }}"###
-    )
-}
-
-fn generate_finish_pipeline_on_success_script(pipeline: &str) -> String {
-    format!(
-        r###"pub async fn main (engine, event) {{
-            engine.pipeline_success("{pipeline}").await;
-        }}"###
-    )
-}
-
-fn generate_finish_pipeline_on_fail_script(pipeline: &str) -> String {
-    format!(
-        r###"pub async fn main (engine, event) {{
-            engine.pipeline_fail("{pipeline}").await;
         }}"###
     )
 }

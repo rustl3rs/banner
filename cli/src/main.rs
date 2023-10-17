@@ -1,6 +1,6 @@
 use std::{error::Error, fs, path::PathBuf, process, sync::Arc};
 
-use banner_engine::{parse_file, start_engine, Engine};
+use banner_engine::{parse_file, start_engine, Engine, PragmasBuilder};
 use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
 use log::{self, LevelFilter};
@@ -116,7 +116,9 @@ async fn execute_command() -> Result<Option<LocalEngine>, Box<dyn Error + Send +
         }
         Commands::PipelineRepresentation { file } => {
             let mut engine = LocalEngine::new();
-            engine.with_pipeline_from_file(file).await?;
+            engine
+                .with_pipeline_from_file(file, PragmasBuilder::new().register_context("local"))
+                .await?;
             let pipeline = engine.get_pipelines()[0];
             println!("{:#?}", pipeline);
             Ok(None)
@@ -130,7 +132,9 @@ async fn execute_pipeline(
     println!("Loading pipeline from file: {:?}", filepath);
     log::info!(target: "task_log", "Starting pipeline");
     let mut engine = LocalEngine::new();
-    engine.with_pipeline_from_file(filepath).await?;
+    engine
+        .with_pipeline_from_file(filepath, PragmasBuilder::new().register_context("local"))
+        .await?;
 
     log::info!(target: "task_log", "Confirming requirements");
     println!("Confirming requirements...");
