@@ -6,21 +6,23 @@ categories = ["CICD"]
 edition = "2021"
 keywords = ["ci", "continuous", "integration", "deployment", "delivery",]
 readme = "README.md"
-repository = "local"
+repository = "https://github.com/rustl3rs/banner"
 description = "The Banner CLI. Used to ship pipelines to Banner servers and to run pipelines locally."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 banner-engine = { path = "../banner-engine" }
-clap = { version = "4", features = ["derive"] }
 local-engine = { path = "../local-engine" }
+
 tracing = {workspace = true}
-tokio = {version = "1.25", features = ["test-util", "macros"]}
+tokio = {workspace = true}
+log = {workspace = true}
+futures-util = {workspace = true}
+
+clap = { version = "4", features = ["derive"] }
 ratatui = "0.22"
 crossterm = {version = "0.27", features = ["event-stream"]}
 tui-logger = {version = "0.9", default-features = false, features = ["ratatui-support", "tracing-support"]}
-log = "0.4"
 futures-timer = "3.0"
 futures-core = "0.3"
-futures-util = "0.3"

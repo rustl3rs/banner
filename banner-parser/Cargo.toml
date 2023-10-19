@@ -6,20 +6,21 @@ categories = ["CICD"]
 edition = "2021"
 keywords = ["ci", "continuous", "integration", "deployment", "delivery",]
 readme = "README.md"
-repository = "local"
+repository = "https://github.com/rustl3rs/banner"
 description = "A parser for the Banner DSL."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 tracing = {workspace = true}
-pest = "2.6"
-pest_derive = "2.6"
-pest-ast = "0.3"
-from-pest = "0.3"
+pest = {workspace = true}
+pest_derive = {workspace = true}
+pest-ast = {workspace = true}
+from-pest = {workspace = true}
+log = {workspace = true}
+
 iref = "2.2.3"
-log = "0.4"
 
 [dev-dependencies]
-expect-test = "1.4.0"
+expect-test = {workspace = true}
 tracing-test = {workspace = true}

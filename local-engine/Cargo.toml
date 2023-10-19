@@ -6,21 +6,23 @@ categories = ["CICD"]
 edition = "2021"
 keywords = ["ci", "continuous", "integration", "deployment", "delivery"]
 readme = "README.md"
-repository = "local"
+repository = "https://github.com/rustl3rs/banner"
 description = "A local engine for Banner."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = {workspace = true}
 banner-engine = { path = "../banner-engine" }
+
+async-trait = {workspace = true}
+tokio = {workspace = true}
+tracing = {workspace = true}
+log = {workspace = true}
+futures = {workspace = true}
+futures-util = {workspace = true}
+
 bollard = "0.14"
 cap-tempfile = "1.0"
-futures = "*"
-futures-util = "*"
-tokio = {version = "1.25", features = ["test-util", "macros"]}
-tracing = {workspace = true}
-log = "0.4"
 backon = "0.4"
 rand = "*"
 

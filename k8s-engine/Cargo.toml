@@ -6,7 +6,7 @@ categories = ["CICD"]
 edition = "2021"
 keywords = ["ci", "continuous", "integration", "deployment", "delivery",]
 readme = "README.md"
-repository = "local"
+repository = "https://github.com/rustl3rs/banner"
 description = "A Kubernetes engine for Banner."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

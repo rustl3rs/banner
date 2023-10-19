@@ -6,21 +6,21 @@ categories = ["CICD"]
 edition = "2021"
 keywords = ["ci", "continuous", "integration", "deployment", "delivery",]
 readme = "README.md"
-repository = "local"
+repository = "https://github.com/rustl3rs/banner"
 description = "The contract for Banner engines to conform to."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = {workspace = true}
-chrono = "0.4"
-semver = "*"
-log = "0.4"
 banner-parser = { path = "../banner-parser" }
-tokio = {version = "1.25", features = ["test-util", "macros"]}
+
+async-trait = {workspace = true}
+log = {workspace = true}
+tokio = {workspace = true}
+tracing = {workspace = true}
+
 rune = "*"
 rune-modules = "*"
-tracing = {workspace = true}
 hyper = { version = "*", features = ["client", "http2", "http1"] }
 hyper-tls = "*"
 const_format = "0.2.30"
@@ -28,7 +28,9 @@ serde = "*"
 itertools = "*"
 strum = "*"
 strum_macros = "*"
+chrono = "0.4"
+semver = "*"
 
 [dev-dependencies]
-expect-test = "1.4.0"
+expect-test = {workspace = true}
 tracing-test = {workspace = true}
