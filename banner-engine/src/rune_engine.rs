@@ -1,7 +1,7 @@
 use std::{str::FromStr, sync::Arc};
 
 use rune::Any;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::broadcast::Sender;
 
 use crate::{
     Engine, Event, EventType, ExecutionStatus, SystemEventResult, SystemEventScope,

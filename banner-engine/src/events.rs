@@ -3,7 +3,7 @@ use std::fmt::{Debug, Formatter, Result};
 
 use chrono::{DateTime, TimeZone, Utc};
 use strum_macros::{EnumIter, EnumString};
-use tokio::sync::mpsc::Sender;
+use tokio::sync::broadcast::Sender;
 
 use crate::metadata::Metadata;
 
@@ -183,14 +183,7 @@ impl EventBuilder {
         let mut send_task = self.event.clone();
         send_task.time_emitted = Utc::now().timestamp();
         log::info!(target: "event_log", "{send_task}");
-        tx.send(send_task).await.unwrap_or_default();
-    }
-
-    pub fn blocking_send_from(&self, tx: &Sender<Event>) {
-        let mut send_task = self.event.clone();
-        send_task.time_emitted = Utc::now().timestamp();
-        log::info!(target: "event_log", "{send_task}");
-        tx.blocking_send(send_task).unwrap_or_default();
+        tx.send(send_task).unwrap_or_default();
     }
 
     pub(crate) fn build(&self) -> Event {

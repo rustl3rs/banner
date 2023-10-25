@@ -4,7 +4,7 @@ use banner_engine::{parse_file, start_engine, Engine, PragmasBuilder};
 use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
 use log::{self, LevelFilter};
-use tokio::sync::mpsc::{self};
+use tokio::sync::broadcast;
 use tui_logger::{self, init_logger, set_default_level, set_level_for_target, set_log_file};
 use ui::terminal::create_terminal_ui;
 
@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let log_file = format!("{}/banner.log", engine.get_state_dir().to_str().unwrap());
                 let _ = set_log_file(&log_file); // should probably handle the error that this could produce.
                 log::debug!(target: "task_log", "Creating channels");
-                let (tx, rx) = mpsc::channel(100);
+                let (tx, rx) = broadcast::channel(100);
 
                 let engine: Arc<dyn Engine + Send + Sync> = Arc::new(engine);
                 let se = engine.clone();

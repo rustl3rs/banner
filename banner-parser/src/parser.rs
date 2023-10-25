@@ -193,7 +193,9 @@ pipeline test [
 ]
         "#######;
 
-        check(&code, expect![[r#"
+        check(
+            &code,
+            expect![[r#"
             Pipeline {
                 pragmas: [
                     Pragma {
@@ -245,7 +247,8 @@ pipeline test [
                     },
                 ],
                 eoi: EndOfInput,
-            }"#]]);
+            }"#]],
+        );
     }
 
     #[traced_test]

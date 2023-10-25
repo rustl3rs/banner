@@ -17,7 +17,7 @@ use ratatui::{
     widgets::{Block, Borders},
     Frame, Terminal,
 };
-use tokio::{select, sync::mpsc::Sender};
+use tokio::{select, sync::broadcast::Sender};
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
 
 // use crate::ui::pipeline::;

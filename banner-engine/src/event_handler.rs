@@ -6,7 +6,7 @@ use rune::{
     termcolor::{BufferWriter, ColorChoice},
     ContextError, Diagnostics, Module, Source, Sources, Vm,
 };
-use tokio::sync::mpsc::Sender;
+use tokio::sync::broadcast::Sender;
 
 use crate::ListenForEvents;
 use crate::{
@@ -235,7 +235,7 @@ mod tests {
 
     use async_trait::async_trait;
     use banner_parser::ast::PipelineSpecification;
-    use tokio::sync::mpsc;
+    use tokio::sync::broadcast;
 
     use crate::{ExecutionResult, Pipeline, TaskDefinition};
 
@@ -318,7 +318,7 @@ mod tests {
         }}
         "###;
 
-        let (tx, mut rx) = mpsc::channel::<Event>(100);
+        let (tx, mut rx) = broadcast::channel::<Event>(100);
         let eng = Arc::new(MockEngine {});
 
         let result = execute_event_script(

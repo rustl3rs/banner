@@ -2,8 +2,8 @@ use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
 use banner_parser::ast::PipelineSpecification;
-use log::debug;
-use tokio::sync::mpsc::{Receiver, Sender};
+use log::{debug, error};
+use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::{event_handler::EventHandler, Event, Events, Pipeline, TaskDefinition};
 
@@ -74,47 +74,53 @@ pub async fn start_engine(
 
     loop {
         let event = rx.recv().await;
+        // if we have fallen behind and the channel is full, we'll get an error.
+        // continue on, because we can continue to process events.
+        if event.is_err() {
+            error!(target: "task_log", "error receiving event: {:?}", event);
+            continue;
+        }
+
+        let event = event.unwrap();
         debug!(target: "task_log", "received event: {:?}", event);
 
-        if let Some(event) = event {
-            if event == Event::new_builder(crate::EventType::UserDefined).build() {
-                log::debug!(target: "task_log", "received user defined event");
-                engine.get_pipelines().into_iter().for_each(|p| {
+        if event == Event::new_builder(crate::EventType::UserDefined).build() {
+            log::debug!(target: "task_log", "received user defined event");
+            engine.get_pipelines().into_iter().for_each(|p| {
                     log::debug!(target: "task_log", "Number of event handlers: {}", p.event_handlers.len());
                     p.event_handlers
                         .iter()
                         .for_each(|eh| log::debug!(target: "task_log", "event handler: {:?}", eh))
                 });
-                engine.get_pipelines().into_iter().for_each(|p| {
-                    p.tasks.iter().for_each(|t| {
-                        log::debug!(target: "task_log", "task: {:?}", t);
-                    });
+            engine.get_pipelines().into_iter().for_each(|p| {
+                p.tasks.iter().for_each(|t| {
+                    log::debug!(target: "task_log", "task: {:?}", t);
                 });
-                continue;
-            }
+            });
+            continue;
+        }
 
-            // get all event handlers that are listening for this event.
-            let pipelines = engine.get_pipelines();
-            let event_handlers: Vec<EventHandler> = pipelines
-                .into_iter()
-                .filter_map(|pipeline| {
-                    let handlers = pipeline.events_matching(&event);
-                    log::debug!(target: "event_log", "handlers: {:?}", handlers);
-                    if !handlers.is_empty() {
-                        Some(handlers)
-                    } else {
-                        None
-                    }
-                })
-                .flatten()
-                .collect();
-            // and execute them all.
-            for eh in event_handlers.into_iter() {
-                let e = engine.clone();
-                let tx = tx.clone();
-                let ev = event.clone();
-                eh.execute(e, tx, ev).await;
-            }
+        // get all event handlers that are listening for this event.
+        let pipelines = engine.get_pipelines();
+        let event_handlers: Vec<EventHandler> = pipelines
+            .into_iter()
+            .filter_map(|pipeline| {
+                let handlers = pipeline.events_matching(&event);
+                log::debug!(target: "event_log", "handlers: {:?}", handlers);
+                if !handlers.is_empty() {
+                    Some(handlers)
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .collect();
+        // and execute them all.
+        for eh in event_handlers.into_iter() {
+            let e = engine.clone();
+            let tx = tx.clone();
+            let ev = event.clone();
+            eh.execute(e, tx, ev).await;
         }
     }
 }
