@@ -676,8 +676,7 @@ pub struct PipelineSpecification {
 impl PipelineSpecification {
     pub fn iter_jobs(&self) -> impl Iterator<Item = &IdentifierListItem> {
         let jobs: Vec<&IdentifierListItem> = self.jobs.iter().collect();
-        let iterator = IdentifierListItemIter { stack: jobs };
-        iterator
+        IdentifierListItemIter { stack: jobs }
     }
 }
 

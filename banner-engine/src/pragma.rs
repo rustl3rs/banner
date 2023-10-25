@@ -6,6 +6,7 @@ pub struct Pragma {
     pub src: String,
 }
 
+#[derive(Debug)]
 pub struct PragmasBuilder {
     pub(crate) contexts: Vec<String>,
 }
@@ -20,7 +21,7 @@ impl PragmasBuilder {
         self
     }
 
-    pub(crate) fn build_from(&self, pragmas: &Vec<ast::Pragma>) -> Vec<Pragma> {
+    pub(crate) fn build_from(&self, pragmas: &[ast::Pragma]) -> Vec<Pragma> {
         pragmas
             .iter()
             .filter(|p| self.contexts.contains(&p.context))
@@ -30,6 +31,12 @@ impl PragmasBuilder {
                 Pragma { context, src }
             })
             .collect()
+    }
+}
+
+impl Default for PragmasBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

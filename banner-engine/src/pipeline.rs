@@ -165,17 +165,14 @@ fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sy
     // After that is done, remove any reference to a IdentifierWithMarkers from the pipelines list of jobs.
     for pipeline in ast.pipelines.iter() {
         for job in pipeline.iter_jobs() {
-            match job {
-                IdentifierListItem::Identifier(job, markers) => {
-                    if markers.contains(&IdentifierMarker::JobMacro) {
-                        let job_spec = JobSpecification {
-                            name: job.clone(),
-                            tasks: vec![IdentifierListItem::Identifier(job.clone(), vec![])],
-                        };
-                        ast.jobs.push(job_spec);
-                    }
+            if let IdentifierListItem::Identifier(job, markers) = job {
+                if markers.contains(&IdentifierMarker::JobMacro) {
+                    let job_spec = JobSpecification {
+                        name: job.clone(),
+                        tasks: vec![IdentifierListItem::Identifier(job.clone(), vec![])],
+                    };
+                    ast.jobs.push(job_spec);
                 }
-                _ => (),
             }
         }
     }

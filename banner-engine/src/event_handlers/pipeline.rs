@@ -238,11 +238,10 @@ fn get_event_handlers_for_job_type(
 }
 
 fn generate_finish_pipeline_script() -> String {
-    format!(
-        r###"pub async fn main (engine, event) {{
-            engine.pipeline_complete(event).await;
-        }}"###
-    )
+    r###"pub async fn main (engine, event) {{
+        engine.pipeline_complete(event).await;
+    }}"###
+        .to_string()
 }
 
 fn generate_start_pipeline_script_single_job(pipeline: &str, job_name: &str) -> String {

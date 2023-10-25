@@ -399,11 +399,10 @@ fn create_finish_event_listener(
 }
 
 fn generate_finish_job_script() -> String {
-    format!(
-        r###"pub async fn main (engine, event) {{
-            engine.job_complete(event).await;
-        }}"###
-    )
+    r###"pub async fn main (engine, event) {
+        engine.job_complete(event).await;
+    }"###
+        .to_string()
 }
 
 fn generate_job_with_no_tasks_script(pipeline: &str, job: &str) -> String {
