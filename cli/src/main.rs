@@ -80,7 +80,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             None => Ok(()),
         },
         Err(e) => {
-            eprintln!("{}", e);
+            eprintln!("{e}");
             process::exit(1);
         }
     }
@@ -92,7 +92,7 @@ async fn execute_command() -> Result<Option<LocalEngine>, Box<dyn Error + Send +
         Commands::Local { file } => match execute_pipeline(file).await {
             Ok(engine) => Ok(engine),
             Err(e) => {
-                eprintln!("{}", e);
+                eprintln!("{e}");
                 Err(e)
             }
         },
@@ -120,7 +120,7 @@ async fn execute_command() -> Result<Option<LocalEngine>, Box<dyn Error + Send +
                 .with_pipeline_from_file(file, PragmasBuilder::new().register_context("local"))
                 .await?;
             let pipeline = engine.get_pipelines()[0];
-            println!("{:#?}", pipeline);
+            println!("{pipeline:#?}");
             Ok(None)
         }
     }
@@ -129,7 +129,7 @@ async fn execute_command() -> Result<Option<LocalEngine>, Box<dyn Error + Send +
 async fn execute_pipeline(
     filepath: PathBuf,
 ) -> Result<Option<LocalEngine>, Box<dyn Error + Send + Sync>> {
-    println!("Loading pipeline from file: {:?}", filepath);
+    println!("Loading pipeline from file: {filepath:?}");
     log::info!(target: "task_log", "Starting pipeline");
     let mut engine = LocalEngine::new();
     engine

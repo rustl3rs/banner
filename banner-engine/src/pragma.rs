@@ -12,10 +12,12 @@ pub struct PragmasBuilder {
 }
 
 impl PragmasBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self { contexts: vec![] }
     }
 
+    #[must_use]
     pub fn register_context(mut self, context: &str) -> Self {
         self.contexts.push(context.to_string());
         self

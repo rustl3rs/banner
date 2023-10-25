@@ -54,7 +54,7 @@ pub async fn create_terminal_ui(
         let event = reader.next().fuse();
 
         select! {
-            _ = delay => {
+            () = delay => {
                 terminal.draw(|f| {
                     ui(f, &ui_layout, engine);
                 })?;
@@ -140,7 +140,7 @@ fn set_statuses_on_jobs(
     pipeline_with_metadata: &mut PipelineSpecification,
     engine: &Arc<dyn Engine + Send + Sync>,
 ) {
-    for job in pipeline_with_metadata.jobs.iter_mut() {
+    for job in &mut pipeline_with_metadata.jobs {
         set_status_on_job(&pipeline_with_metadata.name, job, engine);
     }
 }
@@ -170,12 +170,12 @@ fn set_status_on_job(
             j.set_status(js);
         }
         super::pipeline::IdentifierListItem::SequentialList(list) => {
-            for job in list.iter_mut() {
+            for job in &mut *list {
                 set_status_on_job(pipeline_name, job, engine);
             }
         }
         IdentifierListItem::ParallelList(list) => {
-            for job in list.iter_mut() {
+            for job in &mut *list {
                 set_status_on_job(pipeline_name, job, engine);
             }
         }

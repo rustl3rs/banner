@@ -19,7 +19,7 @@ pub fn parse_file(code: String) -> Result<(), Box<dyn Error + Send + Sync>> {
         Ok(tree) => tree,
         Err(e) => {
             trace!("ERROR = {:#?}", e);
-            panic!("{:?}", e);
+            panic!("{e:?}");
         }
     };
     trace!("syntax tree = {:#?}", syntax_tree);

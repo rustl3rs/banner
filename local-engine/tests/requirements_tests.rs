@@ -30,7 +30,7 @@ async fn starts_task_with_required_tags() {
 
     async fn check_succeeds(tags: Vec<Tag>) {
         let result = execute(tags).await;
-        println!("{:?}", result);
+        println!("{result:?}");
         assert!(result.is_ok());
     }
 

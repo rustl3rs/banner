@@ -90,7 +90,7 @@ pub async fn start_engine(
                     log::debug!(target: "task_log", "Number of event handlers: {}", p.event_handlers.len());
                     p.event_handlers
                         .iter()
-                        .for_each(|eh| log::debug!(target: "task_log", "event handler: {:?}", eh))
+                        .for_each(|eh| log::debug!(target: "task_log", "event handler: {:?}", eh));
                 });
             engine.get_pipelines().into_iter().for_each(|p| {
                 p.tasks.iter().for_each(|t| {
@@ -116,7 +116,7 @@ pub async fn start_engine(
             .flatten()
             .collect();
         // and execute them all.
-        for eh in event_handlers.into_iter() {
+        for eh in event_handlers {
             let e = engine.clone();
             let tx = tx.clone();
             let ev = event.clone();

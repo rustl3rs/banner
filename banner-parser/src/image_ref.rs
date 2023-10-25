@@ -105,11 +105,10 @@ impl<'a> ::from_pest::FromPest<'a> for ImageRef {
                 },
                 eoi: ::from_pest::FromPest::from_pest(inner)?,
             };
-            if inner.clone().next().is_some() {
-                {
-                    panic!("when converting ImageRef, found extraneous {0:?}", inner)
-                }
-            }
+            assert!(
+                !inner.clone().next().is_some(),
+                "when converting ImageRef, found extraneous {inner:?}"
+            );
             *pest = clone;
             Ok(this)
         } else {

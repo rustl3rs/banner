@@ -194,7 +194,7 @@ impl Job {
                 for i in lx..rx {
                     let symbol = buf.get(i, ry).symbol.clone();
                     if symbol.as_str() == " " {
-                        buf.set_string(i, ly, Connector::HORIZONTAL, connector_style)
+                        buf.set_string(i, ly, Connector::HORIZONTAL, connector_style);
                     }
                 }
                 buf.set_string(rx - 1, ry, Connector::ARROW_RIGHT, connector_style);
@@ -225,7 +225,7 @@ impl Job {
                 for i in midpoint..rx {
                     let symbol = buf.get(i, ry).symbol.clone();
                     if symbol.as_str() == " " {
-                        buf.set_string(i, ry, Connector::HORIZONTAL, connector_style)
+                        buf.set_string(i, ry, Connector::HORIZONTAL, connector_style);
                     }
                 }
                 buf.set_string(rx - 1, ry, Connector::ARROW_RIGHT, connector_style);

@@ -1,8 +1,10 @@
 use banner_parser::ast::{self, IdentifierListItem};
 
 use crate::{
-    event_handler::EventHandler, ListenForEvent, ListenForEventType, ListenForSystemEventResult,
-    ListenForSystemEventScope, ListenForSystemEventType, Metadata, Select::*,
+    event_handler::EventHandler,
+    ListenForEvent, ListenForEventType, ListenForSystemEventResult, ListenForSystemEventScope,
+    ListenForSystemEventType, Metadata,
+    Select::{Any, Only},
 };
 
 use super::{create_start_task_event_handler, task::generate_start_task_script};
@@ -99,8 +101,10 @@ pub fn create_start_pipeline_job_event_handler(
             );
             event_handlers.push(eh);
         }
-        (IdentifierListItem::Identifier(job_name, _), IdentifierListItem::SequentialList(_))
-        | (IdentifierListItem::Identifier(job_name, _), IdentifierListItem::ParallelList(_)) => {
+        (
+            IdentifierListItem::Identifier(job_name, _),
+            IdentifierListItem::SequentialList(_) | IdentifierListItem::ParallelList(_),
+        ) => {
             // if we have a straight forward job followed by a list of jobs; either parallel
             // or sequential; then we need to trigger the first job in the list when the current
             // job finishes.
@@ -120,8 +124,7 @@ pub fn create_start_pipeline_job_event_handler(
             for nj in next_jobs {
                 let job_tag = Metadata::new_banner_job(nj);
                 let description_tag = Metadata::new_banner_description(&format!(
-                    "Trigger the start of the list-job: {}/{}",
-                    pipeline_name, nj
+                    "Trigger the start of the list-job: {pipeline_name}/{nj}"
                 ));
                 let eh = EventHandler::new(
                     vec![pipeline_tag.clone(), job_tag, description_tag],
@@ -133,20 +136,21 @@ pub fn create_start_pipeline_job_event_handler(
         }
         (IdentifierListItem::SequentialList(_), IdentifierListItem::SequentialList(_)) => todo!(),
         (IdentifierListItem::SequentialList(_), IdentifierListItem::ParallelList(_)) => todo!(),
-        (IdentifierListItem::SequentialList(_), IdentifierListItem::Identifier(nj_name, _))
-        | (IdentifierListItem::ParallelList(_), IdentifierListItem::Identifier(nj_name, _)) => {
+        (
+            IdentifierListItem::SequentialList(_) | IdentifierListItem::ParallelList(_),
+            IdentifierListItem::Identifier(nj_name, _),
+        ) => {
             // if we have any list type before a straight forward job, then we need to trigger
             // the next job after all the last jobs in the previous list have finished.
             let pipeline_tag = Metadata::new_banner_pipeline(pipeline_name);
             let job_tag = Metadata::new_banner_job(nj_name);
             let description_tag = Metadata::new_banner_description(&format!(
-                "Trigger the start of the job: {}/{}",
-                pipeline_name, nj_name
+                "Trigger the start of the job: {pipeline_name}/{nj_name}"
             ));
 
             let previous_jobs = flatten_jobs_for_finish(current);
 
-            for job in previous_jobs.iter() {
+            for job in &previous_jobs {
                 let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(
                     Only(ListenForSystemEventType::Done(
                         Only(ListenForSystemEventScope::Job),
@@ -294,8 +298,7 @@ pub fn create_start_job_event_handler(
     let pipeline_tag = Metadata::new_banner_pipeline(pipeline);
     let job_tag = Metadata::new_banner_job(job);
     let description_tag = Metadata::new_banner_description(&format!(
-        "Trigger the start of the job: {}/{}/{}",
-        pipeline, job, task
+        "Trigger the start of the job: {pipeline}/{job}/{task}"
     ));
     let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(Only(
         ListenForSystemEventType::Trigger(Only(ListenForSystemEventScope::Job)),
@@ -400,8 +403,8 @@ fn create_finish_event_listener(
 
 fn generate_finish_job_script() -> String {
     r###"pub async fn main (engine, event) {
-        engine.job_complete(event).await;
-    }"###
+            engine.job_complete(event).await;
+        }"###
         .to_string()
 }
 

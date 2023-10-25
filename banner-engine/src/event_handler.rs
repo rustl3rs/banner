@@ -27,12 +27,12 @@ impl Debug for EventHandler {
 
         writeln!(f, "    listen_for_events:")?;
         for event in &self.listen_for_events {
-            writeln!(f, "        {:?},", event)?;
+            writeln!(f, "        {event:?},")?;
         }
 
         writeln!(f, r#"    tags:"#)?;
         for tag in &self.tags {
-            writeln!(f, "        {:?},", tag)?;
+            writeln!(f, "        {tag:?},")?;
         }
 
         writeln!(f, r#####"    script: ###""#####)?;
@@ -64,7 +64,7 @@ impl EventHandler {
 
         // as long as everything is good, exit, otherwise raise an error event.
         match result {
-            Ok(_) => (),
+            Ok(()) => (),
             Err(e) => {
                 Event::new_builder(EventType::System(SystemEventType::Done(
                     SystemEventScope::EventHandler,
@@ -185,7 +185,7 @@ async fn execute_event_script(
                 log::trace!("Rune script completed successfully: {:?}", out);
             }
             Err(e) => {
-                println!("ERROR: {:?}", e);
+                println!("ERROR: {e:?}");
                 let writer = BufferWriter::stderr(ColorChoice::Never);
                 let mut buffer = writer.buffer();
                 e.emit(&mut buffer, &sources).unwrap();
@@ -310,13 +310,13 @@ mod tests {
         let mut hm = HashMap::new();
         hm.insert("", "");
 
-        let script = r###"
+        let script = r#"
         pub async fn main (engine, event) {{
             engine.trigger_pipeline("pipeline_1").await;
             engine.trigger_job("pipeline_1", "job_1").await;
             engine.trigger_task("pipeline_1", "job_1", "task_1").await;
         }}
-        "###;
+        "#;
 
         let (tx, mut rx) = broadcast::channel::<Event>(100);
         let eng = Arc::new(MockEngine {});
@@ -386,7 +386,7 @@ mod event_handler_tests {
             )),
         ))
         .build()];
-        let script = String::from("");
+        let script = String::new();
         let eh = EventHandler::new(tags, listen_for_events, script);
         let listen_for = Event::new_builder(EventType::System(SystemEventType::Done(
             SystemEventScope::Task,

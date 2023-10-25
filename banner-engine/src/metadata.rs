@@ -22,6 +22,7 @@ impl Debug for Metadata {
 }
 
 impl Metadata {
+    #[must_use]
     pub fn new(key: &str, value: &str) -> Self {
         // if key.starts_with(&BANNER_METADATA_PREFIX) {
         //     panic!(
@@ -77,10 +78,12 @@ impl Metadata {
         }
     }
 
+    #[must_use]
     pub fn key(&self) -> &str {
         self.key.as_ref()
     }
 
+    #[must_use]
     pub fn value(&self) -> &str {
         self.value.as_ref()
     }

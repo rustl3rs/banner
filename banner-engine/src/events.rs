@@ -17,6 +17,7 @@ pub struct Event {
 }
 
 impl Event {
+    #[must_use]
     pub fn new_builder(r#type: EventType) -> EventBuilder {
         EventBuilder {
             event: Self {
@@ -27,18 +28,22 @@ impl Event {
         }
     }
 
+    #[must_use]
     pub fn r#type(&self) -> &EventType {
         &self.r#type
     }
 
+    #[must_use]
     pub fn get_type(&self) -> EventType {
         self.r#type
     }
 
+    #[must_use]
     pub fn time_emitted(&self) -> DateTime<Utc> {
         Utc.timestamp_millis_opt(self.time_emitted).unwrap()
     }
 
+    #[must_use]
     pub fn metadata(&self) -> &[Metadata] {
         self.metadata.as_ref()
     }
@@ -150,29 +155,34 @@ pub struct EventBuilder {
 // TODO: Make impossible states impossible; where possible.
 //   eg: log messages should only be attachable to Log event types.
 impl EventBuilder {
+    #[must_use]
     pub fn with_pipeline_name(mut self, pipeline_name: &str) -> EventBuilder {
         let metadata = Metadata::new_banner_pipeline(pipeline_name);
         self.event.metadata.push(metadata);
         self
     }
 
+    #[must_use]
     pub fn with_job_name(mut self, job_name: &str) -> EventBuilder {
         let metadata = Metadata::new_banner_job(job_name);
         self.event.metadata.push(metadata);
         self
     }
 
+    #[must_use]
     pub fn with_task_name(mut self, task_name: &str) -> EventBuilder {
         let metadata = Metadata::new_banner_task(task_name);
         self.event.metadata.push(metadata);
         self
     }
 
+    #[must_use]
     pub fn with_metadata(mut self, metadata: Metadata) -> EventBuilder {
         self.event.metadata.push(metadata);
         self
     }
 
+    #[must_use]
     pub fn with_event(mut self, event: &Event) -> EventBuilder {
         let metadata = Metadata::new_banner_event(event);
         self.event.metadata.push(metadata);
@@ -190,6 +200,7 @@ impl EventBuilder {
         self.event.clone()
     }
 
+    #[must_use]
     pub fn with_log_message(mut self, message: &str) -> EventBuilder {
         let metadata = Metadata::new_log_message(message);
         self.event.metadata.push(metadata);
@@ -337,6 +348,6 @@ mod tests {
             .with_pipeline_name("pipeline_name")
             .with_log_message("my log message")
             .build();
-        assert!(true)
+        assert!(true);
     }
 }

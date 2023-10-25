@@ -79,13 +79,12 @@ pub async fn build_and_validate_pipeline(
         let cyclic_uris: HashSet<_> = all_imports.intersection(&isc).collect();
         // remove cycles from the imports and keep going
         if !cyclic_uris.is_empty() {
-            cyclic_uris.into_iter().for_each(|uri| {
+            for uri in cyclic_uris {
                 import_set.remove(uri);
                 errors.push(Box::new(CyclicImportError::new(format!(
-                    "Tried to import {} more than once.",
-                    uri
+                    "Tried to import {uri} more than once."
                 ))));
-            });
+            }
         }
 
         // ensure we keep track of the current imports.
@@ -119,7 +118,7 @@ pub async fn build_and_validate_pipeline(
 fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sync>> {
     // 1. validate the docker image references in task definitions and add the `latest` tag to any image ref
     //    that doesn't have an explicit tag or digest
-    for task in ast.tasks.iter_mut() {
+    for task in &mut ast.tasks {
         if task.image.starts_with("${") {
             continue;
         }
@@ -137,13 +136,13 @@ fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sy
         };
         match (image_ref.tag, image_ref.digest) {
             (None, None) => task.image = format!("{}:latest", task.image), // no tag or digest, so add latest
-            (None, Some(_)) | (Some(_), None) | (Some(_), Some(_)) => {} // do nothing, there is already a tag or digest associated to the image.
+            (None | Some(_), Some(_)) | (Some(_), None) => {} // do nothing, there is already a tag or digest associated to the image.
         };
     }
 
     // 2. validate the docker references in image definitions and add the `latest` tag to any image ref
     //    that doesn't have an explicit tag or digest
-    for image_def in ast.images.iter_mut() {
+    for image_def in &mut ast.images {
         let mut tree = ImageRefParser::parse(image_ref::Rule::reference, &image_def.image.name)?;
         let image_ref = match image_ref::ImageRef::from_pest(&mut tree) {
             Ok(tree) => tree,
@@ -157,13 +156,13 @@ fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sy
         };
         match (image_ref.tag, image_ref.digest) {
             (None, None) => image_def.image.name = format!("{}:latest", image_def.image.name), // no tag or digest, so add latest
-            (None, Some(_)) | (Some(_), None) | (Some(_), Some(_)) => {} // do nothing, there is already a tag or digest associated to the image.
+            (None | Some(_), Some(_)) | (Some(_), None) => {} // do nothing, there is already a tag or digest associated to the image.
         };
     }
 
     // 3. Create a job for any job macro defined in the pipeline directive
     // After that is done, remove any reference to a IdentifierWithMarkers from the pipelines list of jobs.
-    for pipeline in ast.pipelines.iter() {
+    for pipeline in &ast.pipelines {
         for job in pipeline.iter_jobs() {
             if let IdentifierListItem::Identifier(job, markers) = job {
                 if markers.contains(&IdentifierMarker::JobMacro) {
@@ -191,9 +190,9 @@ fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sy
     let bare_tasks = ast.tasks.clone();
     let mut unused_tasks = ast.tasks.clone();
     let mut annotated_tasks: Vec<TaskSpecification> = vec![];
-    for job in ast.jobs.iter() {
+    for job in &ast.jobs {
         // println!("--------> ANNOTATE job = {:#?}", job.name);
-        for task in job.all_tasks().into_iter() {
+        for task in job.all_tasks() {
             let bare_task = bare_tasks
                 .iter()
                 .find(|t| t.name == task)
@@ -243,7 +242,7 @@ fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sy
 }
 
 fn ident_list_contains_item(list: &[IdentifierListItem], item: &str) -> bool {
-    for ident in list.iter() {
+    for ident in list {
         match ident {
             IdentifierListItem::Identifier(id, _) => {
                 if id == item {
@@ -379,7 +378,7 @@ async fn get_segments(
             "git" => results.push(load_git(&uri)),
             _ => {
                 let error = UnsupportedUriError::new(uri.to_string().clone());
-                results.push(Err(Box::new(error)))
+                results.push(Err(Box::new(error)));
             }
         };
     }
@@ -431,12 +430,12 @@ fn code_to_ast(code: &str) -> ast::Pipeline {
         Ok(mut parse_tree) => match ast::Pipeline::from_pest(&mut parse_tree) {
             Ok(tree) => tree,
             Err(e) => {
-                println!("{:#?}", e);
+                println!("{e:#?}");
                 panic!("Creating the AST failed");
             }
         },
         Err(e) => {
-            println!("{:#?}", e);
+            println!("{e:#?}");
             panic!("Parsing of the pipeline failed");
         }
     }
@@ -460,10 +459,12 @@ pub struct CyclicImportError {
 }
 
 impl CyclicImportError {
+    #[must_use]
     pub fn new(description: String) -> Self {
         Self { description }
     }
 
+    #[must_use]
     pub fn description(&self) -> &str {
         self.description.as_ref()
     }
@@ -483,10 +484,12 @@ pub struct UnsupportedUriError {
 }
 
 impl UnsupportedUriError {
+    #[must_use]
     pub fn new(uri: String) -> Self {
         Self { uri }
     }
 
+    #[must_use]
     pub fn uri(&self) -> &str {
         self.uri.as_ref()
     }
@@ -512,19 +515,20 @@ pub struct AggregatePipelineConstructionError {
 }
 
 impl AggregatePipelineConstructionError {
+    #[must_use]
     pub fn new(errors: Vec<Box<dyn Error + Send + Sync>>) -> Self {
         Self { errors }
     }
 
     pub fn add_error(&mut self, error: Box<dyn Error + Send + Sync>) {
-        self.errors.push(error)
+        self.errors.push(error);
     }
 }
 
 impl Display for AggregatePipelineConstructionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for error in self.errors.iter() {
-            writeln!(f, "{}", error)?;
+        for error in &self.errors {
+            writeln!(f, "{error}")?;
         }
         Ok(())
     }
@@ -538,12 +542,14 @@ pub struct CompositionError {
 }
 
 impl CompositionError {
+    #[must_use]
     pub fn new(uri: &Iri) -> Self {
         Self {
             uri: uri.as_str().to_string(),
         }
     }
 
+    #[must_use]
     pub fn uri(&self) -> &str {
         self.uri.as_ref()
     }
@@ -567,12 +573,12 @@ mod build_pipeline_tests {
     async fn check(code: &str, expect: Expect) {
         match build_and_validate_pipeline(code, PragmasBuilder::new()).await {
             Ok(ast) => {
-                let actual = format!("{:#?}", ast);
+                let actual = format!("{ast:#?}");
                 expect.assert_eq(&actual);
             }
             Err(e) => {
-                println!("{:#?}", e);
-                assert!(false)
+                println!("{e:#?}");
+                assert!(false);
             }
         }
     }
@@ -580,14 +586,14 @@ mod build_pipeline_tests {
     #[traced_test]
     #[tokio::test]
     async fn can_parse_task_with_comment() {
-        let code = r#######"
+        let code = r######"
         // this task does the unit testing of the app
         task unit-test(image: rustl3rs/banner-rust-build:latest, execute: r#"/bin/bash -c"#) {
             r#####"bash
             echo testing, testing, 1, 2, 3!
             "#####
         }
-        "#######;
+        "######;
 
         check(
             code,
@@ -628,7 +634,7 @@ mod build_pipeline_tests {
                     [],
                 )"####]],
         )
-        .await
+        .await;
     }
 
     #[traced_test]
@@ -697,7 +703,7 @@ mod build_pipeline_tests {
                     pragmas: [],
                 },
                 [],
-            )"####]]).await
+            )"####]]).await;
     }
 
     #[traced_test]
@@ -743,13 +749,13 @@ mod build_pipeline_tests {
                     [],
                 )"####]],
         )
-        .await
+        .await;
     }
 
     #[traced_test]
     #[tokio::test]
     async fn can_parse_job_macro() {
-        let code = r#######"
+        let code = r##"
                 task unit-test(image: alpine, execute: "/bin/sh -c") {
                     r#"
                     // this is a comment
@@ -760,9 +766,9 @@ mod build_pipeline_tests {
                 pipeline test [
                     unit-test!,
                 ]
-            "#######;
+            "##;
 
-        check(&code, expect![[r####"
+        check(code, expect![[r####"
             (
                 Pipeline {
                     tasks: [
@@ -867,7 +873,7 @@ mod build_pipeline_tests {
                         ],
                     },
                 ],
-            )"####]]).await
+            )"####]]).await;
     }
 }
 
@@ -880,18 +886,18 @@ mod event_handler_creation_tests {
 
     async fn check_all(pipeline: ast::Pipeline, expect: Expect) {
         let actual = ast_to_repr(pipeline, PragmasBuilder::new());
-        expect.assert_eq(&format!("{actual:?}"))
+        expect.assert_eq(&format!("{actual:?}"));
     }
 
     async fn check_pipeline(pipeline: ast::Pipeline, expect: Expect) {
-        let actual = get_eventhandlers_for_pipeline(&pipeline.pipelines.first().unwrap());
-        expect.assert_eq(&format!("{actual:?}"))
+        let actual = get_eventhandlers_for_pipeline(pipeline.pipelines.first().unwrap());
+        expect.assert_eq(&format!("{actual:?}"));
     }
 
     async fn check_job(pipeline: ast::Pipeline, expect: Expect) {
         let actual =
-            get_eventhandlers_for_job(pipeline.pipelines.first(), &pipeline.jobs.first().unwrap());
-        expect.assert_eq(&format!("{actual:?}"))
+            get_eventhandlers_for_job(pipeline.pipelines.first(), pipeline.jobs.first().unwrap());
+        expect.assert_eq(&format!("{actual:?}"));
     }
 
     fn get_ast_for(code: &str) -> ast::Pipeline {

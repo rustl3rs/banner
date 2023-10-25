@@ -12,7 +12,7 @@ pub enum StringLiteral {
 
 impl Default for StringLiteral {
     fn default() -> Self {
-        Self::StringLiteral("".into())
+        Self::StringLiteral(String::new())
     }
 }
 
@@ -47,6 +47,7 @@ impl<'a> ::from_pest::FromPest<'a> for StringLiteral {
 }
 
 impl StringLiteral {
+    #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
             StringLiteral::RawString(_, inner) => inner,
@@ -54,10 +55,12 @@ impl StringLiteral {
         }
     }
 
+    #[must_use]
     pub fn from_raw_string(raw: Pair<Rule>) -> StringLiteral {
-        if raw.as_rule() != Rule::raw_string {
-            panic!("Expected raw_string, got {:?}", raw);
-        };
+        assert!(
+            !(raw.as_rule() != Rule::raw_string),
+            "Expected raw_string, got {raw:?}"
+        );
         // subtract 1 for the starting `r` char
         // since we are zero based, we don't need to subtract an extra 1 for the ending `"`
         let count = raw.as_str().find('\"').unwrap() as u8 - 1;
@@ -249,7 +252,7 @@ pub enum MountSource {
 
 impl Default for MountSource {
     fn default() -> Self {
-        Self::StringLiteral("".into())
+        Self::StringLiteral(String::new())
     }
 }
 
@@ -407,12 +410,11 @@ impl<'pest> FromPest<'pest> for Image {
             pair = clone.next();
         }
 
-        if pair.is_some() {
-            panic!(
-                "when converting MountSource::StringLiteral, found extraneous {0:?}",
-                pair.unwrap().as_str()
-            )
-        }
+        assert!(
+            pair.is_none(),
+            "when converting MountSource::StringLiteral, found extraneous {0:?}",
+            pair.unwrap().as_str()
+        );
 
         *pest = clone;
         Ok(image)
@@ -467,6 +469,7 @@ pub struct IdentifierListItemIter<'a> {
 }
 
 impl IdentifierListItem {
+    #[must_use]
     pub fn iter(&self) -> IdentifierListItemIter {
         IdentifierListItemIter { stack: vec![self] }
     }
@@ -494,7 +497,7 @@ impl<'a> Iterator for IdentifierListItemIter<'a> {
 
 impl Default for IdentifierListItem {
     fn default() -> Self {
-        Self::Identifier("".to_string(), vec![])
+        Self::Identifier(String::new(), vec![])
     }
 }
 
@@ -579,18 +582,18 @@ impl Display for IdentifierListItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IdentifierListItem::SequentialList(tasks) => {
-                for task in tasks.iter() {
-                    write!(f, "{},", task)?
+                for task in tasks {
+                    write!(f, "{task},")?;
                 }
             }
             IdentifierListItem::ParallelList(tasks) => {
-                for task in tasks.iter() {
-                    write!(f, "{},", task)?
+                for task in tasks {
+                    write!(f, "{task},")?;
                 }
             }
             IdentifierListItem::Identifier(task_name, markers) => {
-                write!(f, "{}", task_name)?;
-                for marker in markers.iter() {
+                write!(f, "{task_name}")?;
+                for marker in markers {
                     match marker {
                         IdentifierMarker::JobMacro => write!(f, "!")?,
                         IdentifierMarker::Optional => write!(f, "?")?,
@@ -609,15 +612,16 @@ pub struct JobSpecification {
 }
 
 impl JobSpecification {
+    #[must_use]
     pub fn all_tasks(&self) -> Vec<String> {
         let mut tasks = Vec::<String>::new();
-        for task in self.tasks.iter() {
+        for task in &self.tasks {
             match task {
                 IdentifierListItem::Identifier(task_name, _) => {
                     tasks.push(task_name.to_string());
                 }
                 IdentifierListItem::SequentialList(task_list) => {
-                    for task in task_list.iter() {
+                    for task in task_list {
                         match task {
                             IdentifierListItem::Identifier(task_name, _) => {
                                 tasks.push(task_name.to_string());
@@ -627,7 +631,7 @@ impl JobSpecification {
                     }
                 }
                 IdentifierListItem::ParallelList(task_list) => {
-                    for task in task_list.iter() {
+                    for task in task_list {
                         match task {
                             IdentifierListItem::Identifier(task_name, _) => {
                                 tasks.push(task_name.to_string());

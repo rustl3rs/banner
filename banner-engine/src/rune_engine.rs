@@ -228,7 +228,7 @@ impl<'a> RuneEngineWrapper {
         let val = value.to_string();
         let result = self.engine.set_state_for_id(key, val);
         match result {
-            Ok(_) => {
+            Ok(()) => {
                 log::debug!(target: "task_log", "set_state_for_task called on {key} with value {value}");
             }
             Err(e) => {

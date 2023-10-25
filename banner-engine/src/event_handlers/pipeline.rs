@@ -1,9 +1,11 @@
 use banner_parser::ast::{self, IdentifierListItem, PipelineSpecification};
 
 use crate::{
-    event_handler::EventHandler, event_handlers::create_start_pipeline_job_event_handler,
+    event_handler::EventHandler,
+    event_handlers::create_start_pipeline_job_event_handler,
     ListenForEvent, ListenForEventType, ListenForSystemEventScope, ListenForSystemEventType,
-    Metadata, Select::*,
+    Metadata,
+    Select::{Any, Only},
 };
 
 pub fn create_finished_pipeline_event_handler(
@@ -199,7 +201,7 @@ fn get_event_handlers_for_job_type(
             let eh = create_start_pipeline_job_event_handler(&pipeline.name, current_job, next_job);
             event_handlers.extend(eh);
 
-            for job in list.iter() {
+            for job in list {
                 match job {
                     IdentifierListItem::Identifier(_, _) => (),
                     IdentifierListItem::SequentialList(list) => {
@@ -238,9 +240,9 @@ fn get_event_handlers_for_job_type(
 }
 
 fn generate_finish_pipeline_script() -> String {
-    r###"pub async fn main (engine, event) {{
-        engine.pipeline_complete(event).await;
-    }}"###
+    r###"pub async fn main (engine, event) {
+            engine.pipeline_complete(event).await;
+        }"###
         .to_string()
 }
 

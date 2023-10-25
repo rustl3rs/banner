@@ -14,6 +14,7 @@ pub struct TaskDefinition {
 }
 
 impl TaskDefinition {
+    #[must_use]
     pub fn new(
         tags: Vec<Tag>,
         image: Image,
@@ -30,10 +31,12 @@ impl TaskDefinition {
         }
     }
 
+    #[must_use]
     pub fn image(&self) -> &Image {
         &self.image
     }
 
+    #[must_use]
     pub fn tags(&self) -> &[Tag] {
         self.tags.as_ref()
     }
@@ -51,6 +54,7 @@ impl TaskDefinition {
         self.outputs.push(output);
     }
 
+    #[must_use]
     pub fn env_vars(&self) -> Vec<EnvironmentVariable> {
         self.inputs
             .iter()
@@ -61,6 +65,7 @@ impl TaskDefinition {
             .collect()
     }
 
+    #[must_use]
     pub fn mounts(&self) -> Vec<&MountPoint> {
         self.inputs
             .iter()
@@ -71,18 +76,22 @@ impl TaskDefinition {
             .collect()
     }
 
+    #[must_use]
     pub fn inputs(&self) -> &[TaskResource] {
         self.inputs.as_ref()
     }
 
+    #[must_use]
     pub fn outputs(&self) -> &[TaskResource] {
         self.outputs.as_ref()
     }
 
+    #[must_use]
     pub fn command(&self) -> &[String] {
         self.command.as_ref()
     }
 
+    #[must_use]
     pub fn get_name(&self) -> &str {
         debug!(target: "task_log", "Searching for name tag in: {:?}", self);
         self.tags
@@ -108,6 +117,7 @@ pub struct Image {
 }
 
 impl Image {
+    #[must_use]
     pub fn new(source: Uri, credentials: Option<ImageRepositoryCredentials>) -> Self {
         Self {
             source,
@@ -115,10 +125,12 @@ impl Image {
         }
     }
 
+    #[must_use]
     pub fn source(&self) -> &str {
         self.source.as_ref()
     }
 
+    #[must_use]
     pub fn credentials(&self) -> Option<&ImageRepositoryCredentials> {
         self.credentials.as_ref()
     }
@@ -161,7 +173,7 @@ impl From<&TaskSpecification> for TaskDefinition {
             .command
             .as_str()
             .split_whitespace()
-            .map(|s| s.into())
+            .map(std::convert::Into::into)
             .collect();
         command.push(task.script.clone().as_str().into());
         Self::new(tags, image, command, vec![], vec![])

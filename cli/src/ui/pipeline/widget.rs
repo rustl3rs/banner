@@ -42,7 +42,7 @@ impl<'a> Widget for PipelineWidget<'a> {
         let y = 0;
         let mut job_number: u16 = 1;
         let mut previous_job: Option<&IdentifierListItem> = None;
-        for job in pipeline.jobs.iter() {
+        for job in &pipeline.jobs {
             // log::debug!(target: "task_log", "Rendering job: {:?}", job);
             let (nx, _ny) = render_job(previous_job, job, (x, y), &mut job_number, buf);
             render_connector(previous_job, job, buf);
@@ -87,7 +87,7 @@ fn render_job(
             let mut pj = previous_job;
             let (mut x, y) = (current_xy.0, current_xy.1);
             let (mut lx, mut ly) = (current_xy.0, current_xy.1);
-            for job in list.iter() {
+            for job in list {
                 // log::debug!(target: "task_log", "SEQUENTIAL LIST: [{x}, {y}]");
                 let (nx, ny) = render_job(pj, job, (x, y), job_number, buf);
                 if nx > lx {
@@ -105,7 +105,7 @@ fn render_job(
             // TODO: come back and simplify this
             let (x, mut y) = (current_xy.0, current_xy.1);
             let (mut lx, mut ly) = (current_xy.0, current_xy.1);
-            for job in list.iter() {
+            for job in list {
                 // log::debug!(target: "task_log", "PARALLEL LIST: [{x}, {y}]");
                 let (nx, ny) = render_job(previous_job, job, (x, y), job_number, buf);
                 if nx > lx {
@@ -140,14 +140,14 @@ fn render_connector(
             let tx = x * 10 + 5;
             let ty = y * 5 + 3;
             let status = id.get_status();
-            let cj = Job::new((tx, ty), status, Status::Pending, String::from(""));
+            let cj = Job::new((tx, ty), status, Status::Pending, String::new());
             match previous_job {
                 IdentifierListItem::Identifier(pid) => {
                     let (x, y) = pid.get_position().unwrap();
                     let tx = x * 10 + 5;
                     let ty = y * 5 + 3;
                     let status = pid.get_status();
-                    let pj = Job::new((tx, ty), status, Status::Pending, String::from(""));
+                    let pj = Job::new((tx, ty), status, Status::Pending, String::new());
                     pj.connect(&cj, buf);
                 }
                 IdentifierListItem::SequentialList(list) => {
@@ -155,7 +155,7 @@ fn render_connector(
                     render_connector(pj, current_job, buf);
                 }
                 IdentifierListItem::ParallelList(list) => {
-                    for pj in list.iter() {
+                    for pj in list {
                         render_connector(Some(pj), current_job, buf);
                     }
                 }
@@ -166,7 +166,7 @@ fn render_connector(
             render_connector(Some(previous_job), cj, buf);
         }
         IdentifierListItem::ParallelList(list) => {
-            for cj in list.iter() {
+            for cj in list {
                 render_connector(Some(previous_job), cj, buf);
             }
         }

@@ -2,9 +2,11 @@ use banner_parser::ast::{self, IdentifierListItem, JobSpecification, PipelineSpe
 use itertools::Itertools;
 
 use crate::{
-    event_handler::EventHandler, ListenForEvent, ListenForEventType, ListenForSystemEventResult,
-    ListenForSystemEventScope, ListenForSystemEventType, Metadata, Select::*, TaskDefinition,
-    JOB_TAG, PIPELINE_TAG, TASK_TAG,
+    event_handler::EventHandler,
+    ListenForEvent, ListenForEventType, ListenForSystemEventResult, ListenForSystemEventScope,
+    ListenForSystemEventType, Metadata,
+    Select::{Any, Only},
+    TaskDefinition, JOB_TAG, PIPELINE_TAG, TASK_TAG,
 };
 
 #[allow(dead_code)]
@@ -60,7 +62,7 @@ pub fn get_eventhandlers_for_task_definition(task_def: &TaskDefinition) -> Vec<E
         .find(|tag| tag.key() == TASK_TAG)
         .map_or("_", |tag| tag.value());
     let description_tag =
-        Metadata::new_banner_description(&format!("Execute the task: {}", task_name));
+        Metadata::new_banner_description(&format!("Execute the task: {task_name}"));
     tags.extend(vec![description_tag]);
 
     let listen_for_event = ListenForEvent::new_builder(ListenForEventType::System(Only(
@@ -113,8 +115,10 @@ pub fn create_start_task_event_handler(
 
             event_handlers.push(eh);
         }
-        (IdentifierListItem::Identifier(task, _), IdentifierListItem::SequentialList(_))
-        | (IdentifierListItem::Identifier(task, _), IdentifierListItem::ParallelList(_)) => {
+        (
+            IdentifierListItem::Identifier(task, _),
+            IdentifierListItem::SequentialList(_) | IdentifierListItem::ParallelList(_),
+        ) => {
             // create an event handler that will trigger the task when all the previous parallel tasks have completed.
             let job_tag = Metadata::new_banner_job(&job.name);
             let pipeline_tag = Metadata::new_banner_pipeline(pipeline);
@@ -170,7 +174,7 @@ pub fn create_start_task_event_handler(
             .with_task_name(prev)
             .build();
 
-            for task in flatten_task_for_start(task).iter() {
+            for task in &flatten_task_for_start(task) {
                 let description_tag = Metadata::new_banner_description(&format!(
                     "Trigger the start of the task: {}/{}/{}",
                     pipeline, &job.name, task
@@ -379,7 +383,7 @@ mod script_tests {
             "pipeline1",
             "job1",
             "task3",
-            &vec!["task1", "task2"],
+            &["task1", "task2"],
         );
         expect.assert_eq(&script);
     }
@@ -414,7 +418,7 @@ mod flatten_tasks_tests {
                 "task1",
                 "task2",
             ]"#]],
-        )
+        );
     }
 
     #[test]
@@ -430,7 +434,7 @@ mod flatten_tasks_tests {
                 "task1",
                 "task2",
             ]"#]],
-        )
+        );
     }
 
     #[test]

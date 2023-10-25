@@ -62,7 +62,7 @@ impl From<&banner_engine::PipelineSpecification> for PipelineSpecification {
     fn from(pipeline: &banner_engine::PipelineSpecification) -> Self {
         PipelineSpecification {
             name: pipeline.name.clone(),
-            jobs: pipeline.jobs.iter().map(|j| j.into()).collect(),
+            jobs: pipeline.jobs.iter().map(std::convert::Into::into).collect(),
         }
     }
 }
@@ -71,7 +71,7 @@ impl From<&banner_engine::JobSpecification> for JobSpecification {
     fn from(job: &banner_engine::JobSpecification) -> Self {
         JobSpecification {
             name: job.name.clone(),
-            tasks: job.tasks.iter().map(|t| t.into()).collect(),
+            tasks: job.tasks.iter().map(std::convert::Into::into).collect(),
         }
     }
 }
@@ -83,10 +83,14 @@ impl From<&banner_engine::IdentifierListItem> for IdentifierListItem {
                 IdentifierListItem::Identifier(Metadata::new(i.clone()))
             }
             banner_engine::IdentifierListItem::SequentialList(list) => {
-                IdentifierListItem::SequentialList(list.iter().map(|i| i.into()).collect())
+                IdentifierListItem::SequentialList(
+                    list.iter().map(std::convert::Into::into).collect(),
+                )
             }
             banner_engine::IdentifierListItem::ParallelList(list) => {
-                IdentifierListItem::ParallelList(list.iter().map(|i| i.into()).collect())
+                IdentifierListItem::ParallelList(
+                    list.iter().map(std::convert::Into::into).collect(),
+                )
             }
         }
     }

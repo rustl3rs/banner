@@ -48,6 +48,7 @@ pub struct LocalEngine {
 }
 
 impl LocalEngine {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             pipelines: vec![],
@@ -64,6 +65,7 @@ impl LocalEngine {
         }
     }
 
+    #[must_use]
     pub fn get_state_dir(&self) -> &PathBuf {
         &self.state_dir
     }
@@ -82,7 +84,7 @@ impl LocalEngine {
             }
             Err(e) => {
                 let f = filepath.to_str().unwrap();
-                eprintln!("Error parsing pipeline from file: {f}.\n\n{e}")
+                eprintln!("Error parsing pipeline from file: {f}.\n\n{e}");
             }
         }
 
@@ -103,7 +105,7 @@ impl LocalEngine {
             ),
             HostPath::Volume(_name) => todo!(),
             HostPath::EngineInit(name) => {
-                let key = format!("{}.{}.{}.{}", pipeline_name, job_name, task_name, name);
+                let key = format!("{pipeline_name}.{job_name}.{task_name}.{name}");
                 let mut path = PathBuf::new();
                 path.push(&self.state_dir);
                 path.push(&key);
@@ -224,7 +226,7 @@ impl Engine for LocalEngine {
             image: Some(task.image().source()),
             cmd: Some(commands),
 
-            env: Some(env_vars.iter().map(|s| s.as_ref()).collect()),
+            env: Some(env_vars.iter().map(std::convert::AsRef::as_ref).collect()),
             host_config: Some(host_config),
             ..Default::default()
         };
@@ -244,7 +246,7 @@ impl Engine for LocalEngine {
             .with_max_times(2);
 
         match start.retry(&backoff).await {
-            Ok(_) => (),
+            Ok(()) => (),
             Err(e) => {
                 let _ = remove_container(&container_name).await;
                 return Err(Box::new(e));
@@ -301,7 +303,7 @@ impl Engine for LocalEngine {
     fn get_state_for_id(&self, key: &str) -> Option<String> {
         let hm = self.state.read().unwrap();
         let result = hm.get(key);
-        result.map(|val| val.to_string())
+        result.map(std::string::ToString::to_string)
     }
 
     /// Returns a value from state based on the key.
@@ -328,9 +330,10 @@ fn get_task_definition_for_tags<'a>(
         .filter(|task| tags.iter().all(|tag| task.tags().contains(tag)))
         .collect();
 
-    if tasks.len() > 1 {
-        panic!("more than one task found for tags: {tags:?}");
-    }
+    assert!(
+        tasks.len() <= 1,
+        "more than one task found for tags: {tags:?}"
+    );
 
     tasks.first().unwrap()
 }

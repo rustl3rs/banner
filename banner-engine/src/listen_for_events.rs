@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter, Result};
 use strum_macros::{EnumIter, EnumString};
 
 use crate::metadata::Metadata;
-use crate::select::Select::*;
+use crate::select::Select::{Any, Only};
 use crate::{Event, EventType, Select, SystemEventResult, SystemEventScope, SystemEventType};
 
 pub type ListenForEvents = Vec<ListenForEvent>;
@@ -16,6 +16,7 @@ pub struct ListenForEvent {
 }
 
 impl ListenForEvent {
+    #[must_use]
     pub fn new_builder(r#type: ListenForEventType) -> ListenForEventBuilder {
         ListenForEventBuilder {
             event: Self {
@@ -25,14 +26,17 @@ impl ListenForEvent {
         }
     }
 
+    #[must_use]
     pub fn r#type(&self) -> &ListenForEventType {
         &self.r#type
     }
 
+    #[must_use]
     pub fn metadata(&self) -> &[Metadata] {
         self.metadata.as_ref()
     }
 
+    #[must_use]
     pub fn matches_event(&self, other: &Event) -> bool {
         match (self.r#type, other.r#type()) {
             (ListenForEventType::System(sel), EventType::System(ser)) => match (sel, ser) {
@@ -126,29 +130,34 @@ pub struct ListenForEventBuilder {
 // TODO: Make impossible states impossible; where possible.
 //   eg: log messages should only be attachable to Log event types.
 impl ListenForEventBuilder {
+    #[must_use]
     pub fn with_pipeline_name(mut self, pipeline_name: &str) -> ListenForEventBuilder {
         let metadata = Metadata::new_banner_pipeline(pipeline_name);
         self.event.metadata.push(metadata);
         self
     }
 
+    #[must_use]
     pub fn with_job_name(mut self, job_name: &str) -> ListenForEventBuilder {
         let metadata = Metadata::new_banner_job(job_name);
         self.event.metadata.push(metadata);
         self
     }
 
+    #[must_use]
     pub fn with_task_name(mut self, task_name: &str) -> ListenForEventBuilder {
         let metadata = Metadata::new_banner_task(task_name);
         self.event.metadata.push(metadata);
         self
     }
 
+    #[must_use]
     pub fn with_metadata(mut self, metadata: Metadata) -> ListenForEventBuilder {
         self.event.metadata.push(metadata);
         self
     }
 
+    #[must_use]
     pub fn with_listen_for_event(mut self, event: &ListenForEvent) -> ListenForEventBuilder {
         let metadata = Metadata::new_listen_for_event(event);
         self.event.metadata.push(metadata);
@@ -321,6 +330,6 @@ mod tests {
             .with_job_name("job_name")
             .with_pipeline_name("pipeline_name")
             .build();
-        assert!(true)
+        assert!(true);
     }
 }
