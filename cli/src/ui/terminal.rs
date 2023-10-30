@@ -10,7 +10,7 @@ use futures_timer::Delay;
 use futures_util::future::FutureExt;
 use futures_util::stream::StreamExt;
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
+    backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     prelude::Alignment,
     style::{Color, Style},
@@ -182,7 +182,7 @@ fn set_status_on_job(
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, ui_layout: &UiLayout, engine: &Arc<dyn Engine + Send + Sync>) {
+fn ui(f: &mut Frame, ui_layout: &UiLayout, engine: &Arc<dyn Engine + Send + Sync>) {
     match ui_layout {
         UiLayout::FullScreenLogs => full_screen_logs(f),
         UiLayout::FullScreenEvents => full_screen_events(f),
@@ -191,7 +191,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, ui_layout: &UiLayout, engine: &Arc<dyn Engin
     }
 }
 
-fn full_screen_pipeline<B: Backend>(f: &mut Frame<B>, engine: &Arc<dyn Engine + Send + Sync>) {
+fn full_screen_pipeline(f: &mut Frame, engine: &Arc<dyn Engine + Send + Sync>) {
     let mut spec = PipelineSpecification::from(&engine.get_pipeline_specification()[0]);
     set_statuses_on_jobs(&mut spec, engine);
     let pipe = PipelineWidget::default().block(
@@ -205,7 +205,7 @@ fn full_screen_pipeline<B: Backend>(f: &mut Frame<B>, engine: &Arc<dyn Engine + 
     f.render_widget(pipe, f.size());
 }
 
-fn full_screen_events<B: Backend>(f: &mut Frame<B>) {
+fn full_screen_events(f: &mut Frame) {
     let ews = TuiWidgetState::new()
         .set_level_for_target("event_log", log::LevelFilter::Debug)
         .set_default_display_level(log::LevelFilter::Off);
@@ -232,7 +232,7 @@ fn full_screen_events<B: Backend>(f: &mut Frame<B>) {
     f.render_widget(ewidget, f.size());
 }
 
-fn full_screen_logs<B: Backend>(f: &mut Frame<B>) {
+fn full_screen_logs(f: &mut Frame) {
     let lws = TuiWidgetState::new()
         .set_level_for_target("task_log", log::LevelFilter::Debug)
         .set_default_display_level(log::LevelFilter::Off);
@@ -259,11 +259,7 @@ fn full_screen_logs<B: Backend>(f: &mut Frame<B>) {
     f.render_widget(lwidget, f.size());
 }
 
-fn multi_panel_layout<B: Backend>(
-    f: &mut Frame<B>,
-    ui_layout: &UiState,
-    engine: &Arc<dyn Engine + Send + Sync>,
-) {
+fn multi_panel_layout(f: &mut Frame, ui_layout: &UiState, engine: &Arc<dyn Engine + Send + Sync>) {
     let constraints = split_frame(ui_layout.pipeline_frame);
     let chunks = Layout::default()
         .direction(Direction::Vertical)

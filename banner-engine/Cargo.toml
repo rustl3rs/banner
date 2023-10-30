@@ -19,8 +19,8 @@ log = {workspace = true}
 tokio = {workspace = true}
 tracing = {workspace = true}
 
-rune = "*"
-rune-modules = "*"
+rune = "0.12.4"
+rune-modules = "0.12.4"
 hyper = { version = "*", features = ["client", "http2", "http1"] }
 hyper-tls = "*"
 const_format = "0.2.30"
