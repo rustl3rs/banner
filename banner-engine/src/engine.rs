@@ -48,10 +48,10 @@ pub trait Engine {
     fn get_pipeline_specification(&self) -> &Vec<PipelineSpecification>;
 
     /// Returns a value from state based on the key.
-    fn get_state_for_id(&self, key: &str) -> Option<String>;
+    async fn get_state_for_id(&self, key: &str) -> Option<String>;
 
     /// Sets a value in state based on the key.
-    fn set_state_for_id(
+    async fn set_state_for_id(
         &self,
         key: &str,
         value: String,

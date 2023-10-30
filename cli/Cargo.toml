@@ -26,3 +26,4 @@ crossterm = {version = "0.27", features = ["event-stream"]}
 tui-logger = {git = "https://github.com/gin66/tui-logger.git", features = ["crossterm", "tracing-support"]}
 futures-timer = "3.0"
 futures-core = "0.3"
+async-recursion = "1.0.5"

@@ -1,5 +1,6 @@
 use std::{error::Error, io, str::FromStr, sync::Arc, time::Duration};
 
+use async_recursion::async_recursion;
 use banner_engine::{Engine, EventType, ExecutionStatus, SystemEventScope, SystemEventType};
 use crossterm::{
     event::{DisableMouseCapture, Event, EventStream, KeyCode},
@@ -17,10 +18,9 @@ use ratatui::{
     widgets::{Block, Borders},
     Frame, Terminal,
 };
+use tokio::runtime::Handle;
 use tokio::{select, sync::broadcast::Sender};
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
-
-// use crate::ui::pipeline::;
 
 use super::{
     pipeline::{IdentifierListItem, PipelineSpecification, PipelineWidget, Status},
@@ -42,22 +42,24 @@ pub async fn create_terminal_ui(
     terminal.clear()?;
     terminal.hide_cursor()?;
 
-    let mut ui_layout = UiLayout::MultiPanelLayout(UiState {
-        log_and_event_frame: 50,
-        pipeline_frame: 40,
-    });
-
     // Here is the main loop
     let mut reader = EventStream::new();
     loop {
+        let mut ui_layout = UiLayout::MultiPanelLayout(UiState {
+            log_and_event_frame: 50,
+            pipeline_frame: 40,
+        });
+
         let delay = Delay::new(Duration::from_millis(300)).fuse();
         let event = reader.next().fuse();
 
         select! {
             () = delay => {
-                terminal.draw(|f| {
-                    ui(f, &ui_layout, engine);
-                })?;
+                terminal.draw(|f| tokio::task::block_in_place(move || {
+                    Handle::current().block_on(async move {
+                        ui(f, &ui_layout, engine).await
+                    });
+                }))?;
             },
             maybe_event = event => {
                 match maybe_event {
@@ -115,9 +117,12 @@ pub async fn create_terminal_ui(
                     Some(Err(e)) => log::error!(target: "task_log", "Error: {:?}\r", e),
                     None => break,
                 };
-                terminal.draw(|f| {
-                    ui(f, &ui_layout, engine);
-                })?;
+                // terminal.draw(|f| async move {ui(f, &ui_layout, engine).await})?;
+                terminal.draw(|f| tokio::task::block_in_place(move || {
+                    Handle::current().block_on(async move {
+                        ui(f, &ui_layout, engine).await
+                    });
+                }))?;
             }
         }
     }
@@ -136,24 +141,26 @@ pub async fn create_terminal_ui(
     Ok(())
 }
 
-fn set_statuses_on_jobs(
+async fn set_statuses_on_jobs(
     pipeline_with_metadata: &mut PipelineSpecification,
     engine: &Arc<dyn Engine + Send + Sync>,
 ) {
     for job in &mut pipeline_with_metadata.jobs {
-        set_status_on_job(&pipeline_with_metadata.name, job, engine);
+        set_status_on_job(&pipeline_with_metadata.name, job, engine).await;
     }
 }
 
-fn set_status_on_job(
+#[async_recursion]
+async fn set_status_on_job(
     pipeline_name: &str,
     job: &mut IdentifierListItem,
     engine: &Arc<dyn Engine + Send + Sync>,
 ) {
     match job {
         super::pipeline::IdentifierListItem::Identifier(j) => {
-            let job_status =
-                engine.get_state_for_id(&format!("{}/{}/{}", "", pipeline_name, j.name));
+            let job_status = engine
+                .get_state_for_id(&format!("{}/{}/{}", "", pipeline_name, j.name))
+                .await;
             let js = match job_status {
                 Some(s) => {
                     let status = ExecutionStatus::from_str(s.as_str()).unwrap();
@@ -171,29 +178,29 @@ fn set_status_on_job(
         }
         super::pipeline::IdentifierListItem::SequentialList(list) => {
             for job in &mut *list {
-                set_status_on_job(pipeline_name, job, engine);
+                set_status_on_job(pipeline_name, job, engine).await;
             }
         }
         IdentifierListItem::ParallelList(list) => {
             for job in &mut *list {
-                set_status_on_job(pipeline_name, job, engine);
+                set_status_on_job(pipeline_name, job, engine).await;
             }
         }
     }
 }
 
-fn ui(f: &mut Frame, ui_layout: &UiLayout, engine: &Arc<dyn Engine + Send + Sync>) {
+async fn ui(f: &mut Frame<'_>, ui_layout: &UiLayout, engine: &Arc<dyn Engine + Send + Sync>) {
     match ui_layout {
         UiLayout::FullScreenLogs => full_screen_logs(f),
         UiLayout::FullScreenEvents => full_screen_events(f),
-        UiLayout::FullScreenPipelines => full_screen_pipeline(f, engine),
-        UiLayout::MultiPanelLayout(ui_state) => multi_panel_layout(f, ui_state, engine),
+        UiLayout::FullScreenPipelines => full_screen_pipeline(f, engine).await,
+        UiLayout::MultiPanelLayout(ui_state) => multi_panel_layout(f, ui_state, engine).await,
     }
 }
 
-fn full_screen_pipeline(f: &mut Frame, engine: &Arc<dyn Engine + Send + Sync>) {
+async fn full_screen_pipeline(f: &mut Frame<'_>, engine: &Arc<dyn Engine + Send + Sync>) {
     let mut spec = PipelineSpecification::from(&engine.get_pipeline_specification()[0]);
-    set_statuses_on_jobs(&mut spec, engine);
+    set_statuses_on_jobs(&mut spec, engine).await;
     let pipe = PipelineWidget::default().block(
         Block::default()
             .title(" Pipeline (test) - ('q' to quit; 's' to start pipeline) - Pipeline ('m' to return to multi panel view) ")
@@ -259,7 +266,11 @@ fn full_screen_logs(f: &mut Frame) {
     f.render_widget(lwidget, f.size());
 }
 
-fn multi_panel_layout(f: &mut Frame, ui_layout: &UiState, engine: &Arc<dyn Engine + Send + Sync>) {
+async fn multi_panel_layout(
+    f: &mut Frame<'_>,
+    ui_layout: &UiState,
+    engine: &Arc<dyn Engine + Send + Sync>,
+) {
     let constraints = split_frame(ui_layout.pipeline_frame);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -268,7 +279,7 @@ fn multi_panel_layout(f: &mut Frame, ui_layout: &UiState, engine: &Arc<dyn Engin
         .split(f.size());
 
     let mut spec = PipelineSpecification::from(&engine.get_pipeline_specification()[0]);
-    set_statuses_on_jobs(&mut spec, engine);
+    set_statuses_on_jobs(&mut spec, engine).await;
     let pipe = PipelineWidget::default().block(
         Block::default()
             .title(" Pipeline (test) - ('q' to quit; 's' to start pipeline) - Pipeline ('m' to return to multi panel view) ")

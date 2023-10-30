@@ -283,11 +283,11 @@ mod tests {
             todo!()
         }
 
-        fn get_state_for_id(&self, _key: &str) -> Option<String> {
+        async fn get_state_for_id(&self, _key: &str) -> Option<String> {
             todo!()
         }
 
-        fn set_state_for_id(
+        async fn set_state_for_id(
             &self,
             _key: &str,
             _value: String,

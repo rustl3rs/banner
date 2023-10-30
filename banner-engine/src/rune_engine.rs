@@ -27,7 +27,7 @@ impl<'a> RuneEngineWrapper {
         let _ = self.engine.set_state_for_id(
             &format!("{}/{}", "", pipeline),
             ExecutionStatus::Running.to_string(),
-        );
+        ).await;
     }
 
     pub async fn trigger_job(&self, pipeline: &str, job: &str) {
@@ -42,7 +42,7 @@ impl<'a> RuneEngineWrapper {
         let _ = self.engine.set_state_for_id(
             &format!("{}/{}/{}", "", pipeline, job),
             ExecutionStatus::Running.to_string(),
-        );
+        ).await;
     }
 
     pub async fn trigger_task(&self, pipeline: &str, job: &str, task: &str) {
@@ -58,7 +58,7 @@ impl<'a> RuneEngineWrapper {
         let _ = self.engine.set_state_for_id(
             &format!("{}/{}/{}/{}", "", pipeline, job, task),
             ExecutionStatus::Running.to_string(),
-        );
+        ).await;
     }
 
     pub async fn log_message(&self, message: &str) {
@@ -78,12 +78,12 @@ impl<'a> RuneEngineWrapper {
                     SystemEventResult::Success => {
                         let _ = self
                             .engine
-                            .set_state_for_id(&key, ExecutionStatus::Success.to_string());
+                            .set_state_for_id(&key, ExecutionStatus::Success.to_string()).await;
                     }
                     _ => {
                         let _ = self
                             .engine
-                            .set_state_for_id(&key, ExecutionStatus::Failed.to_string());
+                            .set_state_for_id(&key, ExecutionStatus::Failed.to_string()).await;
                     }
                 }
                 result
@@ -111,12 +111,12 @@ impl<'a> RuneEngineWrapper {
                     SystemEventResult::Success => {
                         let _ = self
                             .engine
-                            .set_state_for_id(&key, ExecutionStatus::Success.to_string());
+                            .set_state_for_id(&key, ExecutionStatus::Success.to_string()).await;
                     }
                     _ => {
                         let _ = self
                             .engine
-                            .set_state_for_id(&key, ExecutionStatus::Failed.to_string());
+                            .set_state_for_id(&key, ExecutionStatus::Failed.to_string()).await;
                     }
                 }
                 result
@@ -150,7 +150,7 @@ impl<'a> RuneEngineWrapper {
         let _ = self.engine.set_state_for_id(
             &format!("{}/{}/{}/{}", "", pipeline, job, task),
             ExecutionStatus::Success.to_string(),
-        );
+        ).await;
     }
 
     pub async fn task_fail(&self, pipeline: &str, job: &str, task: &str) {
@@ -167,7 +167,7 @@ impl<'a> RuneEngineWrapper {
         let _ = self.engine.set_state_for_id(
             &format!("{}/{}/{}/{}", "", pipeline, job, task),
             ExecutionStatus::Failed.to_string(),
-        );
+        ).await;
     }
 
     pub async fn execute_task_name_in_scope(
@@ -201,7 +201,7 @@ impl<'a> RuneEngineWrapper {
     }
 
     pub async fn get_from_state(&self, _scope: &str, key: &str) -> Option<SystemEventResult> {
-        let value_from_state = self.engine.get_state_for_id(key);
+        let value_from_state = self.engine.get_state_for_id(key).await;
         match value_from_state {
             Some(value) => {
                 let result = SystemEventResult::from_str(&value);
@@ -226,7 +226,7 @@ impl<'a> RuneEngineWrapper {
 
     pub async fn set_state_for_task(&self, _scope: &str, key: &str, value: &SystemEventResult) {
         let val = value.to_string();
-        let result = self.engine.set_state_for_id(key, val);
+        let result = self.engine.set_state_for_id(key, val).await;
         match result {
             Ok(()) => {
                 log::debug!(target: "task_log", "set_state_for_task called on {key} with value {value}");

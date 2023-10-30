@@ -300,14 +300,14 @@ impl Engine for LocalEngine {
     }
 
     /// Returns a map of key/value pairs that represent the state of the engine for a specific pipeline run.
-    fn get_state_for_id(&self, key: &str) -> Option<String> {
+    async fn get_state_for_id(&self, key: &str) -> Option<String> {
         let hm = self.state.read().unwrap();
         let result = hm.get(key);
         result.map(std::string::ToString::to_string)
     }
 
     /// Returns a value from state based on the key.
-    fn set_state_for_id(
+    async fn set_state_for_id(
         &self,
         key: &str,
         value: String,
