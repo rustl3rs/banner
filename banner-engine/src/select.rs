@@ -25,11 +25,4 @@ impl<T> Select<T> {
     pub const fn is_any(&self) -> bool {
         !self.is_specific()
     }
-
-    pub fn unwrap(self) -> T {
-        match self {
-            Select::Only(val) => val,
-            Select::Any => panic!("called `Any::unwrap()` on a `Any` value"),
-        }
-    }
 }

@@ -6,7 +6,7 @@ use pest::iterators::{Pair, Pairs};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StringLiteral {
-    RawString(u8, String),
+    RawString(usize, String),
     StringLiteral(String),
 }
 
@@ -50,21 +50,32 @@ impl StringLiteral {
     #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
-            StringLiteral::RawString(_, inner) => inner,
-            StringLiteral::StringLiteral(inner) => inner,
+            StringLiteral::RawString(_, inner) | StringLiteral::StringLiteral(inner) => inner,
         }
     }
 
+    /// .
+    ///
+    /// # Panics
+    ///
+    /// Panics if:
+    /// * the rule is not `Rule::raw_string`.
+    /// * the raw string does not contain a double quote <- this should be impossible by the time it rea.
     #[must_use]
     pub fn from_raw_string(raw: Pair<Rule>) -> StringLiteral {
         assert!(
-            !(raw.as_rule() != Rule::raw_string),
+            raw.as_rule() == Rule::raw_string,
             "Expected raw_string, got {raw:?}"
         );
         // subtract 1 for the starting `r` char
         // since we are zero based, we don't need to subtract an extra 1 for the ending `"`
-        let count = raw.as_str().find('\"').unwrap() as u8 - 1;
+        let count = raw
+            .as_str()
+            .find('\"')
+            .expect("raw string did not contain a double quote")
+            - 1;
         let raw = raw.into_inner().next().unwrap().as_str().to_string();
+
         StringLiteral::RawString(count, raw)
     }
 }
@@ -544,10 +555,7 @@ fn from_ident_list(pest: &mut Pairs<Rule>) -> Vec<IdentifierListItem> {
                                 markers,
                             ));
                         }
-                        Rule::identifier => {
-                            tasks.push(task);
-                        }
-                        Rule::sequential_identifier_list  |
+                        Rule::identifier | Rule::sequential_identifier_list  |
                         Rule::parallel_identifier_list => {
                             tasks.push(task);
                         }
@@ -612,6 +620,11 @@ pub struct JobSpecification {
 }
 
 impl JobSpecification {
+    /// Returns the all tasks of this [`JobSpecification`] as a Vec of String.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of the [`IdentifierListItem`]s is not an [`IdentifierListItem::Identifier`].
     #[must_use]
     pub fn all_tasks(&self) -> Vec<String> {
         let mut tasks = Vec::<String>::new();
@@ -620,17 +633,8 @@ impl JobSpecification {
                 IdentifierListItem::Identifier(task_name, _) => {
                     tasks.push(task_name.to_string());
                 }
-                IdentifierListItem::SequentialList(task_list) => {
-                    for task in task_list {
-                        match task {
-                            IdentifierListItem::Identifier(task_name, _) => {
-                                tasks.push(task_name.to_string());
-                            }
-                            _ => panic!("expected IdentifierListItem::Identifier"),
-                        }
-                    }
-                }
-                IdentifierListItem::ParallelList(task_list) => {
+                IdentifierListItem::SequentialList(task_list)
+                | IdentifierListItem::ParallelList(task_list) => {
                     for task in task_list {
                         match task {
                             IdentifierListItem::Identifier(task_name, _) => {

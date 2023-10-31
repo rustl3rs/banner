@@ -8,10 +8,21 @@ use crate::image_ref;
 
 extern crate pest;
 
+// TODO: I need to think about this more. I'm not certain this isn't the right name
+#[allow(clippy::module_name_repetitions)]
 #[derive(Parser)]
 #[grammar = "grammar/image_ref.pest"]
 pub struct ImageRefParser;
 
+/// Parses a docker URI.
+///
+/// # Panics
+///
+/// Panics if the parsed input cannot be converted to an AST.
+///
+/// # Errors
+///
+/// This function will return an error if the input cannot be parsed.
 pub fn parse_docker_uri(input: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
     trace!("docker ref = {:#?}", input);
     let mut tree = ImageRefParser::parse(image_ref::Rule::reference, input)?;
@@ -70,11 +81,8 @@ impl<'a> ::from_pest::FromPest<'a> for ImageRef {
                         .peek()
                         .ok_or(::from_pest::ConversionError::NoMatch)?
                         .as_rule()
-                        != Rule::tag
+                        == Rule::tag
                     {
-                        trace!("TAG is None");
-                        None::<String>
-                    } else {
                         trace!("TAG is: {:?}", inner.peek().unwrap().as_span().as_str());
                         span_into_optional_str(
                             inner
@@ -82,6 +90,9 @@ impl<'a> ::from_pest::FromPest<'a> for ImageRef {
                                 .ok_or(::from_pest::ConversionError::NoMatch)?
                                 .as_span(),
                         )
+                    } else {
+                        trace!("TAG is None");
+                        None::<String>
                     }
                 },
                 digest: {
@@ -89,11 +100,8 @@ impl<'a> ::from_pest::FromPest<'a> for ImageRef {
                         .peek()
                         .ok_or(::from_pest::ConversionError::NoMatch)?
                         .as_rule()
-                        != Rule::digest
+                        == Rule::digest
                     {
-                        trace!("Digest is None");
-                        None::<String>
-                    } else {
                         trace!("DIGEST is: {:?}", inner.peek().unwrap().as_span().as_str());
                         span_into_optional_str(
                             inner
@@ -101,12 +109,15 @@ impl<'a> ::from_pest::FromPest<'a> for ImageRef {
                                 .ok_or(::from_pest::ConversionError::NoMatch)?
                                 .as_span(),
                         )
+                    } else {
+                        trace!("Digest is None");
+                        None::<String>
                     }
                 },
                 eoi: ::from_pest::FromPest::from_pest(inner)?,
             };
             assert!(
-                !inner.clone().next().is_some(),
+                inner.clone().next().is_none(),
                 "when converting ImageRef, found extraneous {inner:?}"
             );
             *pest = clone;
@@ -146,43 +157,34 @@ mod docker_uri_parser_tests {
 
     fn check_domain(input: &str) {
         match parse_docker_domain(input) {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(e) => {
-                println!("Failed to parse domain: {:#?}", e);
-                assert!(false)
+                panic!("Failed to parse domain: {e:#?}");
             }
         }
     }
 
     fn check_domain_component(input: &str) {
         match parse_docker_domain_component(input) {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(e) => {
-                println!("{:#?}", e);
-                assert!(false)
+                panic!("{e:#?}");
             }
         }
     }
 
     fn check(input: &str) {
         match parse_docker_uri(input) {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(e) => {
-                println!("{:#?}", e);
-                assert!(false)
+                panic!("{e:#?}");
             }
         }
     }
 
     fn check_invalid(input: &str) {
-        match parse_docker_uri(input) {
-            Ok(_) => {
-                println!("this should be invalid: {input}");
-                assert!(false)
-            }
-            Err(_) => {
-                assert!(true)
-            }
+        if let Ok(()) = parse_docker_uri(input) {
+            panic!("this should be invalid: {input}");
         }
     }
 

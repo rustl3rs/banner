@@ -7,7 +7,7 @@ use banner_engine::{ListenForSystemEventResult, SystemEventResult};
 use strum::IntoEnumIterator;
 
 #[test]
-pub fn check_system_result() {
+fn check_system_result() {
     let ser = SystemEventResult::iter().collect::<Vec<_>>();
     let lf_ser = ListenForSystemEventResult::iter().collect::<Vec<_>>();
     for lf_event in lf_ser {
@@ -21,7 +21,8 @@ pub fn check_system_result() {
     }
 }
 
-pub fn check_listen_for_system_result() {
+#[test]
+fn check_listen_for_system_result() {
     let ser = SystemEventResult::iter().collect::<Vec<_>>();
     let lf_ser = ListenForSystemEventResult::iter().collect::<Vec<_>>();
     for event in ser {

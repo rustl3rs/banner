@@ -121,6 +121,7 @@ fn get_first_jobs_sequential(list: &[IdentifierListItem]) -> Vec<&str> {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 pub fn get_eventhandlers_for_pipeline(pipeline: &ast::PipelineSpecification) -> Vec<EventHandler> {
     // create all the event handlers specific to a defined pipeline. This requires:
     //   * an EH to trigger the first job in the pipeline

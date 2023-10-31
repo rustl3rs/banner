@@ -1,0 +1,35 @@
+[{
+    listen_for_events:
+        ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
+    tags:
+        banner.dev/pipeline: test,
+        banner.dev/description: Trigger the start of the pipeline: test/unit-test,
+    script: ###"
+        pub async fn main (engine, event) {
+            engine.trigger_job("test", "unit-test").await;
+        }
+    "###
+}, {
+    listen_for_events:
+        ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: build-artefacts] },
+    tags:
+        banner.dev/pipeline: test,
+        banner.dev/description: Signal the completion of the pipeline: test; Last job was: build-artefacts,
+    script: ###"
+        pub async fn main (engine, event) {
+            engine.pipeline_complete(event).await;
+        }
+    "###
+}, {
+    listen_for_events:
+        ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+    tags:
+        banner.dev/pipeline: test,
+        banner.dev/job: build-artefacts,
+        banner.dev/description: Trigger the start of the single job: test/build-artefacts,
+    script: ###"
+        pub async fn main (engine, event) {
+            engine.trigger_job("test", "build-artefacts").await;
+        }
+    "###
+}]

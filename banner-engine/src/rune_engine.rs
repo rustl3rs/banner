@@ -9,25 +9,27 @@ use crate::{
 };
 
 #[derive(Any)]
-pub struct RuneEngineWrapper {
+pub struct EventHandlerEngine {
     pub engine: Arc<dyn Engine + Send + Sync>,
     pub tx: Sender<Event>,
 }
 
-impl<'a> RuneEngineWrapper {
+impl<'a> EventHandlerEngine {
     pub async fn trigger_pipeline(&self, pipeline: &str) {
         log::trace!("trigger_pipeline");
         Event::new_builder(EventType::System(SystemEventType::Trigger(
             SystemEventScope::Pipeline,
         )))
         .with_pipeline_name(pipeline)
-        .send_from(&self.tx)
-        .await;
+        .send_from(&self.tx);
 
-        let _ = self.engine.set_state_for_id(
-            &format!("{}/{}", "", pipeline),
-            ExecutionStatus::Running.to_string(),
-        ).await;
+        let _ = self
+            .engine
+            .set_state_for_id(
+                &format!("{}/{}", "", pipeline),
+                ExecutionStatus::Running.to_string(),
+            )
+            .await;
     }
 
     pub async fn trigger_job(&self, pipeline: &str, job: &str) {
@@ -36,13 +38,15 @@ impl<'a> RuneEngineWrapper {
         )))
         .with_pipeline_name(pipeline)
         .with_job_name(job)
-        .send_from(&self.tx)
-        .await;
+        .send_from(&self.tx);
 
-        let _ = self.engine.set_state_for_id(
-            &format!("{}/{}/{}", "", pipeline, job),
-            ExecutionStatus::Running.to_string(),
-        ).await;
+        let _ = self
+            .engine
+            .set_state_for_id(
+                &format!("{}/{}/{}", "", pipeline, job),
+                ExecutionStatus::Running.to_string(),
+            )
+            .await;
     }
 
     pub async fn trigger_task(&self, pipeline: &str, job: &str, task: &str) {
@@ -52,25 +56,26 @@ impl<'a> RuneEngineWrapper {
         .with_pipeline_name(pipeline)
         .with_job_name(job)
         .with_task_name(task)
-        .send_from(&self.tx)
-        .await;
+        .send_from(&self.tx);
 
-        let _ = self.engine.set_state_for_id(
-            &format!("{}/{}/{}/{}", "", pipeline, job, task),
-            ExecutionStatus::Running.to_string(),
-        ).await;
-    }
-
-    pub async fn log_message(&self, message: &str) {
-        log::info!(target: "task_log", "LOGMESSAGE: {message}");
-        Event::new_builder(EventType::Log)
-            .with_log_message(message)
-            .send_from(&self.tx)
+        let _ = self
+            .engine
+            .set_state_for_id(
+                &format!("{}/{}/{}/{}", "", pipeline, job, task),
+                ExecutionStatus::Running.to_string(),
+            )
             .await;
     }
 
+    pub fn log_message(&self, message: &str) {
+        log::info!(target: "task_log", "LOGMESSAGE: {message}");
+        Event::new_builder(EventType::Log)
+            .with_log_message(message)
+            .send_from(&self.tx);
+    }
+
     pub async fn pipeline_complete(&self, event: &Event) {
-        let (pipeline, _, _) = self.get_pipeline_metadata_from_event_tags(event).await;
+        let (pipeline, _, _) = Self::get_pipeline_metadata_from_event_tags(event);
         let key = format!("{scope}/{pipeline}", scope = "");
         let result = match event.get_type() {
             EventType::System(SystemEventType::Done(SystemEventScope::Job, result)) => {
@@ -78,12 +83,14 @@ impl<'a> RuneEngineWrapper {
                     SystemEventResult::Success => {
                         let _ = self
                             .engine
-                            .set_state_for_id(&key, ExecutionStatus::Success.to_string()).await;
+                            .set_state_for_id(&key, ExecutionStatus::Success.to_string())
+                            .await;
                     }
                     _ => {
                         let _ = self
                             .engine
-                            .set_state_for_id(&key, ExecutionStatus::Failed.to_string()).await;
+                            .set_state_for_id(&key, ExecutionStatus::Failed.to_string())
+                            .await;
                     }
                 }
                 result
@@ -98,12 +105,11 @@ impl<'a> RuneEngineWrapper {
             result,
         )))
         .with_pipeline_name(pipeline)
-        .send_from(&self.tx)
-        .await;
+        .send_from(&self.tx);
     }
 
     pub async fn job_complete(&self, event: &Event) {
-        let (pipeline, job, _) = self.get_pipeline_metadata_from_event(event).await;
+        let (pipeline, job, _) = Self::get_pipeline_metadata_from_event(event);
         let key = format!("{scope}/{pipeline}/{job}", scope = "");
         let result = match event.get_type() {
             EventType::System(SystemEventType::Done(SystemEventScope::Task, result)) => {
@@ -111,12 +117,14 @@ impl<'a> RuneEngineWrapper {
                     SystemEventResult::Success => {
                         let _ = self
                             .engine
-                            .set_state_for_id(&key, ExecutionStatus::Success.to_string()).await;
+                            .set_state_for_id(&key, ExecutionStatus::Success.to_string())
+                            .await;
                     }
                     _ => {
                         let _ = self
                             .engine
-                            .set_state_for_id(&key, ExecutionStatus::Failed.to_string()).await;
+                            .set_state_for_id(&key, ExecutionStatus::Failed.to_string())
+                            .await;
                     }
                 }
                 result
@@ -132,8 +140,7 @@ impl<'a> RuneEngineWrapper {
         )))
         .with_pipeline_name(pipeline)
         .with_job_name(job)
-        .send_from(&self.tx)
-        .await;
+        .send_from(&self.tx);
     }
 
     pub async fn task_success(&self, pipeline: &str, job: &str, task: &str) {
@@ -144,13 +151,15 @@ impl<'a> RuneEngineWrapper {
         .with_pipeline_name(pipeline)
         .with_job_name(job)
         .with_task_name(task)
-        .send_from(&self.tx)
-        .await;
+        .send_from(&self.tx);
 
-        let _ = self.engine.set_state_for_id(
-            &format!("{}/{}/{}/{}", "", pipeline, job, task),
-            ExecutionStatus::Success.to_string(),
-        ).await;
+        let _ = self
+            .engine
+            .set_state_for_id(
+                &format!("{}/{}/{}/{}", "", pipeline, job, task),
+                ExecutionStatus::Success.to_string(),
+            )
+            .await;
     }
 
     pub async fn task_fail(&self, pipeline: &str, job: &str, task: &str) {
@@ -161,13 +170,15 @@ impl<'a> RuneEngineWrapper {
         .with_pipeline_name(pipeline)
         .with_job_name(job)
         .with_task_name(task)
-        .send_from(&self.tx)
-        .await;
+        .send_from(&self.tx);
 
-        let _ = self.engine.set_state_for_id(
-            &format!("{}/{}/{}/{}", "", pipeline, job, task),
-            ExecutionStatus::Failed.to_string(),
-        ).await;
+        let _ = self
+            .engine
+            .set_state_for_id(
+                &format!("{}/{}/{}/{}", "", pipeline, job, task),
+                ExecutionStatus::Failed.to_string(),
+            )
+            .await;
     }
 
     pub async fn execute_task_name_in_scope(
@@ -202,25 +213,19 @@ impl<'a> RuneEngineWrapper {
 
     pub async fn get_from_state(&self, _scope: &str, key: &str) -> Option<SystemEventResult> {
         let value_from_state = self.engine.get_state_for_id(key).await;
-        match value_from_state {
-            Some(value) => {
-                let result = SystemEventResult::from_str(&value);
-                log::warn!(target: "task_log", "get_from_state called on {key} with value {value}, leaving result: {result:?}");
-                match result {
-                    Ok(r) => {
-                        log::debug!(target: "task_log", "Some(r): {:?}", Some(r));
-                        Some(r)
-                    }
-                    Err(_) => {
-                        log::error!(target: "task_log", "get_from_state called on {key} with value {value:?} which is not a valid SystemEventResult");
-                        None
-                    }
-                }
-            }
-            None => {
-                log::warn!(target: "task_log", "get_from_state called on {key} which does not exist");
+        if let Some(value) = value_from_state {
+            let result = SystemEventResult::from_str(&value);
+            log::warn!(target: "task_log", "get_from_state called on {key} with value {value}, leaving result: {result:?}");
+            if let Ok(r) = result {
+                log::debug!(target: "task_log", "Some(r): {:?}", Some(r));
+                Some(r)
+            } else {
+                log::error!(target: "task_log", "get_from_state called on {key} with value {value:?} which is not a valid SystemEventResult");
                 None
             }
+        } else {
+            log::warn!(target: "task_log", "get_from_state called on {key} which does not exist");
+            None
         }
     }
 
@@ -237,10 +242,7 @@ impl<'a> RuneEngineWrapper {
         }
     }
 
-    pub async fn get_pipeline_metadata_from_event(
-        &self,
-        event: &'a Event,
-    ) -> (&'a str, &'a str, &'a str) {
+    pub fn get_pipeline_metadata_from_event(event: &'a Event) -> (&'a str, &'a str, &'a str) {
         let pipeline = event
             .metadata()
             .iter()
@@ -259,8 +261,7 @@ impl<'a> RuneEngineWrapper {
         }
     }
 
-    pub async fn get_pipeline_metadata_from_event_tags(
-        &self,
+    pub fn get_pipeline_metadata_from_event_tags(
         event: &'a Event,
     ) -> (&'a str, Option<&'a str>, Option<&'a str>) {
         let pipeline = event

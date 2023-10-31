@@ -1,0 +1,105 @@
+(
+    Pipeline {
+        tasks: [
+            TaskDefinition {
+                tags: [
+                    banner.dev/task: unit-test,
+                    banner.dev/job: unit-test,
+                    banner.dev/pipeline: test,
+                ],
+                image: Image {
+                    source: "alpine:latest",
+                    credentials: None,
+                },
+                command: [
+                    "/bin/sh",
+                    "-c",
+                    "\n                    // this is a comment\n                    echo -n \"testing, testing, 1, 2, 3!\"\n                    ",
+                ],
+                inputs: [],
+                outputs: [],
+            },
+        ],
+        event_handlers: [
+            {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Trigger the start of the pipeline: test/unit-test!,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_job("test", "unit-test").await;
+                    }
+                "###
+            },
+            {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: unit-test!,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.pipeline_complete(event).await;
+                    }
+                "###
+            },
+            {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Done(Only(Task), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test, banner.dev/task: unit-test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/job: unit-test,
+                    banner.dev/description: Signal the completion of the job: test/unit-test; Last task was: unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.job_complete(event).await;
+                    }
+                "###
+            },
+            {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
+                tags:
+                    banner.dev/pipeline: test,
+                    banner.dev/job: unit-test,
+                    banner.dev/job: unit-test,
+                    banner.dev/description: Trigger the start of the job: test/unit-test/unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.trigger_task("test", "unit-test", "unit-test").await;
+                    }
+                "###
+            },
+            {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test, banner.dev/task: unit-test] },
+                tags:
+                    banner.dev/task: unit-test,
+                    banner.dev/job: unit-test,
+                    banner.dev/pipeline: test,
+                    banner.dev/description: Execute the task: unit-test,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.execute_task_name_in_scope("", "test", "unit-test", "unit-test").await;
+                    }
+                "###
+            },
+        ],
+        pragmas: [],
+    },
+    [
+        PipelineSpecification {
+            name: "test",
+            jobs: [
+                Identifier(
+                    "unit-test",
+                    [
+                        JobMacro,
+                    ],
+                ),
+            ],
+        },
+    ],
+)

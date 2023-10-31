@@ -1,0 +1,52 @@
+[{
+    listen_for_events:
+        ListenForEvent { type: System(Only(Done(Only(Task), Any))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: publish-docker] },
+    tags:
+        banner.dev/pipeline: _,
+        banner.dev/job: build,
+        banner.dev/description: Signal the completion of the job: _/build; Last task was: publish-docker,
+    script: ###"
+        pub async fn main (engine, event) {
+            engine.job_complete(event).await;
+        }
+    "###
+}, {
+    listen_for_events:
+        ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: build-docker] },
+    tags:
+        banner.dev/pipeline: _,
+        banner.dev/job: build,
+        banner.dev/task: publish-docker,
+        banner.dev/description: Trigger the start of the task: _/build/publish-docker,
+    script: ###"
+        pub async fn main (engine, event) {
+            engine.trigger_task("_", "build", "publish-docker").await;
+        }
+    "###
+}, {
+    listen_for_events:
+        ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: unit-test] },
+    tags:
+        banner.dev/pipeline: _,
+        banner.dev/job: build,
+        banner.dev/task: build-docker,
+        banner.dev/description: Trigger the start of the task: _/build/build-docker,
+    script: ###"
+        pub async fn main (engine, event) {
+            engine.trigger_task("_", "build", "build-docker").await;
+        }
+    "###
+}, {
+    listen_for_events:
+        ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build] },
+    tags:
+        banner.dev/pipeline: _,
+        banner.dev/job: build,
+        banner.dev/job: unit-test,
+        banner.dev/description: Trigger the start of the job: _/build/unit-test,
+    script: ###"
+        pub async fn main (engine, event) {
+            engine.trigger_task("_", "build", "unit-test").await;
+        }
+    "###
+}]

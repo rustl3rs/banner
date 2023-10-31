@@ -1,0 +1,58 @@
+(
+    Pipeline {
+        tasks: [
+            TaskDefinition {
+                tags: [],
+                image: Image {
+                    source: "alpine:latest",
+                    credentials: None,
+                },
+                command: [
+                    "sh",
+                    "-c",
+                    "bash\n    # this is a bash comment\n    echo rustl3rs herd!\n    # basically a no-op.\n    # But a good start to our testing.\n    ",
+                ],
+                inputs: [],
+                outputs: [],
+            },
+            TaskDefinition {
+                tags: [],
+                image: Image {
+                    source: "kmcgivern/cowsay-alpine:latest",
+                    credentials: None,
+                },
+                command: [
+                    "",
+                ],
+                inputs: [],
+                outputs: [],
+            },
+        ],
+        event_handlers: [
+            {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/pipeline: _, banner.dev/job: _, banner.dev/task: _] },
+                tags:
+                    banner.dev/description: Execute the task: _,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.execute_task_name_in_scope("", "_", "_", "_").await;
+                    }
+                "###
+            },
+            {
+                listen_for_events:
+                    ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/pipeline: _, banner.dev/job: _, banner.dev/task: _] },
+                tags:
+                    banner.dev/description: Execute the task: _,
+                script: ###"
+                    pub async fn main (engine, event) {
+                        engine.execute_task_name_in_scope("", "_", "_", "_").await;
+                    }
+                "###
+            },
+        ],
+        pragmas: [],
+    },
+    [],
+)

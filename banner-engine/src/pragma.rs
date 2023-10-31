@@ -23,7 +23,7 @@ impl PragmasBuilder {
         self
     }
 
-    pub(crate) fn build_from(&self, pragmas: &[ast::Pragma]) -> Vec<Pragma> {
+    pub(crate) fn build_from(self, pragmas: &[ast::Pragma]) -> Vec<Pragma> {
         pragmas
             .iter()
             .filter(|p| self.contexts.contains(&p.context))

@@ -2,7 +2,6 @@ use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
 use banner_parser::ast::PipelineSpecification;
-use log::{debug, error};
 use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::{event_handler::EventHandler, Event, Events, Pipeline, TaskDefinition};
@@ -64,7 +63,16 @@ pub enum ExecutionResult {
     Failed(Events),
 }
 
-pub async fn start_engine(
+/// .
+///
+/// # Panics
+///
+/// Panics if .
+///
+/// # Errors
+///
+/// This function will return an error if .
+pub async fn start(
     engine: &Arc<dyn Engine + Send + Sync>,
     mut rx: Receiver<Event>,
     tx: Sender<Event>,
@@ -77,21 +85,21 @@ pub async fn start_engine(
         // if we have fallen behind and the channel is full, we'll get an error.
         // continue on, because we can continue to process events.
         if event.is_err() {
-            error!(target: "task_log", "error receiving event: {:?}", event);
+            log::error!(target: "task_log", "error receiving event: {:?}", event);
             continue;
         }
 
         let event = event.unwrap();
-        debug!(target: "task_log", "received event: {:?}", event);
+        log::debug!(target: "task_log", "received event: {:?}", event);
 
         if event == Event::new_builder(crate::EventType::UserDefined).build() {
             log::debug!(target: "task_log", "received user defined event");
             engine.get_pipelines().into_iter().for_each(|p| {
-                    log::debug!(target: "task_log", "Number of event handlers: {}", p.event_handlers.len());
-                    p.event_handlers
-                        .iter()
-                        .for_each(|eh| log::debug!(target: "task_log", "event handler: {:?}", eh));
-                });
+                log::debug!(target: "task_log", "Number of event handlers: {}", p.event_handlers.len());
+                p.event_handlers
+                    .iter()
+                    .for_each(|eh| log::debug!(target: "task_log", "event handler: {:?}", eh));
+            });
             engine.get_pipelines().into_iter().for_each(|p| {
                 p.tasks.iter().for_each(|t| {
                     log::debug!(target: "task_log", "task: {:?}", t);
@@ -107,10 +115,10 @@ pub async fn start_engine(
             .filter_map(|pipeline| {
                 let handlers = pipeline.events_matching(&event);
                 log::debug!(target: "event_log", "handlers: {:?}", handlers);
-                if !handlers.is_empty() {
-                    Some(handlers)
-                } else {
+                if handlers.is_empty() {
                     None
+                } else {
+                    Some(handlers)
                 }
             })
             .flatten()
@@ -118,9 +126,8 @@ pub async fn start_engine(
         // and execute them all.
         for eh in event_handlers {
             let e = engine.clone();
-            let tx = tx.clone();
             let ev = event.clone();
-            eh.execute(e, tx, ev).await;
+            eh.execute(e, &tx, ev);
         }
     }
 }

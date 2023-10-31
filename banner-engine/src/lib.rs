@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 mod engine;
 mod event_handler;
 mod event_handlers;

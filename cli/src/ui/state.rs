@@ -1,3 +1,5 @@
+// TODO: I need to think about this more. I'm not certain this isn't the right name
+#[allow(clippy::module_name_repetitions)]
 pub struct UiState {
     pub(crate) log_and_event_frame: u8,
     pub(crate) pipeline_frame: u8,

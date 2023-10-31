@@ -1,6 +1,8 @@
+#![warn(clippy::pedantic)]
+
 use std::{error::Error, fs, path::PathBuf, process, sync::Arc};
 
-use banner_engine::{parse_file, start_engine, Engine, PragmasBuilder};
+use banner_engine::{parse_file, start, Engine, PragmasBuilder};
 use clap::{Parser, Subcommand};
 use local_engine::LocalEngine;
 use log::{self, LevelFilter};
@@ -70,7 +72,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let se = engine.clone();
 
                 tokio::select! {
-                    _ = start_engine(&se, rx, tx.clone()) => {},
+                    _ = start(&se, rx, tx.clone()) => {},
                     _ = create_terminal_ui(&engine, tx.clone()) => {}
                 };
 
@@ -103,7 +105,7 @@ async fn execute_command() -> Result<Option<LocalEngine>, Box<dyn Error + Send +
         Commands::ValidatePipeline { file } => {
             let pipeline =
                 fs::read_to_string(file).expect("Should have been able to read the file");
-            match parse_file(pipeline) {
+            match parse_file(&pipeline) {
                 Ok(()) => {
                     println!("Pipeline validated successfully! 👍🏽 🎉 ✅");
                     Ok(None)

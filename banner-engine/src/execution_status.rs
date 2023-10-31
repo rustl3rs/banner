@@ -3,6 +3,7 @@ use std::fmt::Display;
 use strum_macros::EnumString;
 
 #[derive(Debug, Clone, Copy, PartialEq, EnumString)]
+#[non_exhaustive]
 pub enum ExecutionStatus {
     Pending,
     Running,

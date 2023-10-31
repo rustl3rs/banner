@@ -57,7 +57,7 @@ pub async fn create_terminal_ui(
             () = delay => {
                 terminal.draw(|f| tokio::task::block_in_place(move || {
                     Handle::current().block_on(async move {
-                        ui(f, &ui_layout, engine).await
+                        ui(f, &ui_layout, engine).await;
                     });
                 }))?;
             },
@@ -73,28 +73,28 @@ pub async fn create_terminal_ui(
                             log::info!(target: "task_log", "Start Pipeline UI Event received");
                             banner_engine::Event::new_builder(EventType::System(SystemEventType::Trigger(SystemEventScope::Pipeline)))
                                 .with_pipeline_name("banner")
-                                .send_from(&tx).await;
+                                .send_from(&tx);
                         }
 
                         if event == Event::Key(KeyCode::Char('h').into()) {
                             log::info!(target: "task_log", "Print EventHandler UI Event received");
                             banner_engine::Event::new_builder(EventType::UserDefined)
                                 .with_pipeline_name("banner")
-                                .send_from(&tx).await;
+                                .send_from(&tx);
                         }
 
                         if event == Event::Key(KeyCode::Char('L').into()) {
                             log::info!(target: "task_log", "FullScreen logs event received");
                             banner_engine::Event::new_builder(EventType::UserDefined)
                                 .with_pipeline_name("banner")
-                                .send_from(&tx).await;
+                                .send_from(&tx);
                             ui_layout.set_full_screen_logs();
                         }
                         if event == Event::Key(KeyCode::Char('m').into()) {
                             log::info!(target: "task_log", "Multi panel screen event received");
                             banner_engine::Event::new_builder(EventType::UserDefined)
                                 .with_pipeline_name("banner")
-                                .send_from(&tx).await;
+                                .send_from(&tx);
                             ui_layout.set_multi_panel();
                         }
 
@@ -102,7 +102,7 @@ pub async fn create_terminal_ui(
                             log::info!(target: "task_log", "FullScreen Events event received");
                             banner_engine::Event::new_builder(EventType::UserDefined)
                                 .with_pipeline_name("banner")
-                                .send_from(&tx).await;
+                                .send_from(&tx);
                             ui_layout.set_full_screen_events();
                         }
 
@@ -110,17 +110,16 @@ pub async fn create_terminal_ui(
                                                     log::info!(target: "task_log", "FullScreen Pipeline event received");
                                                     banner_engine::Event::new_builder(EventType::UserDefined)
                                                         .with_pipeline_name("banner")
-                                                        .send_from(&tx).await;
+                                                        .send_from(&tx);
                                                     ui_layout.set_full_screen_pipeline();
                                                 }
                     }
                     Some(Err(e)) => log::error!(target: "task_log", "Error: {:?}\r", e),
                     None => break,
                 };
-                // terminal.draw(|f| async move {ui(f, &ui_layout, engine).await})?;
                 terminal.draw(|f| tokio::task::block_in_place(move || {
                     Handle::current().block_on(async move {
-                        ui(f, &ui_layout, engine).await
+                        ui(f, &ui_layout, engine).await;
                     });
                 }))?;
             }

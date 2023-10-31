@@ -68,9 +68,12 @@ impl PartialEq for Event {
     fn eq(&self, other: &Self) -> bool {
         tracing::info!("Checking equality of {self:?} and {other:?}");
         match (self.r#type, other.r#type) {
-            (EventType::System(sel), EventType::System(ser)) => match (sel, ser) {
-                (SystemEventType::Trigger(sesl), SystemEventType::Trigger(sesr)) => {
-                    match (sesl, sesr) {
+            (EventType::System(left_se), EventType::System(right_se)) => {
+                match (left_se, right_se) {
+                    (
+                        SystemEventType::Trigger(left_se_trigger),
+                        SystemEventType::Trigger(right_se_trigger),
+                    ) => match (left_se_trigger, right_se_trigger) {
                         (SystemEventScope::Pipeline, SystemEventScope::Pipeline)
                         | (SystemEventScope::Job, SystemEventScope::Job)
                         | (SystemEventScope::Task, SystemEventScope::Task) => {
@@ -78,10 +81,11 @@ impl PartialEq for Event {
                             matching_banner_metadata(&self.metadata, &other.metadata)
                         }
                         (_, _) => false,
-                    }
-                }
-                (SystemEventType::Starting(sesl), SystemEventType::Starting(sesr)) => {
-                    match (sesl, sesr) {
+                    },
+                    (
+                        SystemEventType::Starting(left_se_starting),
+                        SystemEventType::Starting(right_se_starting),
+                    ) => match (left_se_starting, right_se_starting) {
                         (SystemEventScope::Pipeline, SystemEventScope::Pipeline)
                         | (SystemEventScope::Job, SystemEventScope::Job)
                         | (SystemEventScope::Task, SystemEventScope::Task)
@@ -90,16 +94,17 @@ impl PartialEq for Event {
                             matching_banner_metadata(&self.metadata, &other.metadata)
                         }
                         (_, _) => false,
-                    }
-                }
-                (SystemEventType::Done(sesl, serl), SystemEventType::Done(sesr, serr)) => {
-                    match (sesl, sesr) {
+                    },
+                    (
+                        SystemEventType::Done(left_done_scope, left_done_result),
+                        SystemEventType::Done(right_done_scope, right_done_result),
+                    ) => match (left_done_scope, right_done_scope) {
                         (SystemEventScope::Pipeline, SystemEventScope::Pipeline)
                         | (SystemEventScope::Job, SystemEventScope::Job)
                         | (SystemEventScope::Task, SystemEventScope::Task)
                         | (SystemEventScope::EventHandler, SystemEventScope::EventHandler) => {
                             tracing::info!("=====> Done -> Pipeline/Job/Task/EventHandler");
-                            match (serl, serr) {
+                            match (left_done_result, right_done_result) {
                                 (SystemEventResult::Success, SystemEventResult::Success)
                                 | (SystemEventResult::Failed, SystemEventResult::Failed)
                                 | (SystemEventResult::Aborted, SystemEventResult::Aborted)
@@ -111,10 +116,10 @@ impl PartialEq for Event {
                             }
                         }
                         (_, _) => false,
-                    }
+                    },
+                    (_, _) => false,
                 }
-                (_, _) => false,
-            },
+            }
             (EventType::External, EventType::External)
             | (EventType::Metric, EventType::Metric)
             | (EventType::Log, EventType::Log)
@@ -189,7 +194,7 @@ impl EventBuilder {
         self
     }
 
-    pub async fn send_from(&self, tx: &Sender<Event>) {
+    pub fn send_from(&self, tx: &Sender<Event>) {
         let mut send_task = self.event.clone();
         send_task.time_emitted = Utc::now().timestamp();
         log::info!(target: "event_log", "{send_task}");
@@ -348,6 +353,5 @@ mod tests {
             .with_pipeline_name("pipeline_name")
             .with_log_message("my log message")
             .build();
-        assert!(true);
     }
 }

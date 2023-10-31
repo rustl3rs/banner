@@ -11,9 +11,18 @@ use crate::{
 extern crate from_pest;
 extern crate pest;
 
-pub fn parse_file(code: String) -> Result<(), Box<dyn Error + Send + Sync>> {
-    trace!("code = {:#?}", &code);
-    let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, &code)?;
+/// Parses a pipeline file.
+///
+/// # Panics
+///
+/// Panics if the file cannot be parsed into a pipeline AST.
+///
+/// # Errors
+///
+/// This function will return an error if the file cannot be parsed.
+pub fn parse_file(code: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+    trace!("code = {code:#?}");
+    let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, code)?;
     trace!("parse tree = {:#?}", parse_tree);
     let syntax_tree: Pipeline = match Pipeline::from_pest(&mut parse_tree) {
         Ok(tree) => tree,
@@ -35,15 +44,14 @@ mod banner_parser_tests {
 
     use super::*;
 
-    fn check(code: &str, expect: Expect) {
-        match parse_file(code.to_owned()) {
+    fn check(code: &str, expect: &Expect) {
+        match parse_file(code) {
             Ok(ast) => {
-                let actual = format!("{:#?}", ast);
+                let actual = format!("{ast:#?}");
                 expect.assert_eq(&actual);
             }
             Err(e) => {
-                println!("{:#?}", e);
-                assert!(false)
+                panic!("{e:#?}");
             }
         }
     }
@@ -62,7 +70,7 @@ mod banner_parser_tests {
             ]
         "#######;
 
-        check(&code, expect!["()"])
+        check(code, &expect!["()"]);
     }
 
     #[traced_test]
@@ -70,28 +78,28 @@ mod banner_parser_tests {
     fn can_parse_comment() {
         let code = String::from("// a test");
 
-        check(&code, expect!["()"])
+        check(&code, &expect!["()"]);
     }
 
-    // #[traced_test]
+    #[traced_test]
     #[test]
     fn can_parse_task_with_comment() {
-        let code = r#######"
+        let code = r######"
         // this task does the unit testing of the app
         task unit-test(image: rustl3rs/banner-rust-build:latest, execute: r#"/bin/bash -c"#) {
             r#####"bash
             echo testing, testing, 1, 2, 3!
             "#####
         }
-        "#######;
+        "######;
 
-        check(code, expect!["()"])
+        check(code, &expect!["()"]);
     }
 
-    // #[traced_test]
+    #[traced_test]
     #[test]
     fn can_parse_task_with_tag_attribute() {
-        let code = r#######"
+        let code = r######"
         [tag: banner.io/owner=me]
         [tag: banner.io/company=rustl3rs]
         task unit-test(image: rustl3rs/banner-rust-build, execute: r#"/bin/bash -c"#) {
@@ -99,12 +107,12 @@ mod banner_parser_tests {
             echo testing, testing, 1, 2, 3!
             "#####
         }
-        "#######;
+        "######;
 
-        check(code, expect!["()"])
+        check(code, &expect!["()"]);
     }
 
-    // #[traced_test]
+    #[traced_test]
     #[test]
     fn can_parse_uri() {
         let code = r#######"
@@ -112,7 +120,7 @@ mod banner_parser_tests {
         // import https://github.com/rustl3rs/banner/test-pipelines/echo_task.ban
         "#######;
 
-        check(code, expect!["()"])
+        check(code, &expect!["()"]);
     }
 
     #[traced_test]
@@ -121,13 +129,13 @@ mod banner_parser_tests {
         let code = fs::read_to_string("../test-pipelines/get-only.ban")
             .expect("Should have been able to read the file");
 
-        check(&code, expect!["()"])
+        check(&code, &expect!["()"]);
     }
 
     #[traced_test]
     #[test]
     fn can_parse_job_macro() {
-        let code = r#######"
+        let code = r##"
         task unit-test(image: alpine, execute: "/bin/sh -c") {
             r#"
             // this is a comment
@@ -138,9 +146,9 @@ mod banner_parser_tests {
         pipeline test [
             unit-test!,
         ]
-        "#######;
+        "##;
 
-        check(&code, expect!["()"])
+        check(code, &expect!["()"]);
     }
 }
 
@@ -152,16 +160,15 @@ mod pipeline_from_ast_tests {
 
     use super::*;
 
-    fn check(code: &str, expect: Expect) {
-        let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, &code).unwrap();
+    fn check(code: &str, expect: &Expect) {
+        let mut parse_tree = BannerParser::parse(Rule::pipeline_definition, code).unwrap();
         match Pipeline::from_pest(&mut parse_tree) {
             Ok(tree) => {
-                let actual = format!("{:#?}", tree);
+                let actual = format!("{tree:#?}");
                 expect.assert_eq(&actual);
             }
             Err(e) => {
-                trace!("ERROR = {:#?}", e);
-                panic!("{:?}", e);
+                panic!("{e:?}");
             }
         }
     }
@@ -169,6 +176,8 @@ mod pipeline_from_ast_tests {
     #[traced_test]
     #[test]
     fn test_pipeline_with_pragma() {
+        // TODO: remove this when https://github.com/rust-lang/rust-clippy/issues/11737 is resolved.
+        #[allow(clippy::needless_raw_string_hashes)]
         let code = r#######"
 #pragma test assert(success);
 #pragma test
@@ -194,8 +203,8 @@ pipeline test [
         "#######;
 
         check(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
             Pipeline {
                 pragmas: [
                     Pragma {
@@ -254,18 +263,18 @@ pipeline test [
     #[traced_test]
     #[test]
     fn test_double_forward_slash_in_string() {
-        let code = r#######"
+        let code = r##"
         task unit-test(image: rustl3rs/banner-rust-build, execute: "/bin/bash -c") {
             r#"
             // this is a comment
             curl https://banner.io/api/v1/echo
             "#
         }
-        "#######;
+        "##;
 
         check(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 Pipeline {
                     pragmas: [],
                     imports: [],
@@ -288,24 +297,24 @@ pipeline test [
                     pipelines: [],
                     eoi: EndOfInput,
                 }"#]],
-        )
+        );
     }
 
     #[test]
     fn test_syntax() {
-        let code = r#######"
+        let code = r##"
         [tag: banner.io/owner=me]
         [tag: banner.io/company=rustl3rs]
         task unit-test(image: rustl3rs/banner-rust-build, execute: r#"/bin/bash -c"#) {
-            r#####"bash
+            r#"bash
             echo testing, testing, 1, 2, 3!
-            "#####
+            "#
         }
-        "#######;
+        "##;
 
         check(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 Pipeline {
                     pragmas: [],
                     imports: [],
@@ -329,7 +338,7 @@ pipeline test [
                                 "/bin/bash -c",
                             ),
                             script: RawString(
-                                5,
+                                1,
                                 "bash\n            echo testing, testing, 1, 2, 3!\n            ",
                             ),
                         },
@@ -338,11 +347,13 @@ pipeline test [
                     pipelines: [],
                     eoi: EndOfInput,
                 }"#]],
-        )
+        );
     }
 
     #[test]
     fn can_parse_pipeline_with_job_and_task() {
+        // TODO: remove this when https://github.com/rust-lang/rust-clippy/issues/11737 is resolved.
+        #[allow(clippy::needless_raw_string_hashes)]
         let code = r#######"
 
         task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
@@ -357,8 +368,8 @@ pipeline test [
         "#######;
 
         check(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 Pipeline {
                     pragmas: [],
                     imports: [],
@@ -402,12 +413,14 @@ pipeline test [
                     ],
                     eoi: EndOfInput,
                 }"#]],
-        )
+        );
     }
 
     #[traced_test]
     #[test]
     fn can_parse_pipeline_with_job_and_task_reversed() {
+        // TODO: remove this when https://github.com/rust-lang/rust-clippy/issues/11737 is resolved.
+        #[allow(clippy::needless_raw_string_hashes)]
         let code = r#######"
             pipeline my_pipeline [
                 build
@@ -427,8 +440,8 @@ pipeline test [
         "#######;
 
         check(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 Pipeline {
                     pragmas: [],
                     imports: [
@@ -489,23 +502,23 @@ pipeline test [
                     ],
                     eoi: EndOfInput,
                 }"#]],
-        )
+        );
     }
 
     #[traced_test]
     #[test]
     fn can_parse_pipeline_with_job() {
-        let code = r#######"
+        let code = r#"
         job build [build]
 
         pipeline test [
             build,
         ]
-        "#######;
+        "#;
 
         check(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 Pipeline {
                     pragmas: [],
                     imports: [],
@@ -535,7 +548,7 @@ pipeline test [
                     ],
                     eoi: EndOfInput,
                 }"#]],
-        )
+        );
     }
 
     #[traced_test]
@@ -546,8 +559,8 @@ pipeline test [
         "#######;
 
         check(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 Pipeline {
                     pragmas: [],
                     imports: [],
@@ -571,13 +584,13 @@ pipeline test [
                     pipelines: [],
                     eoi: EndOfInput,
                 }"#]],
-        )
+        );
     }
 
     #[traced_test]
     #[test]
     fn can_parse_task_with_var() {
-        let code = r#######"
+        let code = r######"
         let build_image = Image {
             name=rancher/alpine-git:latest,
             mount=[
@@ -590,11 +603,11 @@ pipeline test [
             echo testing, testing, 1, 2, 3!
             "#####
         }
-        "#######;
+        "######;
 
         check(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 Pipeline {
                     pragmas: [],
                     imports: [],
@@ -636,7 +649,7 @@ pipeline test [
                     pipelines: [],
                     eoi: EndOfInput,
                 }"#]],
-        )
+        );
     }
 
     #[traced_test]
@@ -659,8 +672,8 @@ pipeline test [
         "#######;
 
         check(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 Pipeline {
                     pragmas: [],
                     imports: [],
@@ -720,7 +733,7 @@ pipeline test [
                     pipelines: [],
                     eoi: EndOfInput,
                 }"#]],
-        )
+        );
     }
 
     #[traced_test]
@@ -743,8 +756,8 @@ pipeline test [
         "#######;
 
         check(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 Pipeline {
                     pragmas: [],
                     imports: [],
@@ -831,15 +844,14 @@ mod string_tests {
 
     use super::*;
 
-    fn check(code: &str, expect: Expect) {
-        match BannerParser::parse(Rule::string_literal, &code) {
+    fn check(code: &str, expect: &Expect) {
+        match BannerParser::parse(Rule::string_literal, code) {
             Ok(tree) => {
-                let actual = format!("{:#?}", tree);
+                let actual = format!("{tree:#?}");
                 expect.assert_eq(&actual);
             }
             Err(e) => {
-                trace!("ERROR = {:#?}", e);
-                panic!("{:?}", e);
+                panic!("{e:?}");
             }
         }
     }
@@ -847,10 +859,10 @@ mod string_tests {
     #[traced_test]
     #[test]
     fn test_string_parsing() {
-        let code = r#######""this is a string""#######;
+        let code = r#""this is a string""#;
         check(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
             [
                 Pair {
                     rule: string_literal,
@@ -884,10 +896,10 @@ mod string_tests {
             ]"#]],
         );
 
-        let code = r#######"r#"this is a string"#"#######;
+        let code = r##"r#"this is a string"#"##;
         check(
-            &code,
-            expect![[r##"
+            code,
+            &expect![[r##"
             [
                 Pair {
                     rule: string_literal,
@@ -930,15 +942,14 @@ mod identifier_list_tests {
 
     use super::*;
 
-    fn check_serial(code: &str, expect: Expect) {
-        match BannerParser::parse(Rule::sequential_identifier_list, &code) {
+    fn check_serial(code: &str, expect: &Expect) {
+        match BannerParser::parse(Rule::sequential_identifier_list, code) {
             Ok(tree) => {
-                let actual = format!("{:#?}", tree);
+                let actual = format!("{tree:#?}");
                 expect.assert_eq(&actual);
             }
             Err(e) => {
-                trace!("ERROR = {:#?}", e);
-                panic!("{:?}", e);
+                panic!("{e:?}");
             }
         }
     }
@@ -961,8 +972,8 @@ mod identifier_list_tests {
     fn single_item_list() {
         let code = r#######"[cowsay]"#######;
         check_serial(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 [
                     Pair {
                         rule: sequential_identifier_list,
@@ -988,8 +999,8 @@ mod identifier_list_tests {
 
         let code = r#######"[cowsay,]"#######;
         check_serial(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 [
                     Pair {
                         rule: sequential_identifier_list,
@@ -1019,8 +1030,8 @@ mod identifier_list_tests {
     fn multi_item_list() {
         let code = r#######"[cowsay,test]"#######;
         check_serial(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 [
                     Pair {
                         rule: sequential_identifier_list,
@@ -1055,8 +1066,8 @@ mod identifier_list_tests {
 
         let code = r#######"[cowsay,test,]"#######;
         check_serial(
-            &code,
-            expect![[r#"
+            code,
+            &expect![[r#"
                 [
                     Pair {
                         rule: sequential_identifier_list,

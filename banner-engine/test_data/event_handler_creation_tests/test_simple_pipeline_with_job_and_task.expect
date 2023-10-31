@@ -1,0 +1,58 @@
+Pipeline { tasks: [TaskDefinition { tags: [], image: Image { source: "alpine:latest", credentials: None }, command: ["sh", "-c", "bash\n                # this is a bash comment\n                echo rustl3rs herd!\n                # basically a no-op.\n                # But a good start to our testing.\n                "], inputs: [], outputs: [] }], event_handlers: [{
+    listen_for_events:
+        ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task] },
+    tags:
+        banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
+        banner.dev/description: Trigger the start of the pipeline: test_simple_pipeline_with_job_and_task/build,
+    script: ###"
+        pub async fn main (engine, event) {
+            engine.trigger_job("test_simple_pipeline_with_job_and_task", "build").await;
+        }
+    "###
+}, {
+    listen_for_events:
+        ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build] },
+    tags:
+        banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
+        banner.dev/description: Signal the completion of the pipeline: test_simple_pipeline_with_job_and_task; Last job was: build,
+    script: ###"
+        pub async fn main (engine, event) {
+            engine.pipeline_complete(event).await;
+        }
+    "###
+}, {
+    listen_for_events:
+        ListenForEvent { type: System(Only(Done(Only(Task), Any))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build, banner.dev/task: unit-test] },
+    tags:
+        banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
+        banner.dev/job: build,
+        banner.dev/description: Signal the completion of the job: test_simple_pipeline_with_job_and_task/build; Last task was: unit-test,
+    script: ###"
+        pub async fn main (engine, event) {
+            engine.job_complete(event).await;
+        }
+    "###
+}, {
+    listen_for_events:
+        ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build] },
+    tags:
+        banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
+        banner.dev/job: build,
+        banner.dev/job: unit-test,
+        banner.dev/description: Trigger the start of the job: test_simple_pipeline_with_job_and_task/build/unit-test,
+    script: ###"
+        pub async fn main (engine, event) {
+            engine.trigger_task("test_simple_pipeline_with_job_and_task", "build", "unit-test").await;
+        }
+    "###
+}, {
+    listen_for_events:
+        ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/pipeline: _, banner.dev/job: _, banner.dev/task: _] },
+    tags:
+        banner.dev/description: Execute the task: _,
+    script: ###"
+        pub async fn main (engine, event) {
+            engine.execute_task_name_in_scope("", "_", "_", "_").await;
+        }
+    "###
+}], pragmas: [] }

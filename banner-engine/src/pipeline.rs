@@ -57,6 +57,15 @@ impl Pipeline {
     }
 }
 
+/// .
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// * There are cyclic imports.
+/// * Any of the imports contain syntax errors.
+/// * There are any errors in the parsing of the AST.
+#[allow(clippy::module_name_repetitions)]
 pub async fn build_and_validate_pipeline(
     code: &str,
     pragma_builder: PragmasBuilder,
@@ -215,9 +224,10 @@ fn post_process(ast: &mut ast::Pipeline) -> Result<(), Box<dyn Error + Send + Sy
             });
 
             let pipeline_name = ast.pipelines.iter().find_map(|pipeline| {
-                match ident_list_contains_item(&pipeline.jobs, &job.name) {
-                    true => Some(&pipeline.name),
-                    false => None,
+                if ident_list_contains_item(&pipeline.jobs, &job.name) {
+                    Some(&pipeline.name)
+                } else {
+                    None
                 }
             });
 
@@ -249,12 +259,7 @@ fn ident_list_contains_item(list: &[IdentifierListItem], item: &str) -> bool {
                     return true;
                 }
             }
-            IdentifierListItem::SequentialList(list) => {
-                if ident_list_contains_item(list, item) {
-                    return true;
-                }
-            }
-            IdentifierListItem::ParallelList(list) => {
+            IdentifierListItem::SequentialList(list) | IdentifierListItem::ParallelList(list) => {
                 if ident_list_contains_item(list, item) {
                     return true;
                 }
@@ -327,7 +332,10 @@ fn ast_to_repr(ast: ast::Pipeline, pragma_builder: PragmasBuilder) -> Pipeline {
                 .iter()
                 .filter(|pipeline| ident_list_contains_item(&pipeline.jobs, &job.name))
                 .collect();
-            if !pipelines.is_empty() {
+            if pipelines.is_empty() {
+                let veh: Vec<EventHandler> = get_eventhandlers_for_job(None, job);
+                veh
+            } else {
                 pipelines
                     .iter()
                     .flat_map(|pipeline| {
@@ -336,18 +344,15 @@ fn ast_to_repr(ast: ast::Pipeline, pragma_builder: PragmasBuilder) -> Pipeline {
                         veh
                     })
                     .collect::<Vec<EventHandler>>()
-            } else {
-                let veh: Vec<EventHandler> = get_eventhandlers_for_job(None, job);
-                veh
             }
         })
         .collect();
 
     let pipeline_events: Vec<EventHandler> = ast
         .pipelines
-        .iter()
+        .into_iter()
         .flat_map(|pipeline| {
-            let veh: Vec<EventHandler> = get_eventhandlers_for_pipeline(pipeline);
+            let veh: Vec<EventHandler> = get_eventhandlers_for_pipeline(&pipeline);
             veh
         })
         .collect();
@@ -565,20 +570,19 @@ impl Error for CompositionError {}
 
 #[cfg(test)]
 mod build_pipeline_tests {
-    use expect_test::{expect, Expect};
+    use expect_test::{expect_file, ExpectFile};
     use tracing_test::traced_test;
 
     use super::*;
 
-    async fn check(code: &str, expect: Expect) {
+    async fn check(code: &str, expect: ExpectFile) {
         match build_and_validate_pipeline(code, PragmasBuilder::new()).await {
             Ok(ast) => {
                 let actual = format!("{ast:#?}");
                 expect.assert_eq(&actual);
             }
             Err(e) => {
-                println!("{e:#?}");
-                assert!(false);
+                panic!("{e:#?}");
             }
         }
     }
@@ -597,42 +601,7 @@ mod build_pipeline_tests {
 
         check(
             code,
-            expect![[r####"
-                (
-                    Pipeline {
-                        tasks: [
-                            TaskDefinition {
-                                tags: [],
-                                image: Image {
-                                    source: "rustl3rs/banner-rust-build:latest",
-                                    credentials: None,
-                                },
-                                command: [
-                                    "/bin/bash",
-                                    "-c",
-                                    "bash\n            echo testing, testing, 1, 2, 3!\n            ",
-                                ],
-                                inputs: [],
-                                outputs: [],
-                            },
-                        ],
-                        event_handlers: [
-                            {
-                                listen_for_events:
-                                    ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/pipeline: _, banner.dev/job: _, banner.dev/task: _] },
-                                tags:
-                                    banner.dev/description: Execute the task: _,
-                                script: ###"
-                                    pub async fn main (engine, event) {
-                                        engine.execute_task_name_in_scope("", "_", "_", "_").await;
-                                    }
-                                "###
-                            },
-                        ],
-                        pragmas: [],
-                    },
-                    [],
-                )"####]],
+            expect_file!["../test_data/build_pipeline_tests/can_parse_task_with_comment.expect"],
         )
         .await;
     }
@@ -645,65 +614,11 @@ mod build_pipeline_tests {
         import https://gist.githubusercontent.com/pms1969/464d6304014f9376be7e07b3ccf3a972/raw/a929e3feccd5384a00fe4e7ce6431f46dbb02951/cowsay.ban
         "#######;
 
-        check(code, expect![[r####"
-            (
-                Pipeline {
-                    tasks: [
-                        TaskDefinition {
-                            tags: [],
-                            image: Image {
-                                source: "alpine:latest",
-                                credentials: None,
-                            },
-                            command: [
-                                "sh",
-                                "-c",
-                                "bash\n    # this is a bash comment\n    echo rustl3rs herd!\n    # basically a no-op.\n    # But a good start to our testing.\n    ",
-                            ],
-                            inputs: [],
-                            outputs: [],
-                        },
-                        TaskDefinition {
-                            tags: [],
-                            image: Image {
-                                source: "kmcgivern/cowsay-alpine:latest",
-                                credentials: None,
-                            },
-                            command: [
-                                "",
-                            ],
-                            inputs: [],
-                            outputs: [],
-                        },
-                    ],
-                    event_handlers: [
-                        {
-                            listen_for_events:
-                                ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/pipeline: _, banner.dev/job: _, banner.dev/task: _] },
-                            tags:
-                                banner.dev/description: Execute the task: _,
-                            script: ###"
-                                pub async fn main (engine, event) {
-                                    engine.execute_task_name_in_scope("", "_", "_", "_").await;
-                                }
-                            "###
-                        },
-                        {
-                            listen_for_events:
-                                ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/pipeline: _, banner.dev/job: _, banner.dev/task: _] },
-                            tags:
-                                banner.dev/description: Execute the task: _,
-                            script: ###"
-                                pub async fn main (engine, event) {
-                                    engine.execute_task_name_in_scope("", "_", "_", "_").await;
-                                }
-                            "###
-                        },
-                    ],
-                    pragmas: [],
-                },
-                [],
-            )"####]]).await;
+        check(
+            code,
+            expect_file!["../test_data/build_pipeline_tests/can_parse_uri.expect"],
+        )
+        .await;
     }
 
     #[traced_test]
@@ -714,40 +629,7 @@ mod build_pipeline_tests {
 
         check(
             &code,
-            expect![[r####"
-                (
-                    Pipeline {
-                        tasks: [
-                            TaskDefinition {
-                                tags: [],
-                                image: Image {
-                                    source: "kmcgivern/cowsay-alpine:latest",
-                                    credentials: None,
-                                },
-                                command: [
-                                    "",
-                                ],
-                                inputs: [],
-                                outputs: [],
-                            },
-                        ],
-                        event_handlers: [
-                            {
-                                listen_for_events:
-                                    ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/pipeline: _, banner.dev/job: _, banner.dev/task: _] },
-                                tags:
-                                    banner.dev/description: Execute the task: _,
-                                script: ###"
-                                    pub async fn main (engine, event) {
-                                        engine.execute_task_name_in_scope("", "_", "_", "_").await;
-                                    }
-                                "###
-                            },
-                        ],
-                        pragmas: [],
-                    },
-                    [],
-                )"####]],
+            expect_file!["../test_data/build_pipeline_tests/can_parse_banner_pipeline.expect"],
         )
         .await;
     }
@@ -768,136 +650,38 @@ mod build_pipeline_tests {
                 ]
             "##;
 
-        check(code, expect![[r####"
-            (
-                Pipeline {
-                    tasks: [
-                        TaskDefinition {
-                            tags: [
-                                banner.dev/task: unit-test,
-                                banner.dev/job: unit-test,
-                                banner.dev/pipeline: test,
-                            ],
-                            image: Image {
-                                source: "alpine:latest",
-                                credentials: None,
-                            },
-                            command: [
-                                "/bin/sh",
-                                "-c",
-                                "\n                    // this is a comment\n                    echo -n \"testing, testing, 1, 2, 3!\"\n                    ",
-                            ],
-                            inputs: [],
-                            outputs: [],
-                        },
-                    ],
-                    event_handlers: [
-                        {
-                            listen_for_events:
-                                ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
-                            tags:
-                                banner.dev/pipeline: test,
-                                banner.dev/description: Trigger the start of the pipeline: test/unit-test!,
-                            script: ###"
-                                pub async fn main (engine, event) {
-                                    engine.trigger_job("test", "unit-test").await;
-                                }
-                            "###
-                        },
-                        {
-                            listen_for_events:
-                                ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
-                            tags:
-                                banner.dev/pipeline: test,
-                                banner.dev/description: Signal the completion of the pipeline: test; Last job was: unit-test!,
-                            script: ###"
-                                pub async fn main (engine, event) {
-                                    engine.pipeline_complete(event).await;
-                                }
-                            "###
-                        },
-                        {
-                            listen_for_events:
-                                ListenForEvent { type: System(Only(Done(Only(Task), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test, banner.dev/task: unit-test] },
-                            tags:
-                                banner.dev/pipeline: test,
-                                banner.dev/job: unit-test,
-                                banner.dev/description: Signal the completion of the job: test/unit-test; Last task was: unit-test,
-                            script: ###"
-                                pub async fn main (engine, event) {
-                                    engine.job_complete(event).await;
-                                }
-                            "###
-                        },
-                        {
-                            listen_for_events:
-                                ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
-                            tags:
-                                banner.dev/pipeline: test,
-                                banner.dev/job: unit-test,
-                                banner.dev/job: unit-test,
-                                banner.dev/description: Trigger the start of the job: test/unit-test/unit-test,
-                            script: ###"
-                                pub async fn main (engine, event) {
-                                    engine.trigger_task("test", "unit-test", "unit-test").await;
-                                }
-                            "###
-                        },
-                        {
-                            listen_for_events:
-                                ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test, banner.dev/task: unit-test] },
-                            tags:
-                                banner.dev/task: unit-test,
-                                banner.dev/job: unit-test,
-                                banner.dev/pipeline: test,
-                                banner.dev/description: Execute the task: unit-test,
-                            script: ###"
-                                pub async fn main (engine, event) {
-                                    engine.execute_task_name_in_scope("", "test", "unit-test", "unit-test").await;
-                                }
-                            "###
-                        },
-                    ],
-                    pragmas: [],
-                },
-                [
-                    PipelineSpecification {
-                        name: "test",
-                        jobs: [
-                            Identifier(
-                                "unit-test",
-                                [
-                                    JobMacro,
-                                ],
-                            ),
-                        ],
-                    },
-                ],
-            )"####]]).await;
+        check(
+            code,
+            expect_file!["../test_data/build_pipeline_tests/can_parse_job_macro.expect"],
+        )
+        .await;
     }
 }
 
 #[cfg(test)]
 mod event_handler_creation_tests {
-    use expect_test::{expect, Expect};
+    use expect_test::{expect_file, ExpectFile};
     use tracing_test::traced_test;
 
     use super::*;
 
-    async fn check_all(pipeline: ast::Pipeline, expect: Expect) {
+    fn check_all(pipeline: ast::Pipeline, expect: ExpectFile) {
         let actual = ast_to_repr(pipeline, PragmasBuilder::new());
         expect.assert_eq(&format!("{actual:?}"));
+        drop(expect);
     }
 
-    async fn check_pipeline(pipeline: ast::Pipeline, expect: Expect) {
+    fn check_pipeline(pipeline: &ast::Pipeline, expect: ExpectFile) {
         let actual = get_eventhandlers_for_pipeline(pipeline.pipelines.first().unwrap());
         expect.assert_eq(&format!("{actual:?}"));
+        drop(expect);
     }
 
-    async fn check_job(pipeline: ast::Pipeline, expect: Expect) {
+    fn check_job(pipeline: &ast::Pipeline, expect: ExpectFile) {
         let actual =
             get_eventhandlers_for_job(pipeline.pipelines.first(), pipeline.jobs.first().unwrap());
         expect.assert_eq(&format!("{actual:?}"));
+        drop(expect);
     }
 
     fn get_ast_for(code: &str) -> ast::Pipeline {
@@ -922,90 +706,12 @@ mod event_handler_creation_tests {
             "#,
         );
 
-        check_pipeline(ast, expect![[r####"
-            [{
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/description: Trigger the start of the pipeline: test/unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "unit-test").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-prod] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: deploy-prod,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.pipeline_complete(event).await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/job: build-artefacts,
-                    banner.dev/description: Trigger the start of the single job: test/build-artefacts,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "build-artefacts").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: build-artefacts] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/job: deploy-ci,
-                    banner.dev/description: Trigger the start of the single job: test/deploy-ci,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "deploy-ci").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-ci] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/job: deploy-qa,
-                    banner.dev/description: Trigger the start of the single job: test/deploy-qa,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "deploy-qa").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: deploy-qa] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/job: sit-test,
-                    banner.dev/description: Trigger the start of the single job: test/sit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "sit-test").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: sit-test] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/job: deploy-prod,
-                    banner.dev/description: Trigger the start of the single job: test/deploy-prod,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "deploy-prod").await;
-                    }
-                "###
-            }]"####]]).await;
+        check_pipeline(
+            &ast,
+            expect_file![
+                "../test_data/event_handler_creation_tests/test_multi_job_pipeline.expect"
+            ],
+        );
     }
 
     #[traced_test]
@@ -1019,30 +725,12 @@ mod event_handler_creation_tests {
             "#,
         );
 
-        check_pipeline(ast, expect![[r####"
-            [{
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/description: Trigger the start of the pipeline: test/unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "unit-test").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.pipeline_complete(event).await;
-                    }
-                "###
-            }]"####]]).await;
+        check_pipeline(
+            &ast,
+            expect_file![
+                "../test_data/event_handler_creation_tests/test_single_job_pipeline.expect"
+            ],
+        );
     }
 
     #[traced_test]
@@ -1057,42 +745,10 @@ mod event_handler_creation_tests {
             "#,
         );
 
-        check_pipeline(ast, expect![[r####"
-            [{
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/description: Trigger the start of the pipeline: test/unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "unit-test").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test, banner.dev/job: build-artefacts] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/description: Signal the completion of the pipeline: test; Last job was: build-artefacts,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.pipeline_complete(event).await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Only(Success)))), metadata: [banner.dev/pipeline: test, banner.dev/job: unit-test] },
-                tags:
-                    banner.dev/pipeline: test,
-                    banner.dev/job: build-artefacts,
-                    banner.dev/description: Trigger the start of the single job: test/build-artefacts,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test", "build-artefacts").await;
-                    }
-                "###
-            }]"####]]).await;
+        check_pipeline(
+            &ast,
+            expect_file!["../test_data/event_handler_creation_tests/test_two_job_pipeline.expect"],
+        );
     }
 
     #[traced_test]
@@ -1106,33 +762,12 @@ mod event_handler_creation_tests {
             "#,
         );
 
-        check_job(ast, expect![[r####"
-            [{
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Task), Any))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: unit-test] },
-                tags:
-                    banner.dev/pipeline: _,
-                    banner.dev/job: build,
-                    banner.dev/description: Signal the completion of the job: _/build; Last task was: unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.job_complete(event).await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build] },
-                tags:
-                    banner.dev/pipeline: _,
-                    banner.dev/job: build,
-                    banner.dev/job: unit-test,
-                    banner.dev/description: Trigger the start of the job: _/build/unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_task("_", "build", "unit-test").await;
-                    }
-                "###
-            }]"####]]).await;
+        check_job(
+            &ast,
+            expect_file![
+                "../test_data/event_handler_creation_tests/test_job_with_single_task.expect"
+            ],
+        );
     }
 
     #[traced_test]
@@ -1148,59 +783,12 @@ mod event_handler_creation_tests {
             "#,
         );
 
-        check_job(ast, expect![[r####"
-            [{
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Task), Any))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: publish-docker] },
-                tags:
-                    banner.dev/pipeline: _,
-                    banner.dev/job: build,
-                    banner.dev/description: Signal the completion of the job: _/build; Last task was: publish-docker,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.job_complete(event).await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: build-docker] },
-                tags:
-                    banner.dev/pipeline: _,
-                    banner.dev/job: build,
-                    banner.dev/task: publish-docker,
-                    banner.dev/description: Trigger the start of the task: _/build/publish-docker,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_task("_", "build", "publish-docker").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Task), Only(Success)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build, banner.dev/task: unit-test] },
-                tags:
-                    banner.dev/pipeline: _,
-                    banner.dev/job: build,
-                    banner.dev/task: build-docker,
-                    banner.dev/description: Trigger the start of the task: _/build/build-docker,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_task("_", "build", "build-docker").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: _, banner.dev/job: build] },
-                tags:
-                    banner.dev/pipeline: _,
-                    banner.dev/job: build,
-                    banner.dev/job: unit-test,
-                    banner.dev/description: Trigger the start of the job: _/build/unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_task("_", "build", "unit-test").await;
-                    }
-                "###
-            }]"####]]).await;
+        check_job(
+            &ast,
+            expect_file![
+                "../test_data/event_handler_creation_tests/test_job_with_multiple_tasks.expect"
+            ],
+        );
     }
 
     #[traced_test]
@@ -1227,64 +815,9 @@ mod event_handler_creation_tests {
             "##,
         );
 
-        check_all(ast, expect![[r####"
-            Pipeline { tasks: [TaskDefinition { tags: [], image: Image { source: "alpine:latest", credentials: None }, command: ["sh", "-c", "bash\n                # this is a bash comment\n                echo rustl3rs herd!\n                # basically a no-op.\n                # But a good start to our testing.\n                "], inputs: [], outputs: [] }], event_handlers: [{
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task] },
-                tags:
-                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
-                    banner.dev/description: Trigger the start of the pipeline: test_simple_pipeline_with_job_and_task/build,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_job("test_simple_pipeline_with_job_and_task", "build").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Job), Any))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build] },
-                tags:
-                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
-                    banner.dev/description: Signal the completion of the pipeline: test_simple_pipeline_with_job_and_task; Last job was: build,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.pipeline_complete(event).await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Done(Only(Task), Any))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build, banner.dev/task: unit-test] },
-                tags:
-                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
-                    banner.dev/job: build,
-                    banner.dev/description: Signal the completion of the job: test_simple_pipeline_with_job_and_task/build; Last task was: unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.job_complete(event).await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Trigger(Only(Job)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task, banner.dev/job: build] },
-                tags:
-                    banner.dev/pipeline: test_simple_pipeline_with_job_and_task,
-                    banner.dev/job: build,
-                    banner.dev/job: unit-test,
-                    banner.dev/description: Trigger the start of the job: test_simple_pipeline_with_job_and_task/build/unit-test,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.trigger_task("test_simple_pipeline_with_job_and_task", "build", "unit-test").await;
-                    }
-                "###
-            }, {
-                listen_for_events:
-                    ListenForEvent { type: System(Only(Trigger(Only(Task)))), metadata: [banner.dev/pipeline: _, banner.dev/job: _, banner.dev/task: _] },
-                tags:
-                    banner.dev/description: Execute the task: _,
-                script: ###"
-                    pub async fn main (engine, event) {
-                        engine.execute_task_name_in_scope("", "_", "_", "_").await;
-                    }
-                "###
-            }], pragmas: [] }"####]]).await;
+        check_all(
+            ast,
+            expect_file!["../test_data/event_handler_creation_tests/test_simple_pipeline_with_job_and_task.expect"],
+        );
     }
 }

@@ -9,6 +9,8 @@ use super::{
     pipeline_metadata::{IdentifierListItem, PipelineSpecification},
 };
 
+// TODO: I need to think about this more. I'm not certain this isn't the right name
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone, Default)]
 pub struct PipelineWidget<'a> {
     block: Option<Block<'a>>,

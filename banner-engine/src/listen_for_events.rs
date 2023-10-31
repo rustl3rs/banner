@@ -39,10 +39,13 @@ impl ListenForEvent {
     #[must_use]
     pub fn matches_event(&self, other: &Event) -> bool {
         match (self.r#type, other.r#type()) {
-            (ListenForEventType::System(sel), EventType::System(ser)) => match (sel, ser) {
-                (Any, _) => true,
-                (Only(ListenForSystemEventType::Trigger(sesl)), SystemEventType::Trigger(sesr)) => {
-                    match (sesl, sesr) {
+            (ListenForEventType::System(left_ets), EventType::System(right_ets)) => {
+                match (left_ets, right_ets) {
+                    (Any, _) => true,
+                    (
+                        Only(ListenForSystemEventType::Trigger(left_et_trigger)),
+                        SystemEventType::Trigger(right_et_trigger),
+                    ) => match (left_et_trigger, right_et_trigger) {
                         (Only(ListenForSystemEventScope::Pipeline), SystemEventScope::Pipeline)
                         | (Only(ListenForSystemEventScope::Job), SystemEventScope::Job)
                         | (Only(ListenForSystemEventScope::Task), SystemEventScope::Task) => {
@@ -50,52 +53,64 @@ impl ListenForEvent {
                         }
                         (Any, _) => true,
                         (_, _) => false,
-                    }
-                }
-                (
-                    Only(ListenForSystemEventType::Starting(sesl)),
-                    SystemEventType::Starting(sesr),
-                ) => match (sesl, sesr) {
-                    (Only(ListenForSystemEventScope::Pipeline), SystemEventScope::Pipeline)
-                    | (Only(ListenForSystemEventScope::Job), SystemEventScope::Job)
-                    | (Only(ListenForSystemEventScope::Task), SystemEventScope::Task)
-                    | (
-                        Only(ListenForSystemEventScope::EventHandler),
-                        SystemEventScope::EventHandler,
-                    ) => matching_banner_metadata(&self.metadata, other.metadata()),
-                    (Any, _) => true,
-                    (_, _) => false,
-                },
-                (
-                    Only(ListenForSystemEventType::Done(sesl, serl)),
-                    SystemEventType::Done(sesr, serr),
-                ) => match (sesl, sesr) {
-                    (Only(ListenForSystemEventScope::Pipeline), SystemEventScope::Pipeline)
-                    | (Only(ListenForSystemEventScope::Job), SystemEventScope::Job)
-                    | (Only(ListenForSystemEventScope::Task), SystemEventScope::Task)
-                    | (
-                        Only(ListenForSystemEventScope::EventHandler),
-                        SystemEventScope::EventHandler,
-                    )
-                    | (Any, _) => match (serl, serr) {
-                        (Only(ListenForSystemEventResult::Success), SystemEventResult::Success)
-                        | (Only(ListenForSystemEventResult::Failed), SystemEventResult::Failed)
-                        | (Only(ListenForSystemEventResult::Aborted), SystemEventResult::Aborted)
-                        | (Only(ListenForSystemEventResult::Errored), SystemEventResult::Errored)
-                        | (Any, _) => matching_banner_metadata(&self.metadata, other.metadata()),
+                    },
+                    (
+                        Only(ListenForSystemEventType::Starting(left_et_starting)),
+                        SystemEventType::Starting(right_et_starting),
+                    ) => match (left_et_starting, right_et_starting) {
+                        (Only(ListenForSystemEventScope::Pipeline), SystemEventScope::Pipeline)
+                        | (Only(ListenForSystemEventScope::Job), SystemEventScope::Job)
+                        | (Only(ListenForSystemEventScope::Task), SystemEventScope::Task)
+                        | (
+                            Only(ListenForSystemEventScope::EventHandler),
+                            SystemEventScope::EventHandler,
+                        ) => matching_banner_metadata(&self.metadata, other.metadata()),
+                        (Any, _) => true,
+                        (_, _) => false,
+                    },
+                    (
+                        Only(ListenForSystemEventType::Done(left_done_scope, left_done_result)),
+                        SystemEventType::Done(right_done_scope, right_done_result),
+                    ) => match (left_done_scope, right_done_scope) {
+                        (Only(ListenForSystemEventScope::Pipeline), SystemEventScope::Pipeline)
+                        | (Only(ListenForSystemEventScope::Job), SystemEventScope::Job)
+                        | (Only(ListenForSystemEventScope::Task), SystemEventScope::Task)
+                        | (
+                            Only(ListenForSystemEventScope::EventHandler),
+                            SystemEventScope::EventHandler,
+                        )
+                        | (Any, _) => match (left_done_result, right_done_result) {
+                            (
+                                Only(ListenForSystemEventResult::Success),
+                                SystemEventResult::Success,
+                            )
+                            | (
+                                Only(ListenForSystemEventResult::Failed),
+                                SystemEventResult::Failed,
+                            )
+                            | (
+                                Only(ListenForSystemEventResult::Aborted),
+                                SystemEventResult::Aborted,
+                            )
+                            | (
+                                Only(ListenForSystemEventResult::Errored),
+                                SystemEventResult::Errored,
+                            )
+                            | (Any, _) => {
+                                matching_banner_metadata(&self.metadata, other.metadata())
+                            }
+                            (_, _) => false,
+                        },
                         (_, _) => false,
                     },
                     (_, _) => false,
-                },
-                (_, _) => false,
-            },
+                }
+            }
             (ListenForEventType::External, EventType::External)
             | (ListenForEventType::Metric, EventType::Metric)
             | (ListenForEventType::Log, EventType::Log)
-            | (ListenForEventType::Notification, EventType::Notification) => {
-                matching_banner_metadata(&self.metadata, other.metadata())
-            }
-            (ListenForEventType::UserDefined, EventType::UserDefined) => {
+            | (ListenForEventType::Notification, EventType::Notification)
+            | (ListenForEventType::UserDefined, EventType::UserDefined) => {
                 matching_banner_metadata(&self.metadata, other.metadata())
             }
             (_, _) => false,
@@ -330,6 +345,5 @@ mod tests {
             .with_job_name("job_name")
             .with_pipeline_name("pipeline_name")
             .build();
-        assert!(true);
     }
 }

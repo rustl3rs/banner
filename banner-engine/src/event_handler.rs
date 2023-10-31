@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::sync::Arc;
 
 use std::fmt::{Debug, Formatter};
@@ -10,7 +11,7 @@ use tokio::sync::broadcast::Sender;
 
 use crate::ListenForEvents;
 use crate::{
-    rune_engine::RuneEngineWrapper, Engine, Event, EventType, Metadata, SystemEventResult,
+    rune_engine::EventHandlerEngine, Engine, Event, EventType, Metadata, SystemEventResult,
     SystemEventScope, SystemEventType, Tag,
 };
 
@@ -53,14 +54,14 @@ impl EventHandler {
         }
     }
 
-    pub(crate) async fn execute(
+    pub(crate) fn execute(
         &self,
         engine: Arc<dyn Engine + Sync + Send>,
-        tx: Sender<Event>,
+        tx: &Sender<Event>,
         trigger: Event,
     ) {
         let script: &str = &self.script;
-        let result = execute_event_script(engine, trigger, tx.clone(), script).await;
+        let result = execute_event_script(engine, trigger, tx, script);
 
         // as long as everything is good, exit, otherwise raise an error event.
         match result {
@@ -73,8 +74,7 @@ impl EventHandler {
                 .with_metadata(Metadata::new_banner_error(&format!(
                     "arghhh. Rune script failed.... :(:\n{e}"
                 )))
-                .send_from(&tx)
-                .await;
+                .send_from(tx);
             }
         }
     }
@@ -96,23 +96,22 @@ impl EventHandler {
     }
 }
 
-async fn execute_event_script(
+fn execute_event_script(
     engine: Arc<dyn Engine + Sync + Send>,
     event: Event,
-    tx: Sender<Event>,
+    tx: &Sender<Event>,
     script: &str,
-) -> rune::Result<()> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let m = module()?;
 
-    // let mut context = rune_modules::with_config(true)?;
     let mut context = rune_modules::default_context()?;
-    // let mut context = Context::with_default_modules()?;
     context.install(&m)?;
 
     let runtime = Arc::new(context.runtime());
 
     let mut sources = Sources::new();
-    sources.insert(Source::new("event", script));
+    let source = Source::new("event", script);
+    sources.insert(source);
 
     let mut diagnostics = Diagnostics::new();
 
@@ -132,8 +131,7 @@ async fn execute_event_script(
                 log::error!(target: "task_log", "{}", message.unwrap());
                 Event::new_builder(EventType::Log)
                     .with_log_message(message.unwrap())
-                    .send_from(&tx)
-                    .await;
+                    .send_from(tx);
             }
             return Err(e.into());
         }
@@ -148,11 +146,10 @@ async fn execute_event_script(
         log::error!(target: "task_log", "{}", message.unwrap());
         Event::new_builder(EventType::Log)
             .with_log_message(message.unwrap())
-            .send_from(&tx)
-            .await;
+            .send_from(tx);
     }
 
-    let wrapper = RuneEngineWrapper {
+    let wrapper = EventHandlerEngine {
         engine,
         tx: tx.clone(),
     };
@@ -169,8 +166,7 @@ async fn execute_event_script(
                 log::error!(target: "task_log", "{}", message.unwrap());
                 Event::new_builder(EventType::Log)
                     .with_log_message(message.unwrap())
-                    .send_from(&tx)
-                    .await;
+                    .send_from(tx);
             }
             return Err(e.into());
         }
@@ -202,22 +198,22 @@ async fn execute_event_script(
 // create a module for rune to use the rune_engine::RuneEngineWrapper and everything required by Event::new including rune_engine::RuneEngineWrapper::trigger_job(pipeline, job)
 fn module() -> Result<Module, ContextError> {
     let mut module = Module::default();
-    module.ty::<RuneEngineWrapper>()?;
-    module.async_inst_fn("trigger_pipeline", RuneEngineWrapper::trigger_pipeline)?;
-    module.async_inst_fn("trigger_job", RuneEngineWrapper::trigger_job)?;
-    module.async_inst_fn("trigger_task", RuneEngineWrapper::trigger_task)?;
-    module.async_inst_fn("log_message", RuneEngineWrapper::log_message)?;
-    module.async_inst_fn("pipeline_complete", RuneEngineWrapper::pipeline_complete)?;
-    module.async_inst_fn("job_complete", RuneEngineWrapper::job_complete)?;
+    module.ty::<EventHandlerEngine>()?;
+    module.async_inst_fn("trigger_pipeline", EventHandlerEngine::trigger_pipeline)?;
+    module.async_inst_fn("trigger_job", EventHandlerEngine::trigger_job)?;
+    module.async_inst_fn("trigger_task", EventHandlerEngine::trigger_task)?;
+    module.inst_fn("log_message", EventHandlerEngine::log_message)?;
+    module.async_inst_fn("pipeline_complete", EventHandlerEngine::pipeline_complete)?;
+    module.async_inst_fn("job_complete", EventHandlerEngine::job_complete)?;
     module.async_inst_fn(
         "execute_task_name_in_scope",
-        RuneEngineWrapper::execute_task_name_in_scope,
+        EventHandlerEngine::execute_task_name_in_scope,
     )?;
-    module.async_inst_fn("get_from_state", RuneEngineWrapper::get_from_state)?;
-    module.async_inst_fn("set_state_for_task", RuneEngineWrapper::set_state_for_task)?;
-    module.async_inst_fn(
+    module.async_inst_fn("get_from_state", EventHandlerEngine::get_from_state)?;
+    module.async_inst_fn("set_state_for_task", EventHandlerEngine::set_state_for_task)?;
+    module.inst_fn(
         "get_pipeline_metadata_from_event",
-        RuneEngineWrapper::get_pipeline_metadata_from_event,
+        EventHandlerEngine::get_pipeline_metadata_from_event,
     )?;
     module.ty::<Event>()?;
     module.inst_fn("get_type", Event::get_type)?;
@@ -324,10 +320,9 @@ mod tests {
         let result = execute_event_script(
             eng,
             Event::new_builder(EventType::UserDefined).build(),
-            tx,
+            &tx,
             script,
-        )
-        .await;
+        );
         assert!(result.is_ok());
         log::debug!("{result:?}");
         let message = rx.recv().await;

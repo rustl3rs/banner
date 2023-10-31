@@ -9,6 +9,7 @@ use crate::{
 
 use super::{create_start_task_event_handler, task::generate_start_task_script};
 
+#[allow(clippy::module_name_repetitions)]
 pub fn get_eventhandlers_for_job(
     pipeline: Option<&ast::PipelineSpecification>,
     job: &ast::JobSpecification,

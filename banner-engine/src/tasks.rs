@@ -91,6 +91,11 @@ impl TaskDefinition {
         self.command.as_ref()
     }
 
+    /// Returns a the name of this [`TaskDefinition`] as described in it's Task Tag.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no task tag is found. However this should never happen as to a [`TaskDefinition`].
     #[must_use]
     pub fn get_name(&self) -> &str {
         debug!(target: "task_log", "Searching for name tag in: {:?}", self);
@@ -104,7 +109,7 @@ impl TaskDefinition {
                     None
                 }
             })
-            .unwrap()
+            .expect("TaskDefinition must have a name tag")
     }
 }
 

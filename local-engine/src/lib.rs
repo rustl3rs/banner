@@ -1,3 +1,5 @@
+#![warn(clippy::pedantic)]
+
 mod tag_missing_error;
 
 use async_trait::async_trait;
@@ -48,6 +50,11 @@ pub struct LocalEngine {
 }
 
 impl LocalEngine {
+    /// Creates a new [`LocalEngine`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the state directory could not be created.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -56,6 +63,7 @@ impl LocalEngine {
             directories: Arc::new(RwLock::new(HashMap::new())),
             state_dir: {
                 let dir = Alphanumeric.sample_string(&mut rand::thread_rng(), 8);
+                // TODO: fix this for windows paths...
                 let path = PathBuf::from("/tmp/banner").join(dir);
                 log::info!(target: "task_log", "Creating state directory: {:?}", path);
                 std::fs::create_dir_all(path.as_path()).unwrap();
@@ -70,6 +78,15 @@ impl LocalEngine {
         &self.state_dir
     }
 
+    /// Adds a pipeline to the engine from a file. Only one pipeline can be added.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the file does not exist.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the pipeline file could not be loded and validated.
     pub async fn with_pipeline_from_file(
         &mut self,
         filepath: PathBuf,
@@ -85,6 +102,7 @@ impl LocalEngine {
             Err(e) => {
                 let f = filepath.to_str().unwrap();
                 eprintln!("Error parsing pipeline from file: {f}.\n\n{e}");
+                return Err(e);
             }
         }
 
@@ -139,7 +157,7 @@ impl Engine for LocalEngine {
     // really add much real value to the function, and obscured it enough that I just thought
     // it was a bad thing.
     async fn confirm_requirements(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        check_access_to_temp().await?;
+        check_access_to_temp()?;
         check_availability_of_docker().await?;
         Ok(())
     }
@@ -155,9 +173,9 @@ impl Engine for LocalEngine {
         let docker = Docker::connect_with_local_defaults()?;
 
         // construct our container name
-        let pipeline_name = get_task_tag_value(task, PIPELINE_TAG)?;
-        let job_name = get_task_tag_value(task, JOB_TAG)?;
-        let task_name = get_task_tag_value(task, TASK_TAG)?;
+        let pipeline_name = get_task_tag_value(task, PIPELINE_TAG);
+        let job_name = get_task_tag_value(task, JOB_TAG);
+        let task_name = get_task_tag_value(task, TASK_TAG);
         let container_name = format!("banner_{pipeline_name}_{job_name}_{task_name}");
         log::info!(target: "task_log", "Starting container: {container_name}");
 
@@ -357,9 +375,8 @@ async fn stream_logs_from_container_to_stdout(
         if let Some(log) = logs.try_next().await? {
             log::info!(target: "task_log", "{task_name}: {log}");
             continue;
-        } else {
-            return Ok(());
         }
+        return Ok(());
     }
 }
 
@@ -394,7 +411,7 @@ async fn check_availability_of_docker() -> Result<(), Box<dyn Error + Send + Syn
     }
 }
 
-async fn check_access_to_temp() -> Result<(), Box<dyn Error + Send + Sync>> {
+fn check_access_to_temp() -> Result<(), Box<dyn Error + Send + Sync>> {
     println!("Checking access to temp...");
     let dir = TempDir::new(ambient_authority())?;
     let _file = TempFile::new(&dir)?;
@@ -402,26 +419,20 @@ async fn check_access_to_temp() -> Result<(), Box<dyn Error + Send + Sync>> {
     Ok(())
 }
 
-fn get_task_tag_value<'a>(
-    task: &'a TaskDefinition,
-    key: &str,
-) -> Result<&'a str, Box<dyn Error + Send + Sync>> {
+fn get_task_tag_value<'a>(task: &'a TaskDefinition, key: &str) -> &'a str {
     log::trace!(target: "task_log", "Looking for {key} in {:?}", task.tags());
-    match task.tags().iter().find_map(|tag| {
+    if let Some(value) = task.tags().iter().find_map(|tag| {
         if tag.key() == key {
             Some(tag.value())
         } else {
             None
         }
     }) {
-        Some(value) => {
-            log::trace!(target: "task_log", "Found: {value}");
-            Ok(value)
-        }
-        None => {
-            let err = TagMissingError::new(format!("Expected tag not present on task: {key}",));
-            log::warn!(target: "task_log", "{err:?}");
-            Ok("_")
-        }
+        log::trace!(target: "task_log", "Found: {value}");
+        value
+    } else {
+        let err = TagMissingError::new(format!("Expected tag not present on task: {key}",));
+        log::warn!(target: "task_log", "{err:?}");
+        "_"
     }
 }
