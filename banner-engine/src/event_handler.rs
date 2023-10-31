@@ -211,8 +211,8 @@ fn module() -> Result<Module, ContextError> {
     )?;
     module.async_inst_fn("get_from_state", EventHandlerEngine::get_from_state)?;
     module.async_inst_fn("set_state_for_task", EventHandlerEngine::set_state_for_task)?;
-    module.inst_fn(
-        "get_pipeline_metadata_from_event",
+    module.function(
+        ["get_pipeline_metadata_from_event"],
         EventHandlerEngine::get_pipeline_metadata_from_event,
     )?;
     module.ty::<Event>()?;
