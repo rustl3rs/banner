@@ -259,7 +259,7 @@ fn generate_execute_task_after_tasks_complete(
     format!(
         r###"pub async fn main (engine, event) {{
     // mark this task as having completed.
-    let values = engine.get_pipeline_metadata_from_event(event).await;
+    let values = get_pipeline_metadata_from_event(event);
     let pipeline = values.0;
     let job = values.1;
     let task = values.2;
@@ -321,7 +321,7 @@ mod script_tests {
         let expect = expect![[r#"
             pub async fn main (engine, event) {
                 // mark this task as having completed.
-                let values = engine.get_pipeline_metadata_from_event(event).await;
+                let values = get_pipeline_metadata_from_event(event);
                 let pipeline = values.0;
                 let job = values.1;
                 let task = values.2;

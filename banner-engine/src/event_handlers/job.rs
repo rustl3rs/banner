@@ -201,7 +201,7 @@ fn generate_execute_job_after_job_complete(
     format!(
         r###"pub async fn main (engine, event) {{
     // mark this job as having completed.
-    let values = engine.get_pipeline_metadata_from_event(event).await;
+    let values = get_pipeline_metadata_from_event(event);
     let pipeline = values.0;
     let job = values.1;
 
