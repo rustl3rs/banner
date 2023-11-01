@@ -1,4 +1,4 @@
-Pipeline { tasks: [TaskDefinition { tags: [], image: Image { source: "alpine:latest", credentials: None }, command: ["sh", "-c", "bash\n                # this is a bash comment\n                echo rustl3rs herd!\n                # basically a no-op.\n                # But a good start to our testing.\n                "], inputs: [], outputs: [] }], event_handlers: [{
+Pipeline { name: "test_simple_pipeline_with_job_and_task", tasks: [TaskDefinition { tags: [], image: Image { source: "alpine:latest", credentials: None }, command: ["sh", "-c", "bash\n                # this is a bash comment\n                echo rustl3rs herd!\n                # basically a no-op.\n                # But a good start to our testing.\n                "], inputs: [], outputs: [] }], event_handlers: [{
     listen_for_events:
         ListenForEvent { type: System(Only(Trigger(Only(Pipeline)))), metadata: [banner.dev/pipeline: test_simple_pipeline_with_job_and_task] },
     tags:

@@ -2,18 +2,23 @@ use std::{error::Error, path::PathBuf, sync::Arc};
 
 use async_trait::async_trait;
 use banner_engine::{
-    start_engine, Engine, Event, ExecutionResult, Pipeline, PipelineSpecification, PragmasBuilder,
+    start, Engine, Event, ExecutionResult, Pipeline, PipelineSpecification, PragmasBuilder,
     TaskDefinition,
 };
 use local_engine::LocalEngine;
-use tokio::sync::mpsc;
+use tokio::sync::broadcast::{self, Sender};
 
 pub struct TestEngine {
     local_engine: Arc<dyn Engine + Send + Sync>,
-    tx: Option<mpsc::Sender<Event>>,
+    tx: Option<Sender<Event>>,
 }
 
 impl TestEngine {
+    /// Create a new [`TestEngine`] from a pipeline file.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the file can't be found or loaded.
     pub async fn new(filepath: PathBuf) -> Self {
         let mut engine = LocalEngine::new();
         engine
@@ -22,22 +27,28 @@ impl TestEngine {
                 PragmasBuilder::new().register_context("test"),
             )
             .await
-            .expect(&format!("Failed to load pipeline from file - {filepath:?}"));
+            .unwrap_or_else(|_| panic!("Failed to load pipeline from file - {filepath:?}"));
         Self {
             local_engine: Arc::new(engine),
             tx: None,
         }
     }
 
+    /// Starts this [`TestEngine`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the local engine fails to confirm requirements or initialise.
     pub async fn start(&mut self) {
         self.local_engine.confirm_requirements().await.unwrap();
         self.local_engine.initialise().await.unwrap();
 
-        let (tx, rx) = mpsc::channel(100);
+        let (tx, rx) = broadcast::channel(100);
 
         self.tx = Some(tx.clone());
         let engine = self.local_engine.clone();
-        let _ = start_engine(&engine, rx, tx).await;
+        tokio::spawn(async move { start(&engine, rx, tx).await });
+        // let _ = start(&engine, rx, tx).await;
         // build_and_send_events(&self.local_engine, &self.tx).await;
         // wait_complete(rx);
     }
@@ -80,15 +91,15 @@ impl Engine for TestEngine {
         self.local_engine.get_pipeline_specification()
     }
 
-    fn get_state_for_id(&self, key: &str) -> Option<String> {
-        self.local_engine.get_state_for_id(key)
+    async fn get_state_for_id(&self, key: &str) -> Option<String> {
+        self.local_engine.get_state_for_id(key).await
     }
 
-    fn set_state_for_id(
+    async fn set_state_for_id(
         &self,
         key: &str,
         value: String,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        self.local_engine.set_state_for_id(key, value)
+        self.local_engine.set_state_for_id(key, value).await
     }
 }

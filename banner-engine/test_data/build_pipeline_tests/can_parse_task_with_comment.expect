@@ -1,5 +1,6 @@
 (
     Pipeline {
+        name: "_",
         tasks: [
             TaskDefinition {
                 tags: [],

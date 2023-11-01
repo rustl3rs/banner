@@ -123,7 +123,7 @@ pub async fn build_and_validate_pipeline(
 
     post_process(&mut main_segment)?;
     let specifications = main_segment.pipelines.clone();
-    let pipeline = ast_to_repr(main_segment, pragma_builder);
+    let pipeline = ast_to_repr(&main_segment, pragma_builder);
     Ok((pipeline, specifications))
 }
 
@@ -272,7 +272,7 @@ fn ident_list_contains_item(list: &[IdentifierListItem], item: &str) -> bool {
     false
 }
 
-fn ast_to_repr(ast: ast::Pipeline, pragma_builder: PragmasBuilder) -> Pipeline {
+fn ast_to_repr(ast: &ast::Pipeline, pragma_builder: PragmasBuilder) -> Pipeline {
     let pragmas = pragma_builder.build_from(&ast.pragmas);
 
     let tasks: Vec<TaskDefinition> = ast
@@ -353,9 +353,9 @@ fn ast_to_repr(ast: ast::Pipeline, pragma_builder: PragmasBuilder) -> Pipeline {
 
     let pipeline_events: Vec<EventHandler> = ast
         .pipelines
-        .into_iter()
+        .iter()
         .flat_map(|pipeline| {
-            let veh: Vec<EventHandler> = get_eventhandlers_for_pipeline(&pipeline);
+            let veh: Vec<EventHandler> = get_eventhandlers_for_pipeline(pipeline);
             veh
         })
         .collect();
@@ -367,15 +367,15 @@ fn ast_to_repr(ast: ast::Pipeline, pragma_builder: PragmasBuilder) -> Pipeline {
         .collect();
 
     Pipeline {
-        name: get_pipeline_name(ast.pipelines),
+        name: get_pipeline_name(&ast.pipelines),
         tasks,
         event_handlers,
         pragmas,
     }
 }
 
-fn get_pipeline_name(pipelines: Vec<PipelineSpecification>) -> String {
-    if pipelines.len() == 0 {
+fn get_pipeline_name(pipelines: &Vec<PipelineSpecification>) -> String {
+    if pipelines.is_empty() {
         return "_".to_string();
     }
     pipelines[0].name.clone()
@@ -680,7 +680,7 @@ mod event_handler_creation_tests {
 
     use super::*;
 
-    fn check_all(pipeline: ast::Pipeline, expect: ExpectFile) {
+    fn check_all(pipeline: &ast::Pipeline, expect: ExpectFile) {
         let actual = ast_to_repr(pipeline, PragmasBuilder::new());
         expect.assert_eq(&format!("{actual:?}"));
         drop(expect);
@@ -831,7 +831,7 @@ mod event_handler_creation_tests {
         );
 
         check_all(
-            ast,
+            &ast,
             expect_file!["../test_data/event_handler_creation_tests/test_simple_pipeline_with_job_and_task.expect"],
         );
     }
