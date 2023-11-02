@@ -42,14 +42,14 @@ pub async fn create_terminal_ui(
     terminal.clear()?;
     terminal.hide_cursor()?;
 
+    let mut ui_layout = UiLayout::MultiPanelLayout(UiState {
+        log_and_event_frame: 50,
+        pipeline_frame: 40,
+    });
+
     // Here is the main loop
     let mut reader = EventStream::new();
     loop {
-        let mut ui_layout = UiLayout::MultiPanelLayout(UiState {
-            log_and_event_frame: 50,
-            pipeline_frame: 40,
-        });
-
         let delay = Delay::new(Duration::from_millis(300)).fuse();
         let event = reader.next().fuse();
 
