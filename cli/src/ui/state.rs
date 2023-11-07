@@ -1,17 +1,15 @@
-// TODO: I need to think about this more. I'm not certain this isn't the right name
-#[allow(clippy::module_name_repetitions)]
-#[derive(Clone, Copy, Debug)]
-pub struct UiState {
-    pub(crate) log_and_event_frame: u8,
-    pub(crate) pipeline_frame: u8,
-}
-
 #[derive(Clone, Copy, Debug)]
 pub enum UiLayout {
     FullScreenLogs,
     FullScreenEvents,
     FullScreenPipelines,
-    MultiPanelLayout(UiState),
+    MultiPanelLayout(FrameSplits),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct FrameSplits {
+    pub(crate) log_and_event_frame: u8,
+    pub(crate) pipeline_frame: u8,
 }
 
 impl UiLayout {
@@ -28,7 +26,7 @@ impl UiLayout {
     }
 
     pub fn set_multi_panel(&mut self) {
-        *self = UiLayout::MultiPanelLayout(UiState {
+        *self = UiLayout::MultiPanelLayout(FrameSplits {
             log_and_event_frame: 50,
             pipeline_frame: 40,
         });

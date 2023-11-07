@@ -24,7 +24,7 @@ use tui_logger::{TuiLoggerLevelOutput, TuiLoggerWidget, TuiWidgetState};
 
 use super::{
     pipeline::{IdentifierListItem, PipelineSpecification, PipelineWidget, Status},
-    state::{UiLayout, UiState},
+    state::{FrameSplits, UiLayout},
 };
 
 pub async fn create_terminal_ui(
@@ -42,7 +42,7 @@ pub async fn create_terminal_ui(
     terminal.clear()?;
     terminal.hide_cursor()?;
 
-    let mut ui_layout = UiLayout::MultiPanelLayout(UiState {
+    let mut ui_layout = UiLayout::MultiPanelLayout(FrameSplits {
         log_and_event_frame: 50,
         pipeline_frame: 40,
     });
@@ -267,7 +267,7 @@ fn full_screen_logs(f: &mut Frame) {
 
 async fn multi_panel_layout(
     f: &mut Frame<'_>,
-    ui_layout: &UiState,
+    ui_layout: &FrameSplits,
     engine: &Arc<dyn Engine + Send + Sync>,
 ) {
     let constraints = split_frame(ui_layout.pipeline_frame);
