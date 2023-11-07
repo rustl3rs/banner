@@ -9,8 +9,10 @@ use banner_parser::{
     image_ref::{self, ImageRefParser},
     FromPest, Iri, Parser,
 };
-use hyper::client::HttpConnector;
-use hyper_tls::HttpsConnector;
+
+use hyper::client;
+use hyper_rustls::ConfigBuilderExt;
+
 use log::trace;
 
 use crate::{
@@ -399,21 +401,25 @@ fn load_s3(_uri: &Iri) -> Result<ast::Pipeline, Box<dyn Error + Send + Sync>> {
 }
 
 async fn load_url<'a>(uri: &Iri<'a>) -> Result<ast::Pipeline, Box<dyn Error + Send + Sync>> {
-    if uri.scheme().as_str() == "http" {
-        let client = hyper::Client::builder().build::<_, hyper::Body>(HttpConnector::new());
-        let resp = client.get(uri.as_str().parse()?).await?;
-        let body = hyper::body::to_bytes(resp).await?;
-        let code = std::str::from_utf8(&body).unwrap();
+    // Prepare the TLS client config
+    let tls = rustls::ClientConfig::builder()
+        .with_safe_defaults()
+        .with_native_roots()
+        .with_no_client_auth();
 
-        try_code_to_ast(code, uri)
-    } else {
-        let client = hyper::Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
-        let resp = client.get(uri.as_str().parse()?).await?;
-        let body = hyper::body::to_bytes(resp.into_body()).await?;
-        let code = std::str::from_utf8(&body).unwrap();
+    // Prepare the HTTPS connector
+    let https = hyper_rustls::HttpsConnectorBuilder::new()
+        .with_tls_config(tls)
+        .https_or_http()
+        .enable_http1()
+        .build();
 
-        try_code_to_ast(code, uri)
-    }
+    let client: client::Client<_, hyper::Body> = client::Client::builder().build(https);
+    let resp = client.get(uri.as_str().parse()?).await?;
+    let body = hyper::body::to_bytes(resp.into_body()).await?;
+    let code = std::str::from_utf8(&body).unwrap();
+
+    try_code_to_ast(code, uri)
 }
 
 fn load_file(uri: &Iri) -> Result<ast::Pipeline, Box<dyn Error + Send + Sync>> {
