@@ -1,0 +1,49 @@
+pragma = {
+    SOI ~
+    ( multi_line_pragma | single_line_pragma )
+    ~ EOI
+}
+
+single_line_pragma = {
+    action_or_assert
+}
+
+multi_line_pragma = {
+    ( action_or_assert ~ ";" )+
+}
+
+action = { trigger_pipeline | trigger_job | trigger_task | expect }
+action_or_assert = { action | expect }
+
+trigger_pipeline = {
+    "trigger_pipeline" ~ "(" ~ pipeline_name ~ ")"
+}
+
+trigger_job = {
+    "trigger_job" ~ "(" ~ pipeline_name ~ "," ~ job_name ~ ")"
+}
+
+trigger_task = {
+    "trigger_task" ~ "(" ~ pipeline_name ~ "," ~ job_name ~ "," ~ task_name ~ ")"
+}
+
+expect = {
+    "expect" ~ "[" ~ event ~ ("," ~ event)* ~ ","? ~ "]"
+}
+
+identifier = @{ (ASCII_ALPHANUMERIC | "_" | "-")+ }
+pragma_argument = { identifier }
+pipeline_name = { identifier }
+job_name = { identifier }
+task_name = { identifier }
+event = { ( pipeline_success | pipeline_failure | job_success | job_failure | task_success | task_failure ) }
+
+pipeline_success = { "pipeline_success" ~ "(" ~ pipeline_name ~ ")" }
+pipeline_failure = { "pipeline_failure" ~ "(" ~ pipeline_name ~ ")" }
+job_success = { "job_success" ~ "(" ~ pipeline_name ~ "," ~ job_name ~ ")" }
+job_failure = { "job_failure" ~ "(" ~ pipeline_name ~ "," ~ job_name ~ ")" }
+task_success = { "task_success" ~ "(" ~ pipeline_name ~ "," ~ job_name ~ "," ~ task_name ~ ")" }
+task_failure = { "task_failure" ~ "(" ~ pipeline_name ~ "," ~ job_name ~ "," ~ task_name ~ ")" }
+
+COMMENT = _{ "//" ~ (!NEWLINE ~ ANY)* }
+WHITESPACE = _{ " " | "\t" | NEWLINE }

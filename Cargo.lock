@@ -2116,6 +2116,7 @@ dependencies = [
  "pest-ast",
  "pest_derive",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

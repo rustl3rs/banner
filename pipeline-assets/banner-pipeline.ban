@@ -1,3 +1,5 @@
+import https://gist.githubusercontent.com/pms1969/464d6304014f9376be7e07b3ccf3a972/raw/a929e3feccd5384a00fe4e7ce6431f46dbb02951/cowsay.ban
+
 let git_image = Image {
     name=rancher/alpine-git:latest,
     mount=[
@@ -5,7 +7,7 @@ let git_image = Image {
     ]
 }
 
-task get-source(image: ${git_image}, execute: r#"clone https://github.com/rustl3rs/banner.git /source"#) { r#""# }
+task get-source(image: ${git_image}, execute: r#"clone -b test-engine https://github.com/rustl3rs/banner.git /source"#) { r#""# }
 
 let rust_build_image = Image {
     name=rust,
@@ -26,8 +28,7 @@ task check-clippy(image: ${rust_build_image}, execute: "bash -eo pipefail -c") {
 
     # would be good to run pedantic; but we aren't there yet.
     # `-Dwarnings` ensures clippy exists non-zero if there are warnings.
-    # cargo clippy -- -Dwarnings -Wclippy::pedantic
-    cargo clippy
+    cargo clippy -- -Dwarnings -Wclippy::pedantic
     "#
 }
 
@@ -52,10 +53,15 @@ task check-format(image: ${rust_build_image}, execute: "bash -eo pipefail -c") {
 
 task test(image: ${rust_build_image}, execute: "bash -exo pipefail -c") {
     r#"
+    if [ $(uname -m) == "aarch64" ]; then
+        curl -LsSf https://get.nexte.st/latest/linux-arm | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+    else
+        curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+    fi
     cd /source-code
 
     # would be good to capture code coverage stats here.
-    cargo test
+    cargo nextest run -v
     "#
 }
 

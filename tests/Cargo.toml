@@ -23,5 +23,5 @@ tracing-test = {workspace = true}
 rstest = "0.18.2"
 
 [[test]]
-name = "test_engine"
-path = "test_engine.rs"
+name = "banner-regression-tests"
+path = "banner-regression-tests.rs"
