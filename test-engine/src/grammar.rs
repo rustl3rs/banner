@@ -116,15 +116,30 @@ mod pragma_tests {
         }
     }
 
-    // #[test]
-    // fn can_parse_single_line_pragma() {
-    //     let input = r#"trigger_pipeline(test_pipeline)"#;
-    //     check(input);
-    // }
+    #[test]
+    fn can_parse_single_line_pragma() {
+        let input = r#"trigger_pipeline(test_pipeline)"#;
+        check(input);
+    }
 
     #[test]
     fn can_parse_multiline_pragma() {
         let input = r#"trigger_pipeline(test_pipeline);
+            expect [
+                task_failure(test_pipeline, test_job, testTask),
+                job_failure(test_pipeline, test_job),
+                pipeline_failure(test_pipeline),
+            ];
+            "#;
+        check(input);
+    }
+
+    #[test]
+    fn can_parse_comments_in_multi_line_pragma() {
+        let input = r#"
+            // trigger the pipeline
+            trigger_pipeline(test_pipeline);
+            // assert the task, job and pipeline failed
             expect [
                 task_failure(test_pipeline, test_job, testTask),
                 job_failure(test_pipeline, test_job),
