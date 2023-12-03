@@ -20,7 +20,13 @@ tokio = {workspace = true}
 async-trait = {workspace = true}
 
 tracing = {workspace = true}
+log = {workspace = true}
+
 pest = {workspace = true}
 pest_derive = {workspace = true}
 pest-ast = {workspace = true}
 from-pest = {workspace = true}
+
+[dev-dependencies]
+expect-test = {workspace = true}
+tracing-test = {workspace = true}

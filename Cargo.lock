@@ -2110,13 +2110,16 @@ version = "0.0.1"
 dependencies = [
  "async-trait",
  "banner-engine",
+ "expect-test",
  "from-pest",
  "local-engine",
+ "log",
  "pest",
  "pest-ast",
  "pest_derive",
  "tokio",
  "tracing",
+ "tracing-test",
 ]
 
 [[package]]

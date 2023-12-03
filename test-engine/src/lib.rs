@@ -1,5 +1,6 @@
 #![warn(clippy::pedantic)]
 
+mod ast;
 mod engine;
 mod grammar;
 
