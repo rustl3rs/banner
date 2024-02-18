@@ -14,7 +14,7 @@ let rust_build_image = Image {
     ],
     env=[
         BANNER_ENV_VAR="hello banner!",
-        RUSTLOG="${log_level}",
+        RUST_LOG="${log_level}",
         RUST_BACKTRACE="1",
     ]
 }

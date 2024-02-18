@@ -21,7 +21,7 @@ log = {workspace = true}
 futures = {workspace = true}
 futures-util = {workspace = true}
 
-bollard = "0.14"
+bollard = "0.15.0"
 cap-tempfile = "1.0"
 backon = "0.4"
 rand = "*"

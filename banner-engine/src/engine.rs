@@ -77,7 +77,7 @@ pub async fn start(
     mut rx: Receiver<Event>,
     tx: Sender<Event>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    log::info!(target: "task_log", "initialising");
+    log::info!(target: "task_log", "Initialising");
     engine.initialise().await?;
 
     loop {

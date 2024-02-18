@@ -23,6 +23,6 @@ pub use crate::pipeline::*;
 pub use crate::pragma::*;
 pub use crate::select::*;
 pub use crate::tasks::*;
-pub use crate::tasks::*;
+
 pub use banner_parser::ast::{IdentifierListItem, JobSpecification, PipelineSpecification};
 pub use banner_parser::parser::parse_file;
