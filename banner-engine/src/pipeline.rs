@@ -659,7 +659,7 @@ mod build_pipeline_tests {
                     echo -n "testing, testing, 1, 2, 3!"
                     "#
                 }
-                
+
                 pipeline test [
                     unit-test!,
                 ]

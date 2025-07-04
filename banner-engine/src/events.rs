@@ -267,7 +267,8 @@ pub enum SystemEventScope {
 // Failed: represents faulty completion
 // Aborted: means the step was cut short by some kind of intervention via Banner
 // Errored: means the step was cut short by some external means; might be best to merge Errored and Aborted with a descriminator.
-// TODO: Executions are either successful or not.  if not, then they have a result of execution-failed, aborted or system-errored. Maybe, think it thru more.
+// TODO: Executions are either successful or not.  if not, then they have a result of execution-failed, aborted or system-errored.
+// Maybe, think it thru more.
 #[derive(Debug, Clone, Copy, PartialEq, rune::Any, EnumString, EnumIter)]
 pub enum SystemEventResult {
     Success,

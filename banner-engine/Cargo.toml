@@ -4,7 +4,7 @@ version = "0.0.1"
 authors = ["Paul Saunders <pms1969@gmail.com>"]
 categories = ["CICD"]
 edition = "2021"
-keywords = ["ci", "continuous", "integration", "deployment", "delivery",]
+keywords = ["ci", "continuous", "integration", "deployment", "delivery"]
 readme = "README.md"
 repository = "https://github.com/rustl3rs/banner"
 description = "The contract for Banner engines to conform to."
@@ -14,15 +14,15 @@ description = "The contract for Banner engines to conform to."
 [dependencies]
 banner-parser = { path = "../banner-parser" }
 
-async-trait = {workspace = true}
-log = {workspace = true}
-tokio = {workspace = true}
-tracing = {workspace = true}
+async-trait = { workspace = true }
+log = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
 
 rune = "0.12.4"
 rune-modules = "0.12.4"
-hyper = { version = "*", features = ["client", "http2", "http1"] }
-hyper-rustls = "*"
+hyper = { version = "0.14", features = ["client", "http2", "http1"] }
+hyper-rustls = "0.24"
 rustls = { version = "0.21.6", default-features = false }
 
 const_format = "0.2.30"
@@ -34,5 +34,5 @@ chrono = "0.4"
 semver = "*"
 
 [dev-dependencies]
-expect-test = {workspace = true}
-tracing-test = {workspace = true}
+expect-test = { workspace = true }
+tracing-test = { workspace = true }

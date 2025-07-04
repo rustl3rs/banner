@@ -80,3 +80,16 @@ job unit-test [
 pipeline banner [
     unit-test,
 ]
+
+
+#pragma test
+    trigger_pipeline(banner);
+    expect [
+        task_success(banner, unit-test, get-source),
+        task_success(banner, unit-test, check-format),
+        task_success(banner, unit-test, check-clippy),
+        task_success(banner, unit-test, test),
+        job_success(banner, unit-test),
+        pipeline_success(banner),
+    ];
+#pragma end;

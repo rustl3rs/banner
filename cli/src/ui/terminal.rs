@@ -47,6 +47,8 @@ pub async fn create_terminal_ui(
         pipeline_frame: 40,
     });
 
+    let first_pipeline = &engine.get_pipelines().first().unwrap().name;
+
     // Here is the main loop
     let mut reader = EventStream::new();
     loop {
@@ -72,28 +74,28 @@ pub async fn create_terminal_ui(
                         if event == Event::Key(KeyCode::Char('s').into()) {
                             log::info!(target: "task_log", "Start Pipeline UI Event received");
                             banner_engine::Event::new_builder(EventType::System(SystemEventType::Trigger(SystemEventScope::Pipeline)))
-                                .with_pipeline_name("banner")
+                                .with_pipeline_name(first_pipeline)
                                 .send_from(&tx);
                         }
 
                         if event == Event::Key(KeyCode::Char('h').into()) {
                             log::info!(target: "task_log", "Print EventHandler UI Event received");
                             banner_engine::Event::new_builder(EventType::UserDefined)
-                                .with_pipeline_name("banner")
+                                .with_pipeline_name(first_pipeline)
                                 .send_from(&tx);
                         }
 
                         if event == Event::Key(KeyCode::Char('L').into()) {
                             log::info!(target: "task_log", "FullScreen logs event received");
                             banner_engine::Event::new_builder(EventType::UserDefined)
-                                .with_pipeline_name("banner")
+                                .with_pipeline_name(first_pipeline)
                                 .send_from(&tx);
                             ui_layout.set_full_screen_logs();
                         }
                         if event == Event::Key(KeyCode::Char('m').into()) {
                             log::info!(target: "task_log", "Multi panel screen event received");
                             banner_engine::Event::new_builder(EventType::UserDefined)
-                                .with_pipeline_name("banner")
+                                .with_pipeline_name(first_pipeline)
                                 .send_from(&tx);
                             ui_layout.set_multi_panel();
                         }
@@ -101,15 +103,15 @@ pub async fn create_terminal_ui(
                         if event == Event::Key(KeyCode::Char('E').into()) {
                             log::info!(target: "task_log", "FullScreen Events event received");
                             banner_engine::Event::new_builder(EventType::UserDefined)
-                                .with_pipeline_name("banner")
+                                .with_pipeline_name(first_pipeline)
                                 .send_from(&tx);
                             ui_layout.set_full_screen_events();
                         }
 
                         if event == Event::Key(KeyCode::Char('P').into()) {
-                                                    log::info!(target: "task_log", "FullScreen Pipeline event received");
-                                                    banner_engine::Event::new_builder(EventType::UserDefined)
-                                                        .with_pipeline_name("banner")
+                            log::info!(target: "task_log", "FullScreen Pipeline event received");
+                            banner_engine::Event::new_builder(EventType::UserDefined)
+                                .with_pipeline_name(first_pipeline)
                                                         .send_from(&tx);
                                                     ui_layout.set_full_screen_pipeline();
                                                 }
@@ -122,8 +124,8 @@ pub async fn create_terminal_ui(
                         ui(f, &ui_layout, engine).await;
                     });
                 }))?;
-            }
         }
+            }
     }
 
     // restore terminal

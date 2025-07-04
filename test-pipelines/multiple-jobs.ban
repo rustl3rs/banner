@@ -44,7 +44,7 @@ job test_j4 [
     test,
 ]
 
-pipeline banner [
+pipeline banner2 [
     pre-load,
     { unit-test, [coverage, sonarqube, {test_j1, [test_j2, test_j3]}], [another-job, test_j4] },
     finish,
@@ -53,3 +53,21 @@ pipeline banner [
 // basically a stateless pipeline at present.
 // when loaded, it must be manually triggered
 // bigger pipeline than the others to test out that multiple jobs are triggered correctly.
+
+#pragma test
+    trigger_pipeline(banner2);
+    expect [
+        task_success(banner2, unit-test, test),
+        job_success(banner2, unit-test),
+        job_success(banner2, test_j1),
+        job_success(banner2, test_j2),
+        job_success(banner2, test_j3),
+        job_success(banner2, test_j4),
+        job_success(banner2, finish),
+        job_success(banner2, pre-load),
+        job_success(banner2, coverage),
+        job_success(banner2, sonarqube),
+        job_success(banner2, another_job),
+        pipeline_success(banner2),
+    ];
+#pragma end;

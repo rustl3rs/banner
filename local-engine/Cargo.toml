@@ -14,14 +14,14 @@ description = "A local engine for Banner."
 [dependencies]
 banner-engine = { path = "../banner-engine" }
 
-async-trait = {workspace = true}
-tokio = {workspace = true}
-tracing = {workspace = true}
-log = {workspace = true}
-futures = {workspace = true}
-futures-util = {workspace = true}
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+log = { workspace = true }
+futures = { workspace = true }
+futures-util = { workspace = true }
 
-bollard = "0.14"
+bollard = "0.18"
 cap-tempfile = "1.0"
 backon = "0.4"
 rand = "*"

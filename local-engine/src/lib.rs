@@ -20,6 +20,7 @@ use bollard::container::{
 use bollard::image::CreateImageOptions;
 use bollard::service::HostConfig;
 use bollard::service::Mount;
+use bollard::service::MountBindOptions;
 use bollard::Docker;
 use cap_tempfile::{ambient_authority, TempDir, TempFile};
 use futures_util::stream::TryStreamExt;
@@ -47,6 +48,7 @@ pub struct LocalEngine {
     directories: Arc<RwLock<HashMap<String, String>>>,
     state_dir: PathBuf,
     state: Arc<RwLock<HashMap<String, String>>>,
+    id: String,
 }
 
 impl LocalEngine {
@@ -57,19 +59,20 @@ impl LocalEngine {
     /// Panics if the state directory could not be created.
     #[must_use]
     pub fn new() -> Self {
+        let id = Alphanumeric.sample_string(&mut rand::thread_rng(), 8);
         Self {
             pipelines: vec![],
             specifications: vec![],
             directories: Arc::new(RwLock::new(HashMap::new())),
             state_dir: {
-                let dir = Alphanumeric.sample_string(&mut rand::thread_rng(), 8);
                 // TODO: fix this for windows paths...
-                let path = PathBuf::from("/tmp/banner").join(dir);
+                let path = PathBuf::from("/tmp/banner").join(id.clone());
                 log::info!(target: "task_log", "Creating state directory: {:?}", path);
                 std::fs::create_dir_all(path.as_path()).unwrap();
                 path
             },
             state: Arc::new(RwLock::new(HashMap::new())),
+            id,
         }
     }
 
@@ -127,7 +130,6 @@ impl LocalEngine {
                 let mut path = PathBuf::new();
                 path.push(&self.state_dir);
                 path.push(&key);
-                std::fs::create_dir(path.as_path()).unwrap();
                 let dir = path.to_str().unwrap();
                 self.directories
                     .write()
@@ -173,10 +175,11 @@ impl Engine for LocalEngine {
         let docker = Docker::connect_with_local_defaults()?;
 
         // construct our container name
+        let id = &self.id;
         let pipeline_name = get_task_tag_value(task, PIPELINE_TAG);
         let job_name = get_task_tag_value(task, JOB_TAG);
         let task_name = get_task_tag_value(task, TASK_TAG);
-        let container_name = format!("banner_{pipeline_name}_{job_name}_{task_name}");
+        let container_name = format!("banner_{id}_{pipeline_name}_{job_name}_{task_name}");
         log::info!(target: "task_log", "Starting container: {container_name}");
 
         // ensure the image is pulled locally.
@@ -231,6 +234,10 @@ impl Engine for LocalEngine {
                     source,
                     typ: mount_type,
                     read_only: Some(false),
+                    bind_options: Some(MountBindOptions {
+                        create_mountpoint: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 }
             })
@@ -248,6 +255,7 @@ impl Engine for LocalEngine {
             host_config: Some(host_config),
             ..Default::default()
         };
+        log::debug!(target: "task_log", "config: {config:?}");
         docker.create_container(options, config).await?;
 
         // start the just created container retry if something happend.... just twice tho.
@@ -264,7 +272,9 @@ impl Engine for LocalEngine {
             .with_max_times(2);
 
         match start.retry(&backoff).await {
-            Ok(()) => (),
+            Ok(()) => {
+                log::debug!(target: "task_log", "successful job at least as far as docker is concerned");
+            }
             Err(e) => {
                 let _ = remove_container(&container_name).await;
                 return Err(Box::new(e));

@@ -1,6 +1,13 @@
 [workspace]
 
-members = ["cli", "banner-engine", "test-engine", "local-engine", "banner-parser", "tests"]
+members = [
+    "cli",
+    "banner-engine",
+    "test-engine",
+    "local-engine",
+    "banner-parser",
+    "tests",
+]
 resolver = "2"
 
 [workspace.dependencies]
@@ -10,11 +17,15 @@ pest_derive = "2.6"
 pest-ast = "0.3"
 from-pest = "0.3"
 log = "0.4"
-tokio = {version = "1.25", features = ["test-util", "macros"]}
+tokio = { version = "1.44", features = [
+    "test-util",
+    "macros",
+    "rt-multi-thread",
+] }
 futures = "*"
 futures-util = "*"
 
 # dev dependencies
-expect-test = "1.4.0"
+expect-test = "1.5.1"
 tracing = "0.1"
 tracing-test = "0.2.4"

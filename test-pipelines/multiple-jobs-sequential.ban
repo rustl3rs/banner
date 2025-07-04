@@ -27,10 +27,10 @@ job finish [
     cowsay,
 ]
 
-pipeline banner [
+pipeline sequential [
     pre-load,
-    unit-test, 
-    coverage, 
+    unit-test,
+    coverage,
     sonarqube,
     finish,
 ]
@@ -38,3 +38,21 @@ pipeline banner [
 // basically a stateless pipeline at present.
 // when loaded, it must be manually triggered
 // bigger pipeline than the others to test out that multiple jobs are triggered correctly.
+
+#pragma test
+    trigger_pipeline(sequential);
+    expect [
+        task_success(sequential, unit-test, test),
+        task_success(sequential, unit-test, cowsay),
+        job_success(sequential, pre-load, cowsay),
+        job_success(sequential, coverage, cowsay),
+        job_success(sequential, sonarqube, cowsay),
+        job_success(sequential, finish, cowsay),
+        job_success(sequential, pre-load),
+        job_success(sequential, unit-test),
+        job_success(sequential, coverage),
+        job_success(sequential, sonarqube),
+        job_success(sequential, finish),
+        pipeline_success(sequential),
+    ];
+#pragma end;

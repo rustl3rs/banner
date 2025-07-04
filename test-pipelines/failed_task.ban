@@ -1,0 +1,24 @@
+#pragma test
+    // trigger the pipeline
+    trigger_pipeline(my_failed_pipeline);
+
+    expect [
+        task_success(my_failed_pipeline, build, cowsay),
+        task_failure(my_failed_pipeline, build, test),
+        job_failure(my_failed_pipeline, build),
+        pipeline_failure(my_failed_pipeline),
+    ];
+#pragma end;
+
+pipeline my_failed_pipeline [
+    build
+]
+
+job build [
+    // this is a comment...
+    cowsay,
+    test
+]
+
+task cowsay(image: kmcgivern/cowsay-alpine:latest, execute: r#""#) {r#""#}
+task test(image: alpine:latest, execute: r#"sh -c"#) {r#"exit 1"#}

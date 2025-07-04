@@ -1,3 +1,15 @@
+#pragma test
+    // trigger the pipeline
+    trigger_pipeline(my_pipeline);
+
+    expect [
+        task_success(my_pipeline, build, cowsay),
+        task_success(my_pipeline, build, test),
+        job_success(my_pipeline, build),
+        pipeline_success(my_pipeline),
+    ];
+#pragma end;
+
 pipeline my_pipeline [
     build
 ]
