@@ -148,6 +148,46 @@ impl LocalEngine {
             }
         }
     }
+
+    /// Prefetches all Docker images used in the loaded pipelines
+    pub async fn prefetch_docker_images(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let docker = Docker::connect_with_local_defaults()?;
+
+        let mut all_images = Vec::new();
+        for pipeline in &self.pipelines {
+            all_images.extend(pipeline.extract_docker_images());
+        }
+
+        // Remove duplicates across all pipelines
+        all_images.sort();
+        all_images.dedup();
+
+        log::info!(target: "task_log", "Prefetching '{}' Docker images", all_images.len());
+
+        for image in all_images {
+            log::info!(target: "task_log", "Prefetching image: '{}'", image);
+            println!("Prefetching image: '{}'", image);
+
+            let create_image_options = CreateImageOptions {
+                from_image: image.clone(),
+                ..Default::default()
+            };
+
+            let mut stream = docker.create_image(Some(create_image_options), None, None);
+
+            while let Some(result) = stream.try_next().await? {
+                if let Some(status) = result.status {
+                    if status.contains("Downloaded") || status.contains("Pull complete") {
+                        log::debug!(target: "task_log", "Image {}: {}", image, status);
+                    }
+                }
+            }
+
+            log::info!(target: "task_log", "Successfully prefetched image: {}", image);
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -178,18 +218,6 @@ impl Engine for LocalEngine {
         let task_name = get_task_tag_value(task, TASK_TAG);
         let container_name = format!("banner_{pipeline_name}_{job_name}_{task_name}");
         log::info!(target: "task_log", "Starting container: {container_name}");
-
-        // ensure the image is pulled locally.
-        let cio = CreateImageOptions {
-            from_image: task.image().source(),
-            ..Default::default()
-        };
-        let mut ci_logs = docker.create_image(Some(cio), None, None);
-        while let Some(log) = ci_logs.try_next().await? {
-            if let Some(status) = log.status {
-                log::info!(target: "task_log", "{task_name}: {}", status);
-            }
-        }
 
         // create our container
         let options = Some(CreateContainerOptions {

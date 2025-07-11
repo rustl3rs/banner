@@ -34,6 +34,21 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
+    /// Extract Docker images used in this pipeline
+    /// Will not filter out duplicates - as this'll be used in a call for multple pipelines,
+    /// so we don't want to sort and dedup repeatedly
+    pub fn extract_docker_images(&self) -> Vec<String> {
+        let mut images = Vec::new();
+
+        for task in &self.tasks {
+            images.push(task.image().source().to_string());
+        }
+
+        images
+    }
+}
+
+impl Pipeline {
     pub(crate) fn events_matching(&self, event: &Event) -> Vec<EventHandler> {
         // figure out what events are listening for this event....... eventtype + tag searching mostly.
         self.event_handlers
