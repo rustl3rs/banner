@@ -158,32 +158,35 @@ impl LocalEngine {
             all_images.extend(pipeline.extract_docker_images());
         }
 
-        // Remove duplicates across all pipelines
         all_images.sort();
         all_images.dedup();
 
-        log::info!(target: "task_log", "Prefetching '{}' Docker images", all_images.len());
+        log::info!(target: "task_log", "Prefetching {} Docker images", all_images.len());
 
         for image in all_images {
             log::info!(target: "task_log", "Prefetching image: '{}'", image);
-            println!("Prefetching image: '{}'", image);
 
-            let create_image_options = CreateImageOptions {
-                from_image: image.clone(),
-                ..Default::default()
-            };
+            Self::fetch_image(image, &docker).await?;
+        }
 
-            let mut stream = docker.create_image(Some(create_image_options), None, None);
+        Ok(())
+    }
 
-            while let Some(result) = stream.try_next().await? {
-                if let Some(status) = result.status {
-                    if status.contains("Downloaded") || status.contains("Pull complete") {
-                        log::debug!(target: "task_log", "Image {}: {}", image, status);
-                    }
-                }
+    async fn fetch_image(image: String, docker: &Docker) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let create_image_options = CreateImageOptions {
+            from_image: image.clone(),
+            ..Default::default()
+        };
+
+        let mut stream = docker.create_image(Some(create_image_options), None, None);
+
+        while let Some(result) = stream.try_next().await? {
+            if let Some(error) = result.error {
+                log::error!(target: "task_log", "Failed to fetch image: {} {}", image, error);
             }
-
-            log::info!(target: "task_log", "Successfully prefetched image: {}", image);
+            else {
+                log::info!(target: "task_log", "Image: {} {}", image, result.status.unwrap_or_default());
+            }
         }
 
         Ok(())
@@ -218,6 +221,9 @@ impl Engine for LocalEngine {
         let task_name = get_task_tag_value(task, TASK_TAG);
         let container_name = format!("banner_{pipeline_name}_{job_name}_{task_name}");
         log::info!(target: "task_log", "Starting container: {container_name}");
+
+        // ensure the image is pulled locally
+        Self::fetch_image(task.image().source().to_string(), &docker).await?;
 
         // create our container
         let options = Some(CreateContainerOptions {
