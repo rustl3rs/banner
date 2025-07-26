@@ -142,5 +142,9 @@ async fn execute_pipeline(
     println!("Confirming requirements...");
     engine.confirm_requirements().await?;
 
+    log::info!(target: "task_log", "Prefetching Docker images");
+    println!("Prefetching Docker images...");
+    engine.prefetch_docker_images().await?;
+
     Ok(Some(engine))
 }

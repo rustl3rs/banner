@@ -34,6 +34,16 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
+    pub fn extract_docker_images(&self) -> Vec<String> {
+        let mut images = Vec::new();
+
+        for task in &self.tasks {
+            images.push(task.image().source().to_string());
+        }
+
+        images
+    }
+
     pub(crate) fn events_matching(&self, event: &Event) -> Vec<EventHandler> {
         // figure out what events are listening for this event....... eventtype + tag searching mostly.
         self.event_handlers
